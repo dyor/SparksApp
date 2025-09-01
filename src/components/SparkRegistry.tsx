@@ -1,0 +1,84 @@
+import { BaseSpark, SparkMetadata } from '../types/spark';
+
+// Import actual spark components
+import React from 'react';
+import { BaseSpark as BaseSparkComponent } from './BaseSpark';
+import { SpinnerSpark } from '../sparks/SpinnerSpark';
+import { FlashcardsSpark } from '../sparks/FlashcardsSpark';
+import { BusinessSpark } from '../sparks/BusinessSpark';
+import styled from 'styled-components/native';
+
+const PlaceholderContainer = styled.View`
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+`;
+
+const PlaceholderText = styled.Text`
+  font-size: 18px;
+  color: #666;
+  text-align: center;
+`;
+
+const PlaceholderSpark: React.FC = () => (
+  <BaseSparkComponent>
+    <PlaceholderContainer>
+      <PlaceholderText>This spark is under construction</PlaceholderText>
+    </PlaceholderContainer>
+  </BaseSparkComponent>
+);
+
+// Registry of all available sparks
+export const sparkRegistry: Record<string, BaseSpark> = {
+  spinner: {
+    metadata: {
+      id: 'spinner',
+      title: 'Spin the Wheel',
+      description: 'Make decisions with customizable spinning wheel',
+      icon: '🎡',
+      category: 'utility',
+      difficulty: 'easy',
+      estimatedTime: 2,
+      available: true,
+    },
+    component: SpinnerSpark,
+  },
+  flashcards: {
+    metadata: {
+      id: 'flashcards',
+      title: 'Flashcards',
+      description: 'Study with interactive flip cards and progress tracking',
+      icon: '🃏',
+      category: 'education',
+      difficulty: 'medium',
+      estimatedTime: 10,
+      available: true,
+    },
+    component: FlashcardsSpark,
+  },
+  'business-sim': {
+    metadata: {
+      id: 'business-sim',
+      title: 'Business Simulator',
+      description: 'Run your own virtual company with strategic decisions',
+      icon: '💼',
+      category: 'game',
+      difficulty: 'hard',
+      estimatedTime: 30,
+      available: true,
+    },
+    component: BusinessSpark,
+  },
+};
+
+export const getSparkById = (id: string): BaseSpark | undefined => {
+  return sparkRegistry[id];
+};
+
+export const getAllSparks = (): BaseSpark[] => {
+  return Object.values(sparkRegistry);
+};
+
+export const getAvailableSparks = (): BaseSpark[] => {
+  return Object.values(sparkRegistry).filter(spark => spark.metadata.available);
+};
