@@ -6,6 +6,7 @@ import { BaseSpark as BaseSparkComponent } from './BaseSpark';
 import { SpinnerSpark } from '../sparks/SpinnerSpark';
 import { FlashcardsSpark } from '../sparks/FlashcardsSpark';
 import { BusinessSpark } from '../sparks/BusinessSpark';
+import { PackingListSpark } from '../sparks/PackingListSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -68,6 +69,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       available: true,
     },
     component: BusinessSpark,
+  },
+  'packing-list': {
+    metadata: {
+      id: 'packing-list',
+      title: 'Packing List',
+      description: 'Organize and track your travel or trip packing items',
+      icon: '🎒',
+      category: 'utility',
+      difficulty: 'easy',
+      estimatedTime: 5,
+      available: true,
+    },
+    component: PackingListSpark,
   },
 };
 

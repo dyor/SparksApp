@@ -1,12 +1,10 @@
 import React, { useEffect } from 'react';
-import styled from 'styled-components/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { MySparkStackParamList, MarketplaceStackParamList } from '../types/navigation';
 import { getSparkById } from '../components/SparkRegistry';
 import { useSparkStore, useAppStore } from '../store';
-import { lightTheme } from '../theme/theme';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -22,66 +20,74 @@ interface Props {
   route: SparkScreenRouteProp;
 }
 
-const Container = styled.View`
-  flex: 1;
-  background-color: ${lightTheme.colors.background};
-`;
-
-const ErrorContainer = styled.View`
-  flex: 1;
-  justify-content: center;
-  align-items: center;
-  padding: ${lightTheme.spacing.lg}px;
-`;
-
-const ErrorText = styled.Text`
-  font-size: 18px;
-  color: ${lightTheme.colors.error};
-  text-align: center;
-  margin-bottom: ${lightTheme.spacing.md}px;
-`;
-
-const ErrorDetail = styled.Text`
-  font-size: 14px;
-  color: ${lightTheme.colors.textSecondary};
-  text-align: center;
-`;
-
-const ButtonsContainer = styled.View`
-  flex-direction: row;
-  padding: 16px;
-  gap: 12px;
-  background-color: ${lightTheme.colors.surface};
-  border-top-width: 1px;
-  border-top-color: ${lightTheme.colors.border};
-`;
-
-const ActionButton = styled.TouchableOpacity<{ variant?: 'primary' | 'secondary' | 'danger' }>`
-  flex: 1;
-  padding: 16px;
-  border-radius: 8px;
-  align-items: center;
-  background-color: ${({ variant = 'primary' }) => {
-    switch (variant) {
-      case 'secondary': return lightTheme.colors.border;
-      case 'danger': return lightTheme.colors.error;
-      default: return lightTheme.colors.primary;
-    }
-  }};
-`;
-
-const ActionButtonText = styled.Text<{ variant?: 'primary' | 'secondary' | 'danger' }>`
-  color: ${({ variant = 'primary' }) => 
-    variant === 'secondary' ? lightTheme.colors.text : '#fff'};
-  font-size: 16px;
-  font-weight: 600;
-`;
 
 export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const { sparkId } = route.params;
   const { updateSparkProgress, isUserSpark, addSparkToUser, removeSparkFromUser } = useSparkStore();
   const { setCurrentSparkId } = useAppStore();
   const { colors } = useTheme();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    errorText: {
+      fontSize: 18,
+      color: colors.error,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    errorDetail: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    buttonsContainer: {
+      flexDirection: 'row',
+      padding: 16,
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    actionButton: {
+      flex: 1,
+      padding: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+    },
+    secondaryButton: {
+      backgroundColor: colors.border,
+    },
+    dangerButton: {
+      backgroundColor: colors.error,
+    },
+    primaryButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    secondaryButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    dangerButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
   
   const spark = getSparkById(sparkId);
   
@@ -133,19 +139,19 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
   if (!spark) {
     return (
-      <Container>
-        <ErrorContainer>
-          <ErrorText>Spark Not Found</ErrorText>
-          <ErrorDetail>The spark "{sparkId}" could not be loaded.</ErrorDetail>
-        </ErrorContainer>
-      </Container>
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Spark Not Found</Text>
+          <Text style={styles.errorDetail}>The spark "{sparkId}" could not be loaded.</Text>
+        </View>
+      </View>
     );
   }
 
   const SparkComponent = spark.component;
 
   return (
-    <Container>
+    <View style={styles.container}>
       <View style={{ flex: 1 }}>
         <SparkComponent
           onStateChange={(state) => {
@@ -163,29 +169,41 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       </View>
       
-      <ButtonsContainer>
-        <ActionButton variant="secondary" onPress={handleClose}>
-          <ActionButtonText variant="secondary">Close</ActionButtonText>
-        </ActionButton>
+      <View style={styles.buttonsContainer}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.secondaryButton]} 
+          onPress={handleClose}
+        >
+          <Text style={styles.secondaryButtonText}>Close</Text>
+        </TouchableOpacity>
         
         {isFromMarketplace ? (
           // In marketplace - show Add/Remove based on collection status
           isInUserCollection ? (
-            <ActionButton variant="danger" onPress={handleRemove}>
-              <ActionButtonText variant="danger">Remove</ActionButtonText>
-            </ActionButton>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.dangerButton]} 
+              onPress={handleRemove}
+            >
+              <Text style={styles.dangerButtonText}>Remove</Text>
+            </TouchableOpacity>
           ) : (
-            <ActionButton variant="primary" onPress={handleAdd}>
-              <ActionButtonText variant="primary">Add to My Sparks</ActionButtonText>
-            </ActionButton>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.primaryButton]} 
+              onPress={handleAdd}
+            >
+              <Text style={styles.primaryButtonText}>Add to My Sparks</Text>
+            </TouchableOpacity>
           )
         ) : (
           // In My Sparks - always show remove option
-          <ActionButton variant="danger" onPress={handleRemove}>
-            <ActionButtonText variant="danger">Remove</ActionButtonText>
-          </ActionButton>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.dangerButton]} 
+            onPress={handleRemove}
+          >
+            <Text style={styles.dangerButtonText}>Remove</Text>
+          </TouchableOpacity>
         )}
-      </ButtonsContainer>
-    </Container>
+      </View>
+    </View>
   );
 };

@@ -1,549 +1,676 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, TextInput, Alert } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
-const cardWidth = Math.min(screenWidth - 40, 320);
 
-interface FlashCard {
+interface TranslationCard {
   id: number;
-  question: string;
-  answer: string;
-  category: string;
+  english: string;
+  spanish: string;
+  correctCount: number;
+  incorrectCount: number;
+  lastAsked: Date | null;
+  needsReview: boolean;
 }
 
-const defaultCards: FlashCard[] = [
-  {
-    id: 1,
-    question: "What is the capital of France?",
-    answer: "Paris",
-    category: "Geography"
-  },
-  {
-    id: 2,
-    question: "What is 2 + 2?",
-    answer: "4",
-    category: "Math"
-  },
-  {
-    id: 3,
-    question: "Who painted the Mona Lisa?",
-    answer: "Leonardo da Vinci",
-    category: "Art"
-  },
-  {
-    id: 4,
-    question: "What is the largest planet in our solar system?",
-    answer: "Jupiter",
-    category: "Science"
-  },
-  {
-    id: 5,
-    question: "In what year was the iPhone first released?",
-    answer: "2007",
-    category: "Technology"
-  },
-  {
-    id: 6,
-    question: "What is the chemical symbol for gold?",
-    answer: "Au",
-    category: "Chemistry"
-  }
+const defaultTranslations: TranslationCard[] = [
+  { id: 1, english: "Hello", spanish: "Hola", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 2, english: "Thank you", spanish: "Gracias", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 3, english: "Good morning", spanish: "Buenos días", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 4, english: "How are you?", spanish: "¿Cómo estás?", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 5, english: "Where is the bathroom?", spanish: "¿Dónde está el baño?", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 6, english: "I don't understand", spanish: "No entiendo", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 7, english: "Please", spanish: "Por favor", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
+  { id: 8, english: "Excuse me", spanish: "Disculpe", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
 ];
 
-export const FlashcardsSpark: React.FC = () => {
-  const { getSparkData, setSparkData } = useSparkStore();
-  
-  const [cards] = useState<FlashCard[]>(defaultCards);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
-  const [isComplete, setIsComplete] = useState(false);
-  const [bestScore, setBestScore] = useState(0);
-  const [totalSessions, setTotalSessions] = useState(0);
+interface FlashcardSettings {
+  english: string;
+  spanish: string;
+}
 
-  // Load persisted data on component mount
-  useEffect(() => {
-    const savedData = getSparkData('flashcards');
-    if (savedData.bestScore) setBestScore(savedData.bestScore);
-    if (savedData.totalSessions) setTotalSessions(savedData.totalSessions);
-  }, [getSparkData]);
-  
-  const flipValue = useRef(new Animated.Value(0)).current;
-  const scaleValue = useRef(new Animated.Value(1)).current;
+const FlashcardSettings: React.FC<{
+  cards: TranslationCard[];
+  onSave: (cards: TranslationCard[]) => void;
+  onClose: () => void;
+}> = ({ cards, onSave, onClose }) => {
+  const { colors } = useTheme();
+  const [customCards, setCustomCards] = useState<TranslationCard[]>(cards);
+  const [newCard, setNewCard] = useState<FlashcardSettings>({ english: '', spanish: '' });
 
-  const currentCard = cards[currentIndex];
-  const progress = (studiedCards.size / cards.length) * 100;
-
-  const flipCard = () => {
-    if (isFlipped) return;
-    
-    HapticFeedback.medium();
-    
-    Animated.sequence([
-      Animated.timing(scaleValue, {
-        toValue: 1.05,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(flipValue, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleValue, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      })
-    ]).start();
-    
-    setIsFlipped(true);
-  };
-
-  const nextCard = (wasCorrect: boolean) => {
-    // Provide haptic feedback based on correctness
-    if (wasCorrect) {
-      HapticFeedback.success();
-      setCorrectCount(prev => prev + 1);
-    } else {
-      HapticFeedback.error();
-    }
-    
-    const newStudiedCards = new Set(studiedCards);
-    newStudiedCards.add(currentCard.id);
-    setStudiedCards(newStudiedCards);
-
-    // Check if all cards are studied
-    if (newStudiedCards.size === cards.length) {
-      const sessionScore = Math.round((correctCount / cards.length) * 100);
-      const newTotalSessions = totalSessions + 1;
-      const newBestScore = Math.max(bestScore, sessionScore);
-      
-      // Update state
-      setIsComplete(true);
-      setTotalSessions(newTotalSessions);
-      setBestScore(newBestScore);
-      
-      // Persist data
-      setSparkData('flashcards', {
-        bestScore: newBestScore,
-        totalSessions: newTotalSessions,
-        lastScore: sessionScore,
-        lastPlayed: new Date().toISOString(),
-      });
-      
+  const addCustomCard = () => {
+    if (!newCard.english.trim() || !newCard.spanish.trim()) {
+      Alert.alert('Error', 'Please enter both English and Spanish phrases');
       return;
     }
 
-    // Animate out current card and in next card
-    Animated.sequence([
-      Animated.timing(scaleValue, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleValue, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      })
-    ]).start();
+    const newTranslationCard: TranslationCard = {
+      id: Math.max(...customCards.map(c => c.id), 0) + 1,
+      english: newCard.english.trim(),
+      spanish: newCard.spanish.trim(),
+      correctCount: 0,
+      incorrectCount: 0,
+      lastAsked: null,
+      needsReview: false,
+    };
 
-    // Reset for next card
-    setCurrentIndex((currentIndex + 1) % cards.length);
-    setIsFlipped(false);
-    flipValue.setValue(0);
+    setCustomCards([...customCards, newTranslationCard]);
+    setNewCard({ english: '', spanish: '' });
+    HapticFeedback.success();
   };
 
-  const resetStudy = () => {
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    setCorrectCount(0);
-    setStudiedCards(new Set());
-    setIsComplete(false);
-    flipValue.setValue(0);
-    scaleValue.setValue(1);
+  const removeCard = (id: number) => {
+    if (customCards.length <= 1) {
+      Alert.alert('Error', 'You must have at least one card');
+      return;
+    }
+    setCustomCards(customCards.filter(card => card.id !== id));
+    HapticFeedback.medium();
   };
 
-  // Animation interpolations
-  const frontInterpolate = flipValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
+  const saveSettings = () => {
+    onSave(customCards);
+    onClose();
+  };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContainer: {
+      padding: 20,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 30,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    addSection: {
+      backgroundColor: colors.surface,
+      padding: 20,
+      borderRadius: 12,
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 15,
+    },
+    input: {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 12,
+    },
+    addButton: {
+      backgroundColor: colors.primary,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    addButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cardsSection: {
+      backgroundColor: colors.surface,
+      padding: 20,
+      borderRadius: 12,
+      marginBottom: 20,
+    },
+    cardItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    cardText: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.text,
+    },
+    removeButton: {
+      backgroundColor: colors.error,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 6,
+      marginLeft: 10,
+    },
+    removeButtonText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    button: {
+      flex: 1,
+      padding: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    saveButton: {
+      backgroundColor: colors.primary,
+    },
+    cancelButton: {
+      backgroundColor: colors.border,
+    },
+    saveButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cancelButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
-  const backInterpolate = flipValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['180deg', '360deg'],
-  });
-
-  if (isComplete) {
-    return (
-      <View style={styles.container}>
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.scrollContainer}>
         <View style={styles.header}>
-          <Text style={styles.title}>🎉 Study Session Complete!</Text>
+          <Text style={styles.title}>⚙️ Flashcard Settings</Text>
+          <Text style={styles.subtitle}>Manage your English-Spanish phrases</Text>
         </View>
 
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>Your Results</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{cards.length}</Text>
-              <Text style={styles.statLabel}>Cards Studied</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#28A745' }]}>
-                {correctCount}
-              </Text>
-              <Text style={styles.statLabel}>Correct</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#DC3545' }]}>
-                {cards.length - correctCount}
-              </Text>
-              <Text style={styles.statLabel}>To Review</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#007AFF' }]}>
-                {Math.round((correctCount / cards.length) * 100)}%
-              </Text>
-              <Text style={styles.statLabel}>This Session</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#FF9500' }]}>
-                {bestScore}%
-              </Text>
-              <Text style={styles.statLabel}>Best Score</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#8E44AD' }]}>
-                {totalSessions}
-              </Text>
-              <Text style={styles.statLabel}>Total Sessions</Text>
-            </View>
-          </View>
-          
-          <View style={styles.accuracyContainer}>
-            <Text style={styles.accuracyLabel}>Accuracy</Text>
-            <Text style={styles.accuracyPercent}>
-              {Math.round((correctCount / cards.length) * 100)}%
-            </Text>
-          </View>
+        <View style={styles.addSection}>
+          <Text style={styles.sectionTitle}>Add New Phrase</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="English phrase"
+            placeholderTextColor={colors.textSecondary}
+            value={newCard.english}
+            onChangeText={(text) => setNewCard({ ...newCard, english: text })}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Spanish translation"
+            placeholderTextColor={colors.textSecondary}
+            value={newCard.spanish}
+            onChangeText={(text) => setNewCard({ ...newCard, spanish: text })}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={addCustomCard}>
+            <Text style={styles.addButtonText}>Add Phrase</Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.restartButton} onPress={resetStudy}>
-          <Text style={styles.restartButtonText}>Study Again</Text>
-        </TouchableOpacity>
+        <View style={styles.cardsSection}>
+          <Text style={styles.sectionTitle}>Your Phrases ({customCards.length})</Text>
+          {customCards.map((card) => (
+            <View key={card.id} style={styles.cardItem}>
+              <Text style={styles.cardText}>{card.english} → {card.spanish}</Text>
+              <TouchableOpacity 
+                style={styles.removeButton} 
+                onPress={() => removeCard(card.id)}
+              >
+                <Text style={styles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={saveSettings}>
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+    </ScrollView>
+  );
+};
+
+export const FlashcardsSpark: React.FC = () => {
+  const { getSparkData, setSparkData } = useSparkStore();
+  const { colors } = useTheme();
+  
+  const [cards, setCards] = useState<TranslationCard[]>(defaultTranslations);
+  const [currentCard, setCurrentCard] = useState<TranslationCard | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [sessionStats, setSessionStats] = useState({ asked: 0, correct: 0 });
+
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load saved data on mount
+  useEffect(() => {
+    const savedData = getSparkData('flashcards');
+    if (savedData.cards) {
+      setCards(savedData.cards);
+    }
+    if (savedData.sessionStats) {
+      setSessionStats(savedData.sessionStats);
+    }
+  }, [getSparkData]);
+
+  // Save data whenever cards or stats change
+  useEffect(() => {
+    setSparkData('flashcards', {
+      cards,
+      sessionStats,
+      lastPlayed: new Date().toISOString(),
+    });
+  }, [cards, sessionStats, setSparkData]);
+
+  const getNextCard = (): TranslationCard | null => {
+    // Prioritize cards that need review (were answered incorrectly)
+    const reviewCards = cards.filter(card => card.needsReview);
+    if (reviewCards.length > 0) {
+      return reviewCards[Math.floor(Math.random() * reviewCards.length)];
+    }
+
+    // Otherwise, return a random card
+    if (cards.length === 0) return null;
+    return cards[Math.floor(Math.random() * cards.length)];
+  };
+
+  const startNewCard = () => {
+    const nextCard = getNextCard();
+    if (!nextCard) return;
+
+    setCurrentCard(nextCard);
+    setShowAnswer(false);
+    setCountdown(5);
+    setIsCountingDown(true);
+
+    // Start countdown
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setIsCountingDown(false);
+          setShowAnswer(true);
+          if (countdownRef.current) {
+            clearInterval(countdownRef.current);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Update session stats
+    setSessionStats(prev => ({ ...prev, asked: prev.asked + 1 }));
+  };
+
+  const handleAnswer = (correct: boolean) => {
+    if (!currentCard) return;
+
+    // Update card statistics
+    const updatedCards = cards.map(card => {
+      if (card.id === currentCard.id) {
+        return {
+          ...card,
+          correctCount: correct ? card.correctCount + 1 : card.correctCount,
+          incorrectCount: correct ? card.incorrectCount : card.incorrectCount + 1,
+          lastAsked: new Date(),
+          needsReview: !correct, // Mark for review if incorrect
+        };
+      }
+      return card;
+    });
+
+    setCards(updatedCards);
+
+    // Update session stats
+    if (correct) {
+      setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+      HapticFeedback.success();
+    } else {
+      HapticFeedback.error();
+    }
+
+    // Start next card after a short delay
+    setTimeout(() => {
+      startNewCard();
+    }, 1000);
+  };
+
+  const resetSession = () => {
+    setSessionStats({ asked: 0, correct: 0 });
+    setCurrentCard(null);
+    setShowAnswer(false);
+    setIsCountingDown(false);
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+    }
+  };
+
+  const saveCustomCards = (newCards: TranslationCard[]) => {
+    setCards(newCards);
+    HapticFeedback.success();
+  };
+
+  // Calculate progress percentages
+  const askedPercentage = sessionStats.asked > 0 ? Math.min((sessionStats.asked / cards.length) * 100, 100) : 0;
+  const correctPercentage = sessionStats.asked > 0 ? (sessionStats.correct / sessionStats.asked) * 100 : 0;
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContainer: {
+      flexGrow: 1,
+      padding: 20,
+    },
+    header: {
+      alignItems: 'center',
+      marginTop: 20,
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    progressBars: {
+      flexDirection: 'row',
+      gap: 15,
+      marginBottom: 20,
+      paddingHorizontal: 10,
+    },
+    progressContainer: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    progressLabel: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 8,
+      fontWeight: '600',
+    },
+    progressBar: {
+      width: '100%',
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    askedProgress: {
+      backgroundColor: colors.primary,
+    },
+    correctProgress: {
+      backgroundColor: colors.success,
+    },
+    progressText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    cardContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 15,
+      padding: 30,
+      marginBottom: 20,
+      alignItems: 'center',
+      minHeight: 200,
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    englishText: {
+      fontSize: 24,
+      fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    countdownContainer: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    countdownText: {
+      fontSize: 48,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    countdownLabel: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 10,
+    },
+    spanishText: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.primary,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    answerButtons: {
+      flexDirection: 'row',
+      gap: 15,
+      marginBottom: 20,
+    },
+    answerButton: {
+      flex: 1,
+      paddingVertical: 15,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    correctButton: {
+      backgroundColor: colors.success,
+    },
+    incorrectButton: {
+      backgroundColor: colors.error,
+    },
+    answerButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    startContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: 1,
+    },
+    startButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 15,
+      paddingHorizontal: 30,
+      borderRadius: 25,
+      marginBottom: 20,
+    },
+    startButtonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    statsText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    bottomButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 'auto',
+      paddingTop: 20,
+    },
+    bottomButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    settingsButton: {
+      backgroundColor: colors.border,
+    },
+    resetButton: {
+      backgroundColor: colors.textSecondary,
+    },
+    bottomButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    resetButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+
+  if (showSettings) {
+    return (
+      <FlashcardSettings
+        cards={cards}
+        onSave={saveCustomCards}
+        onClose={() => setShowSettings(false)}
+      />
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
       <View style={styles.header}>
-        <Text style={styles.title}>🃏 Flashcards</Text>
-        <Text style={styles.subtitle}>Tap the card to reveal the answer</Text>
+        <Text style={styles.title}>🃏 English → Spanish</Text>
+        <Text style={styles.subtitle}>Learn Spanish translations</Text>
         
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+        <View style={styles.progressBars}>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressLabel}>Asked</Text>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  styles.askedProgress, 
+                  { width: `${askedPercentage}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>{sessionStats.asked}/{cards.length}</Text>
           </View>
-          <Text style={styles.progressText}>
-            {studiedCards.size}/{cards.length} cards studied
-          </Text>
+          
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressLabel}>Correct</Text>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  styles.correctProgress, 
+                  { width: `${correctPercentage}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>{sessionStats.correct}/{sessionStats.asked}</Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.cardContainer}>
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              transform: [
-                { rotateY: frontInterpolate },
-                { scale: scaleValue }
-              ],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.cardTouchable}
-            onPress={flipCard}
-            disabled={isFlipped}
-          >
-            <View style={styles.cardContent}>
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{currentCard.category}</Text>
-              </View>
-              <Text style={styles.cardText}>{currentCard.question}</Text>
-              <Text style={styles.tapHint}>
-                {!isFlipped ? '👆 Tap to reveal answer' : ''}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.card,
-            styles.cardBack,
-            {
-              transform: [
-                { rotateY: backInterpolate },
-                { scale: scaleValue }
-              ],
-            },
-          ]}
-        >
-          <View style={styles.cardContent}>
-            <View style={[styles.categoryBadge, styles.categoryBadgeAnswer]}>
-              <Text style={styles.categoryText}>Answer</Text>
-            </View>
-            <Text style={styles.cardText}>{currentCard.answer}</Text>
+      {!currentCard ? (
+        <View style={styles.startContainer}>
+          <View style={styles.cardContainer}>
+            <Text style={styles.statsText}>
+              Ready to practice {cards.length} phrases
+            </Text>
+            <Text style={styles.statsText}>
+              Session: {sessionStats.correct}/{sessionStats.asked} correct
+            </Text>
           </View>
-        </Animated.View>
-      </View>
+          <TouchableOpacity style={styles.startButton} onPress={startNewCard}>
+            <Text style={styles.startButtonText}>Start Learning</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View>
+          <View style={styles.cardContainer}>
+            <Text style={styles.englishText}>{currentCard.english}</Text>
+            
+            {isCountingDown && (
+              <View style={styles.countdownContainer}>
+                <Text style={styles.countdownText}>{countdown}</Text>
+                <Text style={styles.countdownLabel}>Think about the translation...</Text>
+              </View>
+            )}
+            
+            {showAnswer && (
+              <Text style={styles.spanishText}>{currentCard.spanish}</Text>
+            )}
+          </View>
 
-      {isFlipped && (
-        <View style={styles.answerButtons}>
-          <TouchableOpacity
-            style={[styles.answerButton, styles.incorrectButton]}
-            onPress={() => nextCard(false)}
-          >
-            <Text style={styles.answerButtonText}>❌ Incorrect</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.answerButton, styles.correctButton]}
-            onPress={() => nextCard(true)}
-          >
-            <Text style={styles.answerButtonText}>✅ Correct</Text>
-          </TouchableOpacity>
+          {showAnswer && (
+            <View style={styles.answerButtons}>
+              <TouchableOpacity 
+                style={[styles.answerButton, styles.incorrectButton]} 
+                onPress={() => handleAnswer(false)}
+              >
+                <Text style={styles.answerButtonText}>❌ Wrong</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.answerButton, styles.correctButton]} 
+                onPress={() => handleAnswer(true)}
+              >
+                <Text style={styles.answerButtonText}>✅ Correct</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
-      <TouchableOpacity 
-        style={styles.resetButton} 
-        onPress={() => {
-          HapticFeedback.light();
-          resetStudy();
-        }}
-      >
-        <Text style={styles.resetButtonText}>Reset</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.bottomButtons}>
+        <TouchableOpacity 
+          style={[styles.bottomButton, styles.settingsButton]} 
+          onPress={() => setShowSettings(true)}
+        >
+          <Text style={styles.bottomButtonText}>Settings</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.bottomButton, styles.resetButton]} 
+          onPress={resetSession}
+        >
+          <Text style={styles.resetButtonText}>Reset Session</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-    padding: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-    width: '100%',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  progressContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: '#E9ECEF',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-  },
-  cardContainer: {
-    position: 'relative',
-    width: cardWidth,
-    height: 200,
-    marginBottom: 30,
-  },
-  card: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backfaceVisibility: 'hidden',
-  },
-  cardBack: {
-    backgroundColor: '#007AFF',
-  },
-  cardTouchable: {
-    flex: 1,
-  },
-  cardContent: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  categoryBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  categoryBadgeAnswer: {
-    backgroundColor: '#E8F5E8',
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1976D2',
-  },
-  cardText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    lineHeight: 28,
-  },
-  tapHint: {
-    position: 'absolute',
-    bottom: 15,
-    fontSize: 14,
-    color: '#999',
-    fontStyle: 'italic',
-  },
-  answerButtons: {
-    flexDirection: 'row',
-    gap: 15,
-    marginBottom: 20,
-  },
-  answerButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  correctButton: {
-    backgroundColor: '#28A745',
-  },
-  incorrectButton: {
-    backgroundColor: '#DC3545',
-  },
-  answerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  resetButton: {
-    backgroundColor: '#6C757D',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-  },
-  resetButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  resultsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 25,
-    width: '100%',
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  resultsTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  accuracyContainer: {
-    alignItems: 'center',
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-  },
-  accuracyLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  accuracyPercent: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#28A745',
-  },
-  restartButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-  },
-  restartButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-});

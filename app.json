@@ -1,29 +1,58 @@
 {
   "expo": {
-    "name": "SparksApp",
-    "slug": "SparksApp",
+    "name": "Sparks",
+    "slug": "sparks-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "description": "A collection of interactive micro-experiences - spin the wheel, flashcards, and business simulations all in one app.",
+    "keywords": ["games", "education", "interactive", "micro-experiences", "entertainment"],
+    "privacy": "public",
+    "platforms": ["ios", "android", "web"],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sparks.app",
+      "buildNumber": "1",
+      "requireFullScreen": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSCameraUsageDescription": "This app does not use the camera.",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+      }
     },
     "android": {
+      "package": "com.sparks.app",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "VIBRATE"
+      ],
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "sparks-app-project"
+      }
     }
   }
 }

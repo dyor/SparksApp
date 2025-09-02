@@ -213,7 +213,7 @@ export const SpinnerSpark: React.FC = () => {
       // Calculate result based on final angle (right position at 90 degrees)
       const normalizedAngle = (finalAngle % 360);
       // Find which segment is at 90 degrees (right side)
-      const selectedOption = getSelectedOptionAt90Degrees(normalizedAngle);
+      const selectedOption = getSelectedOptionAt0Degrees(normalizedAngle);
       
       setResult(selectedOption.label);
       setIsSpinning(false);
@@ -221,7 +221,7 @@ export const SpinnerSpark: React.FC = () => {
     });
   };
 
-  const getSelectedOptionAt90Degrees = (wheelRotation: number) => {
+  const getSelectedOptionAt0Degrees = (wheelRotation: number) => {
     const totalWeight = options.reduce((sum, option) => sum + option.weight, 0);
     
     let currentAngle = 0;
@@ -234,11 +234,11 @@ export const SpinnerSpark: React.FC = () => {
       const rotatedStart = (startDegrees + wheelRotation) % 360;
       const rotatedEnd = (endDegrees + wheelRotation) % 360;
       
-      // Check if this segment contains the 90-degree position
-      const contains90 = (rotatedStart <= 90 && rotatedEnd > 90) || 
-                        (rotatedStart > rotatedEnd && (rotatedStart <= 90 || 90 < rotatedEnd));
+      // Check if this segment contains the 0-degree position
+      const contains0 = (rotatedStart <= 0 && rotatedEnd > 0) || 
+                        (rotatedStart > rotatedEnd && (rotatedStart <= 0 || 0 < rotatedEnd));
       
-      if (contains90) {
+      if (contains0) {
         return options[i];
       }
       
@@ -337,7 +337,6 @@ export const SpinnerSpark: React.FC = () => {
     <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>🎡 Decision Spinner</Text>
-        <Text style={styles.subtitle}>Spin the wheel to make your choice!</Text>
       </View>
 
       <View style={styles.wheelContainer}>
@@ -361,12 +360,11 @@ export const SpinnerSpark: React.FC = () => {
 
       {result && (
         <View style={styles.resultContainer}>
-          <Text style={styles.resultLabel}>Result:</Text>
-          <Text style={styles.resultText}>{result}</Text>
+          <Text style={styles.resultText}>Result: {result}</Text>
         </View>
       )}
 
-      {/* Debug information */}
+      {/* Debug information
       <View style={styles.debugContainer}>
         <Text style={styles.debugTitle}>Debug: Current Segment Positions</Text>
         {(() => {
@@ -396,7 +394,7 @@ export const SpinnerSpark: React.FC = () => {
           });
         })()}
         <Text style={styles.debugText}>Arrow at: 90°</Text>
-      </View>
+      </View> */}
 
       <View style={styles.controls}>
         <TouchableOpacity
@@ -488,7 +486,7 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 10,
     padding: 20,
     backgroundColor: '#fff',
     borderRadius: 15,
