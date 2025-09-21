@@ -19,7 +19,20 @@ const sparkTransition = {
   ...TransitionPresets.SlideFromRightIOS,
 };
 
-const MySparksStackNavigator = () => {
+// Helper function to get focused route name
+const getFocusedRouteNameFromRoute = (route: any) => {
+  // If state doesn't exist or routes array is empty, return undefined
+  const state = route.state;
+  if (!state || !state.routes || state.routes.length === 0) {
+    return undefined;
+  }
+
+  // Return the name of the currently focused route
+  const focusedRoute = state.routes[state.index];
+  return focusedRoute.name;
+};
+
+const MySparksStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visible: boolean) => void }) => {
   const { colors } = useTheme();
   
   return (
@@ -42,6 +55,9 @@ const MySparksStackNavigator = () => {
           title: 'My Sparks',
           headerShown: false,
         }}
+        listeners={{
+          focus: () => setTabBarVisible?.(true),
+        }}
       />
       <MySparksStack.Screen
         name="Spark"
@@ -49,14 +65,19 @@ const MySparksStackNavigator = () => {
         options={({ route }) => ({
           title: `Spark: ${route.params.sparkId}`,
           headerBackTitle: 'Back',
+          headerShown: false,
           ...sparkTransition,
         })}
+        listeners={{
+          focus: () => setTabBarVisible?.(false),
+          blur: () => setTabBarVisible?.(true),
+        }}
       />
     </MySparksStack.Navigator>
   );
 };
 
-const MarketplaceStackNavigator = () => {
+const MarketplaceStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visible: boolean) => void }) => {
   const { colors } = useTheme();
   
   return (
@@ -79,6 +100,9 @@ const MarketplaceStackNavigator = () => {
           title: 'Marketplace',
           headerShown: false,
         }}
+        listeners={{
+          focus: () => setTabBarVisible?.(true),
+        }}
       />
       <MarketplaceStack.Screen
         name="Spark"
@@ -86,8 +110,13 @@ const MarketplaceStackNavigator = () => {
         options={({ route }) => ({
           title: `Spark: ${route.params.sparkId}`,
           headerBackTitle: 'Back',
+          headerShown: false,
           ...sparkTransition,
         })}
+        listeners={{
+          focus: () => setTabBarVisible?.(false),
+          blur: () => setTabBarVisible?.(true),
+        }}
       />
     </MarketplaceStack.Navigator>
   );
@@ -95,6 +124,7 @@ const MarketplaceStackNavigator = () => {
 
 export const AppNavigator: React.FC = () => {
   const { colors } = useTheme();
+  const [tabBarVisible, setTabBarVisible] = React.useState(true);
   
   return (
     <NavigationContainer>
@@ -103,16 +133,15 @@ export const AppNavigator: React.FC = () => {
         screenOptions={{
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
-          tabBarStyle: {
+          tabBarStyle: tabBarVisible ? {
             backgroundColor: colors.surface,
             borderTopWidth: 1,
             borderTopColor: colors.border,
-          },
+          } : { display: 'none' },
         }}
       >
         <Tab.Screen
           name="MySparks"
-          component={MySparksStackNavigator}
           options={{
             tabBarLabel: 'My Sparks',
             tabBarIcon: ({ color, size }) => (
@@ -120,10 +149,14 @@ export const AppNavigator: React.FC = () => {
             ),
             headerShown: false,
           }}
-        />
+          listeners={{
+            tabPress: () => setTabBarVisible(true),
+          }}
+        >
+          {() => <MySparksStackNavigator setTabBarVisible={setTabBarVisible} />}
+        </Tab.Screen>
         <Tab.Screen
           name="Marketplace"
-          component={MarketplaceStackNavigator}
           options={{
             tabBarLabel: 'Marketplace',
             tabBarIcon: ({ color, size }) => (
@@ -131,7 +164,12 @@ export const AppNavigator: React.FC = () => {
             ),
             headerShown: false,
           }}
-        />
+          listeners={{
+            tabPress: () => setTabBarVisible(true),
+          }}
+        >
+          {() => <MarketplaceStackNavigator setTabBarVisible={setTabBarVisible} />}
+        </Tab.Screen>
         <Tab.Screen
           name="Settings"
           component={SettingsScreen}
@@ -141,6 +179,9 @@ export const AppNavigator: React.FC = () => {
               <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>⚙️</Text>
             ),
             headerShown: false,
+          }}
+          listeners={{
+            tabPress: () => setTabBarVisible(true),
           }}
         />
       </Tab.Navigator>

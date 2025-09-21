@@ -111,7 +111,19 @@ const events: Event[] = [
   }
 ];
 
-export const BusinessSpark: React.FC = () => {
+interface BusinessSparkProps {
+  showSettings?: boolean;
+  onCloseSettings?: () => void;
+  onStateChange?: (state: any) => void;
+  onComplete?: (result: any) => void;
+}
+
+export const BusinessSpark: React.FC<BusinessSparkProps> = ({ 
+  showSettings = false,
+  onCloseSettings,
+  onStateChange,
+  onComplete 
+}) => {
   const { getSparkData, setSparkData } = useSparkStore();
   
   const [gameState, setGameState] = useState<GameState>(initialState);

@@ -7,6 +7,7 @@ import { SpinnerSpark } from '../sparks/SpinnerSpark';
 import { FlashcardsSpark } from '../sparks/FlashcardsSpark';
 import { BusinessSpark } from '../sparks/BusinessSpark';
 import { PackingListSpark } from '../sparks/PackingListSpark';
+import { TodoSpark } from '../sparks/TodoSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -34,7 +35,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   spinner: {
     metadata: {
       id: 'spinner',
-      title: 'Spin the Wheel',
+      title: 'Spinner',
       description: 'Make decisions with customizable spinning wheel',
       icon: '🎡',
       category: 'utility',
@@ -82,6 +83,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       available: true,
     },
     component: PackingListSpark,
+  },
+  'todo': {
+    metadata: {
+      id: 'todo',
+      title: 'Todo List',
+      description: 'Organize tasks with due dates and completion tracking',
+      icon: '📝',
+      category: 'utility',
+      difficulty: 'easy',
+      estimatedTime: 5,
+      available: true,
+    },
+    component: TodoSpark,
   },
 };
 

@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
-import { useSparkStore } from '../store';
-import { useSettingsStore } from '../store/settingsStore';
+import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
+import { NotificationService } from '../utils/notifications';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -16,18 +16,20 @@ export const SettingsScreen: React.FC = () => {
   } = useSparkStore();
   
   const {
-    hapticEnabled,
-    soundEnabled,
-    darkMode,
-    animations,
-    notifications,
-    toggleHaptic,
-    toggleSound,
-    toggleDarkMode,
-    toggleAnimations,
-    toggleNotifications,
-    resetAllSettings
-  } = useSettingsStore();
+    preferences,
+    setPreferences
+  } = useAppStore();
+
+  // Handle daily notification toggle
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled) {
+      await NotificationService.scheduleDailyNotification();
+    } else {
+      await NotificationService.cancelDailyNotification();
+    }
+    setPreferences({ dailyNotificationsEnabled: enabled });
+    HapticFeedback.light();
+  };
 
   const handleResetAllData = () => {
     Alert.alert(
@@ -48,7 +50,12 @@ export const SettingsScreen: React.FC = () => {
             useSparkStore.setState({ sparkProgress: {} });
             
             // Reset settings
-            resetAllSettings();
+            setPreferences({
+              theme: 'system',
+              soundEnabled: true,
+              hapticsEnabled: true,
+              dailyNotificationsEnabled: false
+            });
             
             Alert.alert("Success", "All data has been reset.");
           }
@@ -63,13 +70,7 @@ export const SettingsScreen: React.FC = () => {
       sparkProgress,
       userSparkIds,
       favoriteSparkIds,
-      settings: {
-        hapticEnabled,
-        soundEnabled,
-        darkMode,
-        animations,
-        notifications
-      },
+      settings: preferences,
       exportedAt: new Date().toISOString(),
       version: "1.0.0"
     };
@@ -110,13 +111,13 @@ export const SettingsScreen: React.FC = () => {
             <Text style={styles.settingDescription}>Feel vibrations on interactions</Text>
           </View>
           <Switch
-            value={hapticEnabled}
-            onValueChange={() => {
+            value={preferences.hapticsEnabled}
+            onValueChange={(value) => {
               HapticFeedback.light();
-              toggleHaptic();
+              setPreferences({ hapticsEnabled: value });
             }}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={hapticEnabled ? '#fff' : '#f4f3f4'}
+            thumbColor={preferences.hapticsEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
 
@@ -126,61 +127,26 @@ export const SettingsScreen: React.FC = () => {
             <Text style={styles.settingDescription}>Play audio feedback</Text>
           </View>
           <Switch
-            value={soundEnabled}
-            onValueChange={() => {
+            value={preferences.soundEnabled}
+            onValueChange={(value) => {
               HapticFeedback.light();
-              toggleSound();
+              setPreferences({ soundEnabled: value });
             }}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={soundEnabled ? '#fff' : '#f4f3f4'}
+            thumbColor={preferences.soundEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
 
         <View style={styles.settingItem}>
           <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Dark Mode</Text>
-            <Text style={styles.settingDescription}>Use dark theme</Text>
+            <Text style={styles.settingLabel}>Daily Spark Reminders</Text>
+            <Text style={styles.settingDescription}>Get notified at 8 AM to explore new sparks</Text>
           </View>
           <Switch
-            value={darkMode}
-            onValueChange={() => {
-              HapticFeedback.medium();
-              toggleDarkMode();
-            }}
+            value={preferences.dailyNotificationsEnabled}
+            onValueChange={handleNotificationToggle}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={darkMode ? '#fff' : '#f4f3f4'}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Animations</Text>
-            <Text style={styles.settingDescription}>Enable smooth transitions</Text>
-          </View>
-          <Switch
-            value={animations}
-            onValueChange={() => {
-              HapticFeedback.light();
-              toggleAnimations();
-            }}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={animations ? '#fff' : '#f4f3f4'}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Notifications</Text>
-            <Text style={styles.settingDescription}>Receive app notifications</Text>
-          </View>
-          <Switch
-            value={notifications}
-            onValueChange={() => {
-              HapticFeedback.light();
-              toggleNotifications();
-            }}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={notifications ? '#fff' : '#f4f3f4'}
+            thumbColor={preferences.dailyNotificationsEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
       </View>
@@ -209,6 +175,16 @@ export const SettingsScreen: React.FC = () => {
 
         <TouchableOpacity style={styles.actionButton} onPress={handleExportData}>
           <Text style={styles.actionButtonText}>📤 Export Data</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: colors.warning || '#FF9500' }]} 
+          onPress={async () => {
+            await NotificationService.sendTestNotification();
+            Alert.alert('Test Sent', 'Check for the test notification in a few seconds!');
+          }}
+        >
+          <Text style={styles.actionButtonText}>🔔 Test Notification</Text>
         </TouchableOpacity>
       </View>
 

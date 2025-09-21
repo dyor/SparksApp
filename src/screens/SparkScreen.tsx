@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MySparkStackParamList, MarketplaceStackParamList } from '../types/navigation';
 import { getSparkById } from '../components/SparkRegistry';
 import { useSparkStore, useAppStore } from '../store';
@@ -26,6 +27,8 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const { updateSparkProgress, isUserSpark, addSparkToUser, removeSparkFromUser } = useSparkStore();
   const { setCurrentSparkId } = useAppStore();
   const { colors } = useTheme();
+  
+  const [showSparkSettings, setShowSparkSettings] = useState(false);
 
   const styles = StyleSheet.create({
     container: {
@@ -51,41 +54,63 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     },
     buttonsContainer: {
       flexDirection: 'row',
-      padding: 16,
-      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
       backgroundColor: colors.surface,
-      borderTopWidth: 1,
+      borderTopWidth: 0.5,
       borderTopColor: colors.border,
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 5,
     },
     actionButton: {
       flex: 1,
-      padding: 16,
-      borderRadius: 8,
       alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      minHeight: 60,
+      justifyContent: 'center',
     },
-    primaryButton: {
-      backgroundColor: colors.primary,
+    buttonIcon: {
+      fontSize: 24,
+      marginBottom: 2,
+      lineHeight: 28,
     },
-    secondaryButton: {
-      backgroundColor: colors.border,
+    buttonLabel: {
+      fontSize: 11,
+      fontWeight: '500',
+      textAlign: 'center',
+      lineHeight: 14,
     },
-    dangerButton: {
-      backgroundColor: colors.error,
+    // Button colors
+    closeIcon: {
+      color: colors.textSecondary,
     },
-    primaryButtonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '600',
+    closeLabel: {
+      color: colors.textSecondary,
     },
-    secondaryButtonText: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
+    addIcon: {
+      color: colors.primary,
     },
-    dangerButtonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '600',
+    addLabel: {
+      color: colors.primary,
+    },
+    removeIcon: {
+      color: colors.error,
+    },
+    removeLabel: {
+      color: colors.error,
+    },
+    settingsIcon: {
+      color: colors.primary,
+    },
+    settingsLabel: {
+      color: colors.primary,
     },
   });
   
@@ -137,23 +162,30 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     addSparkToUser(sparkId);
   };
 
+  const handleSettings = () => {
+    HapticFeedback.light();
+    setShowSparkSettings(true);
+  };
+
   if (!spark) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Spark Not Found</Text>
           <Text style={styles.errorDetail}>The spark "{sparkId}" could not be loaded.</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const SparkComponent = spark.component;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={{ flex: 1 }}>
         <SparkComponent
+          showSettings={showSparkSettings}
+          onCloseSettings={() => setShowSparkSettings(false)}
           onStateChange={(state) => {
             // Handle spark state changes
             console.log('Spark state changed:', state);
@@ -169,41 +201,43 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       </View>
       
-      <View style={styles.buttonsContainer}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]} 
-          onPress={handleClose}
-        >
-          <Text style={styles.secondaryButtonText}>Close</Text>
-        </TouchableOpacity>
-        
-        {isFromMarketplace ? (
-          // In marketplace - show Add/Remove based on collection status
-          isInUserCollection ? (
+      {!showSparkSettings && (
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleClose}
+          >
+            <Text style={[styles.buttonIcon, styles.closeIcon]}>↩️</Text>
+            <Text style={[styles.buttonLabel, styles.closeLabel]}>Back</Text>
+          </TouchableOpacity>
+          
+          {isInUserCollection ? (
             <TouchableOpacity 
-              style={[styles.actionButton, styles.dangerButton]} 
+              style={styles.actionButton} 
               onPress={handleRemove}
             >
-              <Text style={styles.dangerButtonText}>Remove</Text>
+              <Text style={[styles.buttonIcon, styles.removeIcon]}>➖</Text>
+              <Text style={[styles.buttonLabel, styles.removeLabel]}>Remove</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
-              style={[styles.actionButton, styles.primaryButton]} 
+              style={styles.actionButton} 
               onPress={handleAdd}
             >
-              <Text style={styles.primaryButtonText}>Add to My Sparks</Text>
+              <Text style={[styles.buttonIcon, styles.addIcon]}>➕</Text>
+              <Text style={[styles.buttonLabel, styles.addLabel]}>Add</Text>
             </TouchableOpacity>
-          )
-        ) : (
-          // In My Sparks - always show remove option
+          )}
+          
           <TouchableOpacity 
-            style={[styles.actionButton, styles.dangerButton]} 
-            onPress={handleRemove}
+            style={styles.actionButton} 
+            onPress={handleSettings}
           >
-            <Text style={styles.dangerButtonText}>Remove</Text>
+            <Text style={[styles.buttonIcon, styles.settingsIcon]}>⚙️</Text>
+            <Text style={[styles.buttonLabel, styles.settingsLabel]}>Settings</Text>
           </TouchableOpacity>
-        )}
-      </View>
-    </View>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };

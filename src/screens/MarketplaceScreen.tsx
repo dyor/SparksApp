@@ -27,12 +27,13 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     },
     header: {
       padding: 24,
+      paddingTop: 44, // Additional spacing for iOS Dynamic Island
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     title: {
-      fontSize: 28,
+      fontSize: 26,
       fontWeight: 'bold',
       color: colors.text,
       marginBottom: 8,

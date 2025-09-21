@@ -300,12 +300,23 @@ const PackingListSettings: React.FC<{
   );
 };
 
-export const PackingListSpark: React.FC = () => {
+interface PackingListSparkProps {
+  showSettings?: boolean;
+  onCloseSettings?: () => void;
+  onStateChange?: (state: any) => void;
+  onComplete?: (result: any) => void;
+}
+
+export const PackingListSpark: React.FC<PackingListSparkProps> = ({ 
+  showSettings = false,
+  onCloseSettings,
+  onStateChange,
+  onComplete 
+}) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
   
   const [items, setItems] = useState<PackingItem[]>(defaultItems);
-  const [showSettings, setShowSettings] = useState(false);
 
   // Load saved data on mount
   useEffect(() => {
@@ -497,7 +508,7 @@ export const PackingListSpark: React.FC = () => {
       <PackingListSettings
         items={items}
         onSave={saveCustomItems}
-        onClose={() => setShowSettings(false)}
+        onClose={onCloseSettings}
       />
     );
   }
@@ -560,12 +571,6 @@ export const PackingListSpark: React.FC = () => {
           <Text style={styles.uncheckAllButtonText}>Uncheck All Items</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.settingsButton} 
-          onPress={() => setShowSettings(true)}
-        >
-          <Text style={styles.settingsButtonText}>Settings</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );

@@ -175,12 +175,23 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
   );
 };
 
-export const SpinnerSpark: React.FC = () => {
+interface SpinnerSparkProps {
+  showSettings?: boolean;
+  onCloseSettings?: () => void;
+  onStateChange?: (state: any) => void;
+  onComplete?: (result: any) => void;
+}
+
+export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({ 
+  showSettings = false,
+  onCloseSettings,
+  onStateChange,
+  onComplete 
+}) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const [options, setOptions] = useState<SpinnerOption[]>(defaultOptions);
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const spinValue = useRef(new Animated.Value(0)).current;
 
   // Load saved options on mount
@@ -328,7 +339,7 @@ export const SpinnerSpark: React.FC = () => {
       <SpinnerSettings
         options={options}
         onSave={saveOptions}
-        onClose={() => setShowSettings(false)}
+        onClose={onCloseSettings}
       />
     );
   }
@@ -407,18 +418,6 @@ export const SpinnerSpark: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.settingsButton]}
-          onPress={() => {
-            HapticFeedback.light();
-            setShowSettings(true);
-          }}
-          disabled={isSpinning}
-        >
-          <Text style={[styles.buttonText, styles.settingsButtonText]}>
-            ⚙️ Spark Settings
-          </Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );

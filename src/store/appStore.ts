@@ -6,6 +6,7 @@ interface UserPreferences {
   theme: 'light' | 'dark' | 'system';
   soundEnabled: boolean;
   hapticsEnabled: boolean;
+  dailyNotificationsEnabled: boolean;
 }
 
 interface AppState {
@@ -30,6 +31,7 @@ export const useAppStore = create<AppState>()(
         theme: 'system',
         soundEnabled: true,
         hapticsEnabled: true,
+        dailyNotificationsEnabled: false,
       },
       isFirstLaunch: true,
       currentSparkId: null,
