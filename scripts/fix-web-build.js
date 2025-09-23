@@ -30,7 +30,7 @@ try {
       /* Mobile-centered layout for web */
       @media (min-width: 768px) {
         body {
-          background-color: #f5f5f5;
+          background-color: #e5e5e5;
           display: flex;
           justify-content: center;
           align-items: flex-start;
