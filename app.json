@@ -6,19 +6,36 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "plugins": [
       [
         "expo-audio",
         {
           "microphonePermission": "This app uses speech synthesis for language learning in flashcards."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FoodCam accesses your photo library to save and select food photos for your diary.",
+          "cameraPermission": "FoodCam uses the camera to take photos of your food for your visual food diary."
+        }
       ]
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, flashcards, business simulations, visual food diary, and more all in one app.",
-    "keywords": ["games", "education", "interactive", "micro-experiences", "entertainment"],
+    "keywords": [
+      "games",
+      "education",
+      "interactive",
+      "micro-experiences",
+      "entertainment"
+    ],
     "privacy": "public",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -29,21 +46,25 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sparks.app",
+      "bundleIdentifier": "com.mattdyor.sparks",
       "buildNumber": "1",
       "requireFullScreen": false,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio",
+          "audio"
+        ],
         "NSCameraUsageDescription": "FoodCam uses the camera to take photos of your food for your visual food diary.",
         "NSPhotoLibraryUsageDescription": "FoodCam accesses your photo library to save and select food photos for your diary.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
         "NSSpeechRecognitionUsageDescription": "This app uses speech synthesis for language learning in flashcards.",
         "AVAudioSessionCategoryPlayback": true,
-        "AVAudioSessionCategoryPlayAndRecord": false
+        "AVAudioSessionCategoryPlayAndRecord": false,
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.sparks.app",
+      "package": "com.mattdyor.sparks",
       "versionCode": 1,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
@@ -57,7 +78,9 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "MODIFY_AUDIO_SETTINGS",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "edgeToEdgeEnabled": true
     },

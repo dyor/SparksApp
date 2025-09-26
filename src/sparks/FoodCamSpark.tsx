@@ -8,18 +8,26 @@ import {
   Image,
   Alert,
   Dimensions,
+  Modal,
+  TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+import { File, Directory } from 'expo-file-system';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface FoodPhoto {
   id: string;
-  uri: string;
+  uri: string; // Local app storage URI
+  originalUri?: string; // Original temporary URI
+  mediaLibraryId?: string; // MediaLibrary asset ID
   timestamp: number;
   date: string; // YYYY-MM-DD format
+  name?: string; // User-defined name for the food
+  calories?: number; // Estimated calories
+  time?: string; // HH:MM format for display
 }
 
 interface FoodCamData {
@@ -34,7 +42,7 @@ interface FoodCamSparkProps {
 }
 
 const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - 48) / 3; // 3 columns with padding
+const PHOTO_SIZE = (width - 60) / 3; // 3 columns with proper padding and gaps
 
 export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
   onStateChange,
@@ -44,6 +52,14 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
   const [photos, setPhotos] = useState<FoodPhoto[]>([]);
   const [hasPermissions, setHasPermissions] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<FoodPhoto | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCalories, setEditCalories] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+
 
   // Load saved data on mount
   useEffect(() => {
@@ -81,6 +97,30 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     return Date.now().toString() + Math.random().toString(36).substring(2);
   };
 
+  const saveImagePermanently = async (tempUri: string, photoId: string): Promise<string> => {
+    try {
+      // Create the FoodCam directory if it doesn't exist
+      const appDir = new Directory('app://');
+      const foodCamDir = appDir.validatePath('foodcam');
+      await foodCamDir.create();
+
+      // Create permanent file path
+      const fileExtension = tempUri.split('.').pop() || 'jpg';
+      const fileName = `${photoId}.${fileExtension}`;
+      const permanentFile = foodCamDir.validatePath(fileName);
+
+      // Copy the temporary file to permanent storage
+      const tempFile = new File(tempUri);
+      await tempFile.copy(permanentFile);
+
+      console.log(`Saved image permanently: ${permanentFile.uri}`);
+      return permanentFile.uri;
+    } catch (error) {
+      console.error('Failed to save image permanently:', error);
+      throw error;
+    }
+  };
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const today = new Date();
@@ -108,15 +148,26 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       const now = new Date();
       const timestamp = now.getTime();
       const date = now.toISOString().split('T')[0];
+      const photoId = generatePhotoId();
 
-      const newPhoto: FoodPhoto = {
-        id: generatePhotoId(),
-        uri: asset.uri,
-        timestamp,
-        date,
-      };
+      try {
+        // Save the image permanently to app storage
+        const permanentUri = await saveImagePermanently(asset.uri, photoId);
 
-      setPhotos(prev => [newPhoto, ...prev]);
+        const newPhoto: FoodPhoto = {
+          id: photoId,
+          uri: permanentUri, // Use permanent URI
+          originalUri: asset.uri,
+          timestamp,
+          date,
+          time: now.toTimeString().substring(0, 5), // HH:MM format
+        };
+
+        setPhotos(prev => [newPhoto, ...prev]);
+      } catch (error) {
+        console.error('Failed to save photo:', error);
+        Alert.alert('Error', 'Failed to save photo. Please try again.');
+      }
     }
   };
 
@@ -132,15 +183,22 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Disable cropping/editing
         quality: 0.8,
+        base64: false, // Don't need base64 for file operations
+        exif: false, // Don't need EXIF data
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerAssetRepresentationMode?.current || 'current',
       });
 
       await handlePhotoResult(result);
     } catch (error) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      console.log('Camera error:', error);
+      Alert.alert(
+        'Camera Not Available',
+        'Camera functionality is not available in emulators. Please test on a physical device or use "Add" to select from gallery.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -156,10 +214,13 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Disable cropping/editing
         quality: 0.8,
+        base64: false, // Don't need base64 for file operations
+        exif: false, // Don't need EXIF data
+        selectionLimit: 1, // Only allow single photo selection
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerAssetRepresentationMode?.current || 'current',
       });
 
       await handlePhotoResult(result);
@@ -168,7 +229,9 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     }
   };
 
-  const deletePhoto = (photoId: string) => {
+  const deletePhoto = async (photoId: string) => {
+    const photoToDelete = photos.find(p => p.id === photoId);
+
     Alert.alert(
       'Delete Photo',
       'Are you sure you want to remove this photo?',
@@ -177,16 +240,91 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             HapticFeedback.light();
+
+            // Remove from state first
             setPhotos(prev => prev.filter(photo => photo.id !== photoId));
+
+            // Try to delete the physical file
+            if (photoToDelete?.uri) {
+              try {
+                const fileToDelete = new File(photoToDelete.uri);
+                await fileToDelete.delete();
+              } catch (error) {
+                console.warn('Failed to delete physical file:', error);
+              }
+            }
           },
         },
       ]
     );
   };
 
-  // Group photos by date
+  // Handle photo editing
+  const handleEditPhoto = (photo: FoodPhoto) => {
+    setEditingPhoto(photo);
+    setEditName(photo.name || '');
+    setEditCalories(photo.calories?.toString() || '');
+    setEditDate(photo.date);
+    setEditTime(photo.time || '');
+    setEditModalVisible(true);
+    HapticFeedback.light();
+  };
+
+  const savePhotoEdit = () => {
+    if (!editingPhoto) return;
+
+    const updatedPhoto: FoodPhoto = {
+      ...editingPhoto,
+      name: editName.trim() || undefined,
+      calories: editCalories ? parseInt(editCalories) : undefined,
+      date: editDate,
+      time: editTime || undefined,
+    };
+
+    setPhotos(prev => prev.map(photo =>
+      photo.id === editingPhoto.id ? updatedPhoto : photo
+    ));
+
+    setEditModalVisible(false);
+    setEditingPhoto(null);
+    HapticFeedback.success();
+  };
+
+  const deletePhotoFromEdit = async () => {
+    if (!editingPhoto) return;
+
+    Alert.alert(
+      'Delete Photo',
+      'Are you sure you want to delete this photo?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // Remove from state first
+            setPhotos(prev => prev.filter(photo => photo.id !== editingPhoto.id));
+
+            // Try to delete the physical file
+            try {
+              const fileToDelete = new File(editingPhoto.uri);
+              await fileToDelete.delete();
+            } catch (error) {
+              console.warn('Failed to delete physical file:', error);
+            }
+
+            setEditModalVisible(false);
+            setEditingPhoto(null);
+            HapticFeedback.light();
+          },
+        },
+      ]
+    );
+  };
+
+  // Group photos by date and sort by time within each date
   const photosByDate = photos.reduce((groups, photo) => {
     if (!groups[photo.date]) {
       groups[photo.date] = [];
@@ -194,6 +332,20 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     groups[photo.date].push(photo);
     return groups;
   }, {} as Record<string, FoodPhoto[]>);
+
+  // Sort each date's photos by time (newest to oldest)
+  Object.keys(photosByDate).forEach(date => {
+    photosByDate[date].sort((a, b) => {
+      // First sort by timestamp (most reliable), then by time string as fallback
+      if (a.timestamp && b.timestamp) {
+        return b.timestamp - a.timestamp; // Newest first
+      }
+      // Fallback to time string comparison
+      const timeA = a.time || '00:00';
+      const timeB = b.time || '00:00';
+      return timeB.localeCompare(timeA); // Latest time first
+    });
+  });
 
   const sortedDates = Object.keys(photosByDate).sort((a, b) => b.localeCompare(a));
 
@@ -259,6 +411,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     photoGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      justifyContent: 'flex-start',
       gap: 8,
     },
     photoContainer: {
@@ -267,6 +420,19 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       borderRadius: 8,
       overflow: 'hidden',
       backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoPlaceholder: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeholderText: {
+      color: colors.textSecondary,
+      fontSize: 24,
     },
     photo: {
       width: '100%',
@@ -294,6 +460,88 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       textAlign: 'center',
       paddingHorizontal: 20,
       marginTop: 20,
+    },
+    // Edit modal styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '90%',
+      maxWidth: 400,
+      maxHeight: '90%',
+    },
+    modalTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    modalPreview: {
+      width: '100%',
+      height: 200,
+      borderRadius: 12,
+      marginBottom: 20,
+      backgroundColor: colors.border,
+    },
+    fieldLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+      marginTop: 12,
+    },
+    modalInput: {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 4,
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 24,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.border,
+    },
+    deleteButton: {
+      backgroundColor: '#ff4444',
+    },
+    saveButton: {
+      backgroundColor: colors.primary,
+    },
+    cancelButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    deleteButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    saveButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
 
@@ -351,10 +599,25 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
                   <TouchableOpacity
                     key={photo.id}
                     style={styles.photoContainer}
+                    onPress={() => handleEditPhoto(photo)}
                     onLongPress={() => deletePhoto(photo.id)}
                     delayLongPress={500}
                   >
-                    <Image source={{ uri: photo.uri }} style={styles.photo} />
+                    {imageErrors.has(photo.id) ? (
+                      <View style={styles.photoPlaceholder}>
+                        <Text style={styles.placeholderText}>🍽️</Text>
+                      </View>
+                    ) : (
+                      <Image
+                        source={{ uri: photo.uri }}
+                        style={styles.photo}
+                        onError={() => {
+                          console.warn('Image failed to load:', photo.uri);
+                          setImageErrors(prev => new Set([...prev, photo.id]));
+                        }}
+                        resizeMode="cover"
+                      />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -362,6 +625,90 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
           ))
         )}
       </ScrollView>
+
+      {/* Edit Photo Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Photo</Text>
+
+            {/* Photo preview */}
+            {editingPhoto && (
+              <Image source={{ uri: editingPhoto.uri }} style={styles.modalPreview} />
+            )}
+
+            {/* Name field */}
+            <Text style={styles.fieldLabel}>Name</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter food name..."
+              placeholderTextColor={colors.textSecondary}
+              value={editName}
+              onChangeText={setEditName}
+            />
+
+            {/* Calories field */}
+            <Text style={styles.fieldLabel}>Calories</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter calories..."
+              placeholderTextColor={colors.textSecondary}
+              value={editCalories}
+              onChangeText={setEditCalories}
+              keyboardType="numeric"
+            />
+
+            {/* Date field */}
+            <Text style={styles.fieldLabel}>Date</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
+              value={editDate}
+              onChangeText={setEditDate}
+            />
+
+            {/* Time field */}
+            <Text style={styles.fieldLabel}>Time</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="HH:MM"
+              placeholderTextColor={colors.textSecondary}
+              value={editTime}
+              onChangeText={setEditTime}
+            />
+
+            {/* Buttons */}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton]}
+                onPress={deletePhotoFromEdit}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={savePhotoEdit}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

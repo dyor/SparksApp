@@ -207,8 +207,8 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionButton} 
             onPress={handleClose}
           >
-            <Text style={[styles.buttonIcon, styles.closeIcon]}>↩️</Text>
-            <Text style={[styles.buttonLabel, styles.closeLabel]}>Back</Text>
+            <Text style={[styles.buttonIcon, styles.closeIcon]}>✖️</Text>
+            <Text style={[styles.buttonLabel, styles.closeLabel]}>Close</Text>
           </TouchableOpacity>
           
           {isInUserCollection ? (

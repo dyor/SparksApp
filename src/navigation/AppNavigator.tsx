@@ -145,7 +145,7 @@ export const AppNavigator: React.FC = () => {
           options={{
             tabBarLabel: 'My Sparks',
             tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>★</Text>
+              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>⚡️</Text>
             ),
             headerShown: false,
           }}
@@ -158,9 +158,9 @@ export const AppNavigator: React.FC = () => {
         <Tab.Screen
           name="Marketplace"
           options={{
-            tabBarLabel: 'Marketplace',
+            tabBarLabel: 'Discover',
             tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>◆</Text>
+              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>🔎</Text>
             ),
             headerShown: false,
           }}
