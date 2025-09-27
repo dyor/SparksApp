@@ -11,6 +11,7 @@ import { TodoSpark } from '../sparks/TodoSpark';
 import { FoodCamSpark } from '../sparks/FoodCamSpark';
 import { SpanishFriendSpark } from '../sparks/SpanishFriendSpark';
 import { TeeTimeTimerSpark } from '../sparks/TeeTimeTimerSpark';
+import { SoundboardSpark } from '../sparks/SoundboardSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -138,6 +139,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       available: true,
     },
     component: TeeTimeTimerSpark,
+  },
+  'soundboard': {
+    metadata: {
+      id: 'soundboard',
+      title: 'Soundboard',
+      description: 'Record and play custom sound clips with categories',
+      icon: '🎛️',
+      category: 'utility',
+      difficulty: 'medium',
+      estimatedTime: 10,
+      available: true,
+    },
+    component: SoundboardSpark,
   },
 };
 
