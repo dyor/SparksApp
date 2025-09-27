@@ -10,6 +10,7 @@ import { PackingListSpark } from '../sparks/PackingListSpark';
 import { TodoSpark } from '../sparks/TodoSpark';
 import { FoodCamSpark } from '../sparks/FoodCamSpark';
 import { SpanishFriendSpark } from '../sparks/SpanishFriendSpark';
+import { TeeTimeTimerSpark } from '../sparks/TeeTimeTimerSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -37,7 +38,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   spinner: {
     metadata: {
       id: 'spinner',
-      title: 'Spinner',
+      title: 'Decision Spinner',
       description: 'Make decisions with customizable spinning wheel',
       icon: '🎡',
       category: 'utility',
@@ -50,7 +51,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   flashcards: {
     metadata: {
       id: 'flashcards',
-      title: 'Flashcards',
+      title: 'Spanish Flashcards',
       description: 'Study with interactive flip cards and progress tracking',
       icon: '🃏',
       category: 'education',
@@ -116,14 +117,27 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     metadata: {
       id: 'spanish-friend',
       title: 'Spanish Friend',
-      description: 'Practice Spanish pronunciation with audio greetings',
+      description: 'Practice Spanish conversation with Ana and Miguel',
       icon: '🇪🇸',
       category: 'education',
       difficulty: 'easy',
-      estimatedTime: 3,
+      estimatedTime: 10,
       available: true,
     },
     component: SpanishFriendSpark,
+  },
+  'tee-time-timer': {
+    metadata: {
+      id: 'tee-time-timer',
+      title: 'Tee Time Timer',
+      description: 'Nail your golf prep routine',
+      icon: '⛳',
+      category: 'utility',
+      difficulty: 'easy',
+      estimatedTime: 5,
+      available: true,
+    },
+    component: TeeTimeTimerSpark,
   },
 };
 

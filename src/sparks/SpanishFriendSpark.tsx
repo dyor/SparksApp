@@ -1,9 +1,209 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { setAudioModeAsync } from 'expo-audio';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
+
+const STORAGE_KEY = 'spanish_friend_user_name';
+
+interface SpanishFriendSettingsProps {
+  conversationMode: '1-friend' | '2-friends';
+  userName: string;
+  onSave: (conversationMode: '1-friend' | '2-friends', userName: string) => void;
+  onClose: () => void;
+}
+
+const SpanishFriendSettings: React.FC<SpanishFriendSettingsProps> = ({
+  conversationMode,
+  userName,
+  onSave,
+  onClose
+}) => {
+  const { colors } = useTheme();
+  const [editingMode, setEditingMode] = useState<'1-friend' | '2-friends'>(conversationMode);
+  const [editingName, setEditingName] = useState(userName);
+
+  const handleSave = async () => {
+    const name = editingName.trim();
+    if (name) {
+      onSave(editingMode, name);
+      onClose();
+    }
+  };
+
+  const settingsStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: 20,
+    },
+    header: {
+      alignItems: 'center',
+      marginTop: 40,
+      marginBottom: 40,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    subtitle: {
+      fontSize: 18,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    scrollContent: {
+      flex: 1,
+    },
+    settingSection: {
+      marginBottom: 32,
+    },
+    settingLabel: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    modeButton: {
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 12,
+      borderWidth: 2,
+    },
+    modeButtonActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '20',
+    },
+    modeButtonInactive: {
+      borderColor: colors.border,
+    },
+    modeButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    nameInput: {
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.text,
+      fontSize: 18,
+    },
+    voiceInfo: {
+      fontSize: 16,
+      color: colors.text,
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      textAlign: 'center',
+      marginTop: 16,
+    },
+    buttons: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingTop: 20,
+      paddingBottom: 20,
+    },
+    cancelButton: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cancelButtonText: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    saveButton: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    saveButtonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+    },
+  });
+
+  return (
+    <View style={settingsStyles.container}>
+      <View style={settingsStyles.header}>
+        <Text style={settingsStyles.title}>Spanish Friend Settings</Text>
+        <Text style={settingsStyles.subtitle}>Customize your conversation experience</Text>
+      </View>
+
+      <ScrollView style={settingsStyles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={settingsStyles.settingSection}>
+          <Text style={settingsStyles.settingLabel}>Conversation Mode</Text>
+          <TouchableOpacity
+            style={[
+              settingsStyles.modeButton,
+              editingMode === '1-friend' ? settingsStyles.modeButtonActive : settingsStyles.modeButtonInactive
+            ]}
+            onPress={() => setEditingMode('1-friend')}
+          >
+            <Text style={[settingsStyles.modeButtonText, { color: editingMode === '1-friend' ? colors.primary : colors.text }]}>
+              1 Amigo - Tú hablas, Ana responde
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              settingsStyles.modeButton,
+              editingMode === '2-friends' ? settingsStyles.modeButtonActive : settingsStyles.modeButtonInactive
+            ]}
+            onPress={() => setEditingMode('2-friends')}
+          >
+            <Text style={[settingsStyles.modeButtonText, { color: editingMode === '2-friends' ? colors.primary : colors.text }]}>
+              2 Amigos - Ana y Miguel hablan
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={settingsStyles.settingSection}>
+          <Text style={settingsStyles.settingLabel}>Your Name</Text>
+          <TextInput
+            style={settingsStyles.nameInput}
+            value={editingName}
+            onChangeText={setEditingName}
+            placeholder="Enter your name"
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+
+        <View style={settingsStyles.settingSection}>
+          <Text style={settingsStyles.settingLabel}>Voice Configuration</Text>
+          <Text style={settingsStyles.voiceInfo}>
+            Ana: 🇪🇸 España (Femenina){editingMode === '2-friends' ? `\n${editingName || 'Miguel'}: 🇲🇽 México (Masculina)` : ''}
+          </Text>
+        </View>
+      </ScrollView>
+
+      <View style={settingsStyles.buttons}>
+        <TouchableOpacity style={settingsStyles.cancelButton} onPress={onClose}>
+          <Text style={settingsStyles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={settingsStyles.saveButton} onPress={handleSave}>
+          <Text style={settingsStyles.saveButtonText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 interface SpanishFriendSparkProps {
   showSettings?: boolean;
@@ -13,18 +213,41 @@ interface SpanishFriendSparkProps {
 }
 
 export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
+  showSettings = false,
+  onCloseSettings,
   onStateChange,
 }) => {
   const { colors } = useTheme();
   const [audioSessionSet, setAudioSessionSet] = useState(false);
-  const [currentVoice, setCurrentVoice] = useState('es-ES'); // Default to Spain Spanish
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const [conversationMode, setConversationMode] = useState<'1-friend' | '2-friends'>('1-friend');
-  const [showSettings, setShowSettings] = useState(false);
+  const [userName, setUserName] = useState<string>('');
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [nameInputText, setNameInputText] = useState('');
 
-  // Beach planning conversation
-  const conversation = [
-    { spanish: "¡Hola Miguel! ¿Qué tal tu día?", english: "Hi Miguel! How's your day?", speaker: 'friend1' },
+  // Storage functions for user name
+  const loadStoredName = async () => {
+    try {
+      const storedName = await AsyncStorage.getItem(STORAGE_KEY);
+      if (storedName) {
+        setUserName(storedName);
+      }
+    } catch (error) {
+      console.error('Error loading stored name:', error);
+    }
+  };
+
+  const saveNameToStorage = async (name: string) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, name);
+    } catch (error) {
+      console.error('Error saving name to storage:', error);
+    }
+  };
+
+  // Beach planning conversation - function to get conversation with dynamic name
+  const getConversation = () => [
+    { spanish: `¡Hola ${userName || 'Miguel'}! ¿Qué tal tu día?`, english: `Hi ${userName || 'Miguel'}! How's your day?`, speaker: 'friend1' },
     { spanish: "¡Muy bien! Hace mucho calor hoy.", english: "Very good! It's so hot today.", speaker: 'friend2' },
     { spanish: "¡Exacto! ¿Te apetece ir a la playa?", english: "Exactly! Do you feel like going to the beach?", speaker: 'friend1' },
     { spanish: "¡Me encanta la idea! ¿A qué hora vamos?", english: "I love the idea! What time should we go?", speaker: 'friend2' },
@@ -36,16 +259,12 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     { spanish: "¡Perfecto! Nos vemos en la playa entonces.", english: "Perfect! See you at the beach then.", speaker: 'friend2' }
   ];
 
-  const getCurrentPhrase = () => conversation[currentPhraseIndex];
+  const getCurrentPhrase = () => getConversation()[currentPhraseIndex];
 
   const setupAudioSession = async () => {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: false,
-        playsInSilentModeIOS: true, // This is key for iOS silent mode
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true, // This is key for iOS silent mode
       });
       setAudioSessionSet(true);
     } catch (error) {
@@ -91,19 +310,36 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     }
   };
 
-  // Set up audio session when component loads
+  // Set up audio session and load stored name when component loads
   useEffect(() => {
     setupAudioSession();
+    loadStoredName();
   }, []);
 
+  // Check for name and play first phrase on component load
+  useEffect(() => {
+    if (!userName) {
+      setShowNameInput(true);
+    } else {
+      // Auto-play first phrase when component loads and name is set
+      setTimeout(() => {
+        const firstPhrase = getConversation()[0];
+        if (conversationMode === '2-friends' || firstPhrase.speaker === 'friend1') {
+          speakSpanish(firstPhrase.spanish, firstPhrase.speaker as 'friend1' | 'friend2');
+        }
+      }, 500);
+    }
+  }, [userName]);
+
   const handleContinue = () => {
+    const conversation = getConversation();
     const nextIndex = (currentPhraseIndex + 1) % conversation.length;
     setCurrentPhraseIndex(nextIndex);
     const nextPhrase = conversation[nextIndex];
 
     if (conversationMode === '2-friends') {
       // In 2-friends mode, phone speaks with different voices for each character
-      speakSpanish(nextPhrase.spanish, nextPhrase.speaker);
+      speakSpanish(nextPhrase.spanish, nextPhrase.speaker as 'friend1' | 'friend2');
     }
     // In 1-friend mode, only phone speaks for friend1 (Ana), user speaks for friend2 (Miguel)
     else if (nextPhrase.speaker === 'friend1') {
@@ -116,27 +352,21 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
   const handleRepeat = () => {
     const currentPhrase = getCurrentPhrase();
     if (conversationMode === '2-friends') {
-      speakSpanish(currentPhrase.spanish, currentPhrase.speaker);
+      speakSpanish(currentPhrase.spanish, currentPhrase.speaker as 'friend1' | 'friend2');
     } else if (currentPhrase.speaker === 'friend1') {
       speakSpanish(currentPhrase.spanish, 'friend1');
     }
   };
 
-  const voices = [
-    { code: 'es-ES', name: 'Spanish (Spain)', flag: '🇪🇸' },
-    { code: 'es-MX', name: 'Spanish (Mexico)', flag: '🇲🇽' },
-    { code: 'es-AR', name: 'Spanish (Argentina)', flag: '🇦🇷' },
-    { code: 'es-CO', name: 'Spanish (Colombia)', flag: '🇨🇴' },
-    { code: 'es-US', name: 'Spanish (United States)', flag: '🇺🇸' },
-  ];
 
 
   const getCurrentSpeakerInfo = () => {
     const currentPhrase = getCurrentPhrase();
+    const displayName = userName || 'Miguel';
     if (conversationMode === '1-friend') {
-      return currentPhrase.speaker === 'friend1' ? 'Ana (Phone)' : 'Miguel (Tú)';
+      return currentPhrase.speaker === 'friend1' ? 'Ana (Phone)' : `${displayName} (Tú)`;
     } else {
-      return currentPhrase.speaker === 'friend1' ? 'Ana' : 'Miguel';
+      return currentPhrase.speaker === 'friend1' ? 'Ana' : displayName;
     }
   };
 
@@ -144,6 +374,22 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     if (conversationMode === '2-friends') return true;
     const currentPhrase = getCurrentPhrase();
     return currentPhrase.speaker === 'friend1'; // Only show repeat for phone's phrases in 1-friend mode
+  };
+
+  const handleNameSubmit = async () => {
+    if (nameInputText.trim()) {
+      const newName = nameInputText.trim();
+      setUserName(newName);
+      await saveNameToStorage(newName);
+      setShowNameInput(false);
+      setNameInputText('');
+    }
+  };
+
+  const handleSettingsSave = async (newMode: '1-friend' | '2-friends', newName: string) => {
+    setConversationMode(newMode);
+    setUserName(newName);
+    await saveNameToStorage(newName);
   };
 
 
@@ -206,59 +452,6 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       fontSize: 18,
       fontWeight: '600',
     },
-    settingsContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 20,
-      margin: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    settingsTitle: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.text,
-      textAlign: 'center',
-      marginBottom: 20,
-    },
-    settingSection: {
-      marginBottom: 24,
-    },
-    settingLabel: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 12,
-    },
-    modeButton: {
-      backgroundColor: colors.background,
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 8,
-      borderWidth: 2,
-    },
-    modeButtonActive: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary + '20',
-    },
-    modeButtonInactive: {
-      borderColor: colors.border,
-    },
-    modeButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-    voiceInfo: {
-      fontSize: 16,
-      color: colors.text,
-      backgroundColor: colors.background,
-      padding: 12,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      textAlign: 'center',
-    },
     speakerInfo: {
       textAlign: 'center',
       marginTop: 8,
@@ -295,29 +488,100 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       fontSize: 18,
       fontWeight: '600',
     },
-    voiceSection: {
-      marginTop: 20,
+    nameInputContainer: {
+      flexDirection: 'row',
       alignItems: 'center',
+      gap: 12,
     },
-    currentVoice: {
+    nameInput: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.text,
       fontSize: 16,
+    },
+    nameSubmitButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    },
+    nameSubmitText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    nameInputModal: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 30,
+      width: '100%',
+      maxWidth: 400,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 28,
+      fontWeight: 'bold',
       color: colors.text,
       marginBottom: 12,
       textAlign: 'center',
     },
-    switchVoiceButton: {
+    modalSubtitle: {
+      fontSize: 18,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 24,
+    },
+    modalNameInput: {
+      width: '100%',
+      backgroundColor: colors.background,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.text,
+      fontSize: 18,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    modalSubmitButton: {
       backgroundColor: colors.primary,
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 8,
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 12,
+      width: '100%',
       alignItems: 'center',
     },
-    switchVoiceButtonText: {
+    modalSubmitText: {
       color: '#fff',
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '600',
     },
   });
+
+  if (showSettings) {
+    return (
+      <SpanishFriendSettings
+        conversationMode={conversationMode}
+        userName={userName}
+        onSave={handleSettingsSave}
+        onClose={onCloseSettings || (() => {})}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -334,7 +598,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       </View>
 
       <Text style={styles.progressText}>
-        Phrase {currentPhraseIndex + 1} of {conversation.length}
+        Phrase {currentPhraseIndex + 1} of {getConversation().length}
       </Text>
 
       <View style={styles.buttonContainer}>
@@ -350,45 +614,28 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
         </View>
       </View>
 
-      {showSettings && (
-        <View style={styles.settingsContainer}>
-          <Text style={styles.settingsTitle}>Configuración</Text>
 
-          <View style={styles.settingSection}>
-            <Text style={styles.settingLabel}>Modo de Conversación</Text>
-            <TouchableOpacity
-              style={[
-                styles.modeButton,
-                conversationMode === '1-friend' ? styles.modeButtonActive : styles.modeButtonInactive
-              ]}
-              onPress={() => setConversationMode('1-friend')}
-            >
-              <Text style={[styles.modeButtonText, { color: conversationMode === '1-friend' ? colors.primary : colors.text }]}>
-                1 Amigo - Tú hablas como Miguel
-              </Text>
+      {/* Name Input Modal for First Visit */}
+      <Modal visible={showNameInput} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.nameInputModal}>
+            <Text style={styles.modalTitle}>¡Bienvenido!</Text>
+            <Text style={styles.modalSubtitle}>Para personalizar tu experiencia, ¿cuál es tu nombre?</Text>
+            <TextInput
+              style={styles.modalNameInput}
+              value={nameInputText}
+              onChangeText={setNameInputText}
+              placeholder="Tu nombre"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+              onSubmitEditing={handleNameSubmit}
+            />
+            <TouchableOpacity style={styles.modalSubmitButton} onPress={handleNameSubmit}>
+              <Text style={styles.modalSubmitText}>Comenzar</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modeButton,
-                conversationMode === '2-friends' ? styles.modeButtonActive : styles.modeButtonInactive
-              ]}
-              onPress={() => setConversationMode('2-friends')}
-            >
-              <Text style={[styles.modeButtonText, { color: conversationMode === '2-friends' ? colors.primary : colors.text }]}>
-                2 Amigos - Ana y Miguel hablan
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.settingSection}>
-            <Text style={styles.settingLabel}>Configuración de Voces</Text>
-            <Text style={styles.voiceInfo}>
-              Ana: 🇪🇸 España (Femenina){"\n"}
-              Miguel: 🇲🇽 México (Masculina)
-            </Text>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, TextInput, Alert, Animated } from 'react-native';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { setAudioModeAsync } from 'expo-audio';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -359,12 +359,8 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   // Setup audio session for iOS silent mode compatibility
   const setupAudioSession = async () => {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: false,
-        playsInSilentModeIOS: true, // This is key for iOS silent mode
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true, // This is key for iOS silent mode
       });
       setAudioSessionSet(true);
     } catch (error) {
