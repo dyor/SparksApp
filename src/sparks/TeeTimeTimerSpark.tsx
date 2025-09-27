@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Animated, PanResponder, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import Svg, { Circle } from 'react-native-svg';
+import {
+  SettingsContainer,
+  SettingsScrollView,
+  SettingsHeader,
+  SettingsSection,
+  SettingsButton,
+  SaveCancelButtons,
+} from '../components/SettingsComponents';
 
 interface Activity {
   id: string;
@@ -614,57 +622,68 @@ const TeeTimeTimerSettings: React.FC<{
     },
   });
 
+  const settingsSubStyles = StyleSheet.create({
+    dragInstruction: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    activitiesContainer: {
+      backgroundColor: 'transparent',
+    },
+  });
+
   return (
-    <ScrollView
-      style={settingsStyles.container}
-      scrollEnabled={!isAnyItemDragging}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled={false}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <View style={settingsStyles.scrollContainer}>
-        <View style={settingsStyles.header}>
-          <Text style={settingsStyles.title}>⚙️ Timer Settings</Text>
-          <Text style={settingsStyles.subtitle}>Customize your golf preparation activities</Text>
-        </View>
-
-        <View style={settingsStyles.section}>
-          <Text style={settingsStyles.sectionTitle}>Activities ({editingActivities.length})</Text>
-          <Text style={[settingsStyles.durationText, { marginBottom: 12, fontStyle: 'italic' }]}>
-            Drag the ☰ handle to reorder activities
-          </Text>
-          {editingActivities.map((activity, index) => (
-            <DraggableActivityItem
-              key={`${activity.id}-${index}-${activity.order}`}
-              activity={activity}
-              index={index}
-              onRemove={removeActivity}
-              onMove={moveActivity}
-              onUpdate={updateActivity}
-              totalActivities={editingActivities.length}
-              onDragStart={() => setIsAnyItemDragging(true)}
-              onDragEnd={() => setIsAnyItemDragging(false)}
+      <SettingsContainer>
+        <SettingsScrollView>
+            <SettingsHeader
+              title="Tee Time Timer Settings"
+              subtitle="Customize your golf preparation activities"
+              icon="⚙️"
             />
-          ))}
-        </View>
 
-        <TouchableOpacity style={settingsStyles.addButton} onPress={addActivity}>
-          <Text style={settingsStyles.addButtonText}>+ Add Activity</Text>
-        </TouchableOpacity>
+            <SettingsSection title={`Activities (${editingActivities.length})`}>
+              <Text style={settingsSubStyles.dragInstruction}>
+                Drag the ☰ handle to reorder activities
+              </Text>
+              <View style={settingsSubStyles.activitiesContainer}>
+                {editingActivities.map((activity, index) => (
+                  <DraggableActivityItem
+                    key={`${activity.id}-${index}-${activity.order}`}
+                    activity={activity}
+                    index={index}
+                    onRemove={removeActivity}
+                    onMove={moveActivity}
+                    onUpdate={updateActivity}
+                    totalActivities={editingActivities.length}
+                    onDragStart={() => setIsAnyItemDragging(true)}
+                    onDragEnd={() => setIsAnyItemDragging(false)}
+                  />
+                ))}
+              </View>
+              <SettingsButton
+                title="+ Add Activity"
+                onPress={addActivity}
+                variant="primary"
+              />
+              <SettingsButton
+                title="Reset to Defaults"
+                onPress={resetToDefaults}
+                variant="outline"
+              />
+            </SettingsSection>
 
-        <TouchableOpacity style={settingsStyles.resetButton} onPress={resetToDefaults}>
-          <Text style={settingsStyles.resetButtonText}>Reset to Defaults</Text>
-        </TouchableOpacity>
-
-        <View style={settingsStyles.buttonContainer}>
-          <TouchableOpacity style={[settingsStyles.button, settingsStyles.cancelButton]} onPress={onClose}>
-            <Text style={settingsStyles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[settingsStyles.button, settingsStyles.saveButton]} onPress={handleSave}>
-            <Text style={settingsStyles.saveButtonText}>Save Changes</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+            <SaveCancelButtons onSave={handleSave} onCancel={onClose} />
+        </SettingsScrollView>
+      </SettingsContainer>
+    </KeyboardAvoidingView>
   );
 };
 

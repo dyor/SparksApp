@@ -3,6 +3,19 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInp
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
+import {
+  SettingsContainer,
+  SettingsScrollView,
+  SettingsHeader,
+  SettingsSection,
+  SettingsButton,
+  SaveCancelButtons,
+  SettingsInput,
+  SettingsItem,
+  SettingsText,
+  SettingsRemoveButton
+} from '../components/SettingsComponents';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const wheelSize = Math.min(screenWidth - 80, 300);
@@ -36,6 +49,7 @@ interface SpinnerSettingsProps {
 
 const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onClose }) => {
   const [editingOptions, setEditingOptions] = useState<SpinnerOption[]>([...options]);
+  const { colors } = useTheme();
 
   const updateOption = (index: number, field: keyof SpinnerOption, value: string | number) => {
     const updated = [...editingOptions];
@@ -91,87 +105,131 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
     onClose();
   };
 
+  const colorPickerStyles = StyleSheet.create({
+    colorPicker: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8,
+    },
+    colorOption: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    selectedColor: {
+      borderColor: colors.text,
+      borderWidth: 3,
+    },
+    weightInput: {
+      width: 80,
+      marginRight: 8,
+    },
+    weightHelp: {
+      flex: 1,
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    inputLabel: {
+      width: 60,
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '600',
+    },
+  });
+
   return (
-    <View style={settingsStyles.container}>
-      <View style={settingsStyles.header}>
-        <Text style={settingsStyles.title}>Spinner Settings</Text>
-        <Text style={settingsStyles.subtitle}>Customize your wheel options and weights</Text>
-      </View>
+    <SettingsContainer>
+      <SettingsScrollView>
+        <SettingsHeader
+          icon="🎡"
+          title="Spinner Settings"
+          subtitle="Customize your wheel options and weights"
+        />
 
-      <ScrollView style={settingsStyles.optionsList}>
-        {editingOptions.map((option, index) => (
-          <View key={index} style={settingsStyles.optionItem}>
-            <View style={settingsStyles.optionHeader}>
-              <Text style={settingsStyles.optionNumber}>Option {index + 1}</Text>
-              <TouchableOpacity
-                style={settingsStyles.deleteButton}
-                onPress={() => deleteOption(index)}
-              >
-                <Text style={settingsStyles.deleteButtonText}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
+        <SettingsSection title="Options">
+          {editingOptions.map((option, index) => (
+            <View key={index} style={{ marginBottom: 20 }}>
+              <SettingsItem>
+                <SettingsText>Option {index + 1}</SettingsText>
+                <SettingsRemoveButton
+                  onPress={() => deleteOption(index)}
+                />
+              </SettingsItem>
 
-            <View style={settingsStyles.inputRow}>
-              <Text style={settingsStyles.inputLabel}>Label:</Text>
-              <TextInput
-                style={settingsStyles.textInput}
-                value={option.label}
-                onChangeText={(text) => updateOption(index, 'label', text)}
-                placeholder="Enter option name"
-              />
-            </View>
+              <View style={colorPickerStyles.inputRow}>
+                <Text style={colorPickerStyles.inputLabel}>Label:</Text>
+                <View style={{ flex: 1 }}>
+                  <SettingsInput
+                    placeholder="Enter option name"
+                    value={option.label}
+                    onChangeText={(text) => updateOption(index, 'label', text)}
+                  />
+                </View>
+              </View>
 
-            <View style={settingsStyles.inputRow}>
-              <Text style={settingsStyles.inputLabel}>Weight:</Text>
-              <TextInput
-                style={settingsStyles.numberInput}
-                value={option.weight.toString()}
-                onChangeText={(text) => {
-                  const weight = parseFloat(text) || 1;
-                  updateOption(index, 'weight', Math.max(0.1, weight));
-                }}
-                placeholder="1"
-                keyboardType="numeric"
-              />
-              <Text style={settingsStyles.weightHelp}>Higher = bigger slice</Text>
-            </View>
-
-            <View style={settingsStyles.inputRow}>
-              <Text style={settingsStyles.inputLabel}>Color:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={settingsStyles.colorPicker}>
-                {colorOptions.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      settingsStyles.colorOption,
-                      { backgroundColor: color },
-                      option.color === color && settingsStyles.selectedColor,
-                    ]}
-                    onPress={() => {
-                      updateOption(index, 'color', color);
-                      HapticFeedback.light();
+              <View style={colorPickerStyles.inputRow}>
+                <Text style={colorPickerStyles.inputLabel}>Weight:</Text>
+                <View style={colorPickerStyles.weightInput}>
+                  <SettingsInput
+                    placeholder="1"
+                    value={option.weight.toString()}
+                    onChangeText={(text) => {
+                      const weight = parseFloat(text) || 1;
+                      updateOption(index, 'weight', Math.max(0.1, weight));
                     }}
                   />
-                ))}
-              </ScrollView>
+                </View>
+                <Text style={colorPickerStyles.weightHelp}>Higher = bigger slice</Text>
+              </View>
+
+              <View style={colorPickerStyles.inputRow}>
+                <Text style={colorPickerStyles.inputLabel}>Color:</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={colorPickerStyles.colorPicker}>
+                    {colorOptions.map((color) => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[
+                          colorPickerStyles.colorOption,
+                          { backgroundColor: color },
+                          option.color === color && colorPickerStyles.selectedColor,
+                        ]}
+                        onPress={() => {
+                          updateOption(index, 'color', color);
+                          HapticFeedback.light();
+                        }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
 
-      <TouchableOpacity style={settingsStyles.addButton} onPress={addOption}>
-        <Text style={settingsStyles.addButtonText}>+ Add Option</Text>
-      </TouchableOpacity>
+          <SettingsButton
+            title="Add Option"
+            onPress={addOption}
+            variant="primary"
+          />
+        </SettingsSection>
 
-      <View style={settingsStyles.buttons}>
-        <TouchableOpacity style={settingsStyles.cancelButton} onPress={onClose}>
-          <Text style={settingsStyles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={settingsStyles.saveButton} onPress={handleSave}>
-          <Text style={settingsStyles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        <SaveCancelButtons
+          onSave={handleSave}
+          onCancel={onClose}
+          saveText="Save Changes"
+          cancelText="Cancel"
+        />
+      </SettingsScrollView>
+    </SettingsContainer>
   );
 };
 
@@ -563,153 +621,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const settingsStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  optionsList: {
-    flex: 1,
-    marginBottom: 20,
-  },
-  optionItem: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  optionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  optionNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  deleteButtonText: {
-    fontSize: 18,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  inputLabel: {
-    width: 60,
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  textInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  numberInput: {
-    width: 80,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    textAlign: 'center',
-  },
-  weightHelp: {
-    marginLeft: 10,
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  colorPicker: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  colorOption: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedColor: {
-    borderColor: '#333',
-    borderWidth: 3,
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttons: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#666',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: '#28A745',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

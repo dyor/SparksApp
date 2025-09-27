@@ -10,7 +10,6 @@ import {
   Dimensions,
   Modal,
   TextInput,
-  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
@@ -23,7 +22,8 @@ import {
   SettingsScrollView,
   SettingsHeader,
   SettingsSection,
-  SettingsButton,
+  SettingsFeedbackSection,
+  SettingsText,
 } from '../components/SettingsComponents';
 
 interface FoodPhoto {
@@ -56,43 +56,6 @@ const PHOTO_SIZE = (width - 60) / 3; // 3 columns with proper padding and gaps
 const FoodCamSettings: React.FC<{
   onClose: () => void;
 }> = ({ onClose }) => {
-  const handleShareFeedback = async () => {
-    const subject = encodeURIComponent('FoodCam Feedback - Sparks App');
-    const body = encodeURIComponent(`Hi Matt,
-
-I'd like to share some feedback about FoodCam:
-
-[Please share your thoughts, suggestions, or issues here]
-
-Thanks!`);
-
-    const emailUrl = `mailto:matt@dyor.com?subject=${subject}&body=${body}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(emailUrl);
-      if (canOpen) {
-        await Linking.openURL(emailUrl);
-        HapticFeedback.success();
-      } else {
-        Alert.alert(
-          'Email Not Available',
-          'Please send your feedback to matt@dyor.com',
-          [
-            { text: 'OK', onPress: () => HapticFeedback.light() }
-          ]
-        );
-      }
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        'Could not open email app. Please send feedback to matt@dyor.com',
-        [
-          { text: 'OK', onPress: () => HapticFeedback.light() }
-        ]
-      );
-    }
-  };
-
   return (
     <SettingsContainer>
       <SettingsScrollView>
@@ -102,19 +65,14 @@ Thanks!`);
           icon="📸"
         />
 
-        <SettingsSection title="Feedback">
-          <SettingsButton
-            title="📧 Share Feedback"
-            onPress={handleShareFeedback}
-          />
-        </SettingsSection>
+        <SettingsFeedbackSection sparkName="FoodCam" />
 
         <SettingsSection title="About">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
-            <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 }}>
+            <SettingsText variant="body">
               FoodCam helps you track your meals with visual photos.{'\n'}
               Take photos, add details, and build your food diary.
-            </Text>
+            </SettingsText>
           </View>
         </SettingsSection>
       </SettingsScrollView>

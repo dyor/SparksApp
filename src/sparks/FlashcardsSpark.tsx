@@ -256,15 +256,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       // Stop any current speech first
       const isSpeaking = await Speech.isSpeakingAsync();
       if (isSpeaking) {
-        await Speech.stop();
+        Speech.stop();
       }
 
       Speech.speak(text, {
         language: 'es-ES', // Use Spain Spanish for more authentic accent
-        rate: 0.6,
-        pitch: 1.0,
+        rate: 0.7,
+        pitch: 1.1,
         volume: 1.0,
-        voice: 'Mónica',
         onStart: () => {
           HapticFeedback.light();
         },
@@ -466,6 +465,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
           setShowAnswer(true);
           // Flip the card and speak Spanish when answer is revealed
           flipCard();
+          // Auto-play Spanish when answer is revealed
           if (nextCard) {
             speakSpanish(nextCard.spanish);
           }
@@ -672,31 +672,25 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       color: colors.textSecondary,
       marginTop: 10,
     },
-    spanishContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 20,
-    },
     spanishText: {
       fontSize: 28,
       fontWeight: 'bold',
       color: colors.primary,
       textAlign: 'center',
-      flex: 1,
+      marginBottom: 15,
     },
-    playButton: {
-      backgroundColor: 'transparent',
-      borderRadius: 25,
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginLeft: 15,
+    repeatButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      alignSelf: 'center',
+      marginBottom: 10,
     },
-    playButtonText: {
-      color: colors.primary,
-      fontSize: 20,
+    repeatButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
     },
     flipButton: {
       backgroundColor: colors.primary,
@@ -929,15 +923,13 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
                 }}
               >
                 <Text style={styles.englishText}>{currentCard.english}</Text>
-                <View style={styles.spanishContainer}>
-                  <Text style={styles.spanishText}>{currentCard.spanish}</Text>
-                  <TouchableOpacity
-                    style={styles.playButton}
-                    onPress={() => speakSpanish(currentCard.spanish)}
-                  >
-                    <Text style={styles.playButtonText}>🔊</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.spanishText}>{currentCard.spanish}</Text>
+                <TouchableOpacity
+                  style={styles.repeatButton}
+                  onPress={() => speakSpanish(currentCard.spanish)}
+                >
+                  <Text style={styles.repeatButtonText}>Repeat</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -948,7 +940,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
                 style={[styles.answerButton, styles.incorrectButton]}
                 onPress={() => handleAnswer(false)}
               >
-                <Text style={styles.answerButtonText}>❌ Wrong</Text>
+                <Text style={styles.answerButtonText}>✕ Wrong</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

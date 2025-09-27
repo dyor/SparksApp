@@ -3,6 +3,15 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'rea
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import {
+  SettingsContainer,
+  SettingsScrollView,
+  SettingsHeader,
+  SettingsFeedbackSection,
+  SettingsSection,
+  SettingsText,
+  SaveCancelButtons
+} from '../components/SettingsComponents';
 
 interface Printer {
   id: string;
@@ -79,7 +88,37 @@ interface BusinessSparkProps {
   onComplete?: (result: any) => void;
 }
 
+const BusinessSimulatorSettings: React.FC<{
+  onClose: () => void;
+}> = ({ onClose }) => {
+  return (
+    <SettingsContainer>
+      <SettingsScrollView>
+        <SettingsHeader
+          title="Business Simulator Settings"
+          subtitle="Manage your business simulation experience"
+          icon="💼"
+        />
+
+        <SettingsFeedbackSection sparkName="Business Simulator" />
+
+        <SettingsSection title="About">
+          <View style={{ padding: 16, backgroundColor: 'transparent' }}>
+            <SettingsText variant="body">
+              Simulate running a 3D printing business over 30 days. Make strategic decisions about investments, operations, and growth to maximize your success.
+            </SettingsText>
+          </View>
+        </SettingsSection>
+
+        <SaveCancelButtons onSave={onClose} onCancel={onClose} saveText="Done" cancelText="Close" />
+      </SettingsScrollView>
+    </SettingsContainer>
+  );
+};
+
 export const BusinessSpark: React.FC<BusinessSparkProps> = ({
+  showSettings = false,
+  onCloseSettings,
   onStateChange,
   onComplete,
 }) => {
@@ -533,6 +572,10 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       fontWeight: '600',
     },
   });
+
+  if (showSettings) {
+    return <BusinessSimulatorSettings onClose={onCloseSettings} />;
+  }
 
   if (!gameState.gameStarted) {
     return (

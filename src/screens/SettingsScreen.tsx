@@ -4,6 +4,7 @@ import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { NotificationService } from '../utils/notifications';
+import { SettingsFeedbackSection } from '../components/SettingsComponents';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -100,6 +101,10 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>⚙️ Settings</Text>
         <Text style={styles.subtitle}>Customize your Sparks experience</Text>
+      </View>
+
+      <View style={styles.feedbackSection}>
+        <SettingsFeedbackSection sparkName="Sparks App" />
       </View>
 
       <View style={styles.section}>
@@ -248,6 +253,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  feedbackSection: {
+    marginBottom: 20,
   },
   section: {
     backgroundColor: colors.surface,

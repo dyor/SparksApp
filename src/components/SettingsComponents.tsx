@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { HapticFeedback } from '../utils/haptics';
 
 interface SettingsContainerProps {
   children: React.ReactNode;
@@ -151,26 +152,55 @@ export const SettingsInput: React.FC<SettingsInputProps> = ({
 interface SettingsButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'outline';
+  disabled?: boolean;
 }
 
 export const SettingsButton: React.FC<SettingsButtonProps> = ({
   title,
   onPress,
-  variant = 'primary'
+  variant = 'primary',
+  disabled = false
 }) => {
   const { colors } = useTheme();
 
   const getButtonStyle = () => {
+    const baseStyle = {
+      opacity: disabled ? 0.6 : 1,
+    };
+
     switch (variant) {
       case 'primary':
-        return { backgroundColor: colors.primary };
+        return {
+          backgroundColor: colors.primary,
+          borderWidth: 0,
+          ...baseStyle
+        };
       case 'secondary':
-        return { backgroundColor: colors.border };
+        return {
+          backgroundColor: colors.border,
+          borderWidth: 0,
+          ...baseStyle
+        };
       case 'danger':
-        return { backgroundColor: colors.error };
+        return {
+          backgroundColor: colors.error,
+          borderWidth: 0,
+          ...baseStyle
+        };
+      case 'outline':
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: colors.border,
+          ...baseStyle
+        };
       default:
-        return { backgroundColor: colors.primary };
+        return {
+          backgroundColor: colors.primary,
+          borderWidth: 0,
+          ...baseStyle
+        };
     }
   };
 
@@ -182,6 +212,8 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
         return { color: colors.text };
       case 'danger':
         return { color: '#fff' };
+      case 'outline':
+        return { color: colors.text };
       default:
         return { color: '#fff' };
     }
@@ -203,7 +235,11 @@ export const SettingsButton: React.FC<SettingsButtonProps> = ({
   });
 
   return (
-    <TouchableOpacity style={styles.button} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.button}
+      onPress={onPress}
+      disabled={disabled}
+    >
       <Text style={styles.buttonText}>{title}</Text>
     </TouchableOpacity>
   );
@@ -229,13 +265,15 @@ interface SaveCancelButtonsProps {
   onCancel: () => void;
   saveText?: string;
   cancelText?: string;
+  saveDisabled?: boolean;
 }
 
 export const SaveCancelButtons: React.FC<SaveCancelButtonsProps> = ({
   onSave,
   onCancel,
   saveText = 'Save Changes',
-  cancelText = 'Cancel'
+  cancelText = 'Cancel',
+  saveDisabled = false
 }) => {
   const { colors } = useTheme();
 
@@ -273,7 +311,15 @@ export const SaveCancelButtons: React.FC<SaveCancelButtonsProps> = ({
       <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onCancel}>
         <Text style={styles.cancelButtonText}>{cancelText}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={onSave}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          styles.saveButton,
+          saveDisabled && { opacity: 0.6 }
+        ]}
+        onPress={onSave}
+        disabled={saveDisabled}
+      >
         <Text style={styles.saveButtonText}>{saveText}</Text>
       </TouchableOpacity>
     </View>
@@ -356,5 +402,57 @@ export const SettingsRemoveButton: React.FC<SettingsRemoveButtonProps> = ({
     <TouchableOpacity style={styles.removeButton} onPress={onPress}>
       <Text style={styles.removeButtonText}>{text}</Text>
     </TouchableOpacity>
+  );
+};
+
+interface SettingsFeedbackSectionProps {
+  sparkName: string;
+}
+
+export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = ({ sparkName }) => {
+  const handleShareFeedback = async () => {
+    const subject = encodeURIComponent(`${sparkName} Feedback - Sparks App`);
+    const body = encodeURIComponent(`Hi Matt,
+
+I'd like to share some feedback about ${sparkName}:
+
+[Please share your thoughts, suggestions, or issues here]
+
+Thanks!`);
+
+    const emailUrl = `mailto:matt@dyor.com?subject=${subject}&body=${body}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(emailUrl);
+      if (canOpen) {
+        await Linking.openURL(emailUrl);
+        HapticFeedback.success();
+      } else {
+        Alert.alert(
+          'Email Not Available',
+          'Please send your feedback to matt@dyor.com',
+          [
+            { text: 'OK', onPress: () => HapticFeedback.light() }
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        'Could not open email app. Please send feedback to matt@dyor.com',
+        [
+          { text: 'OK', onPress: () => HapticFeedback.light() }
+        ]
+      );
+    }
+  };
+
+  return (
+    <SettingsSection title="Feedback">
+      <SettingsButton
+        title="📧 Share Feedback"
+        onPress={handleShareFeedback}
+      />
+    </SettingsSection>
   );
 };
