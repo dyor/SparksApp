@@ -431,7 +431,6 @@ const HoleHistoryModal: React.FC<{
       marginBottom: 0,
       borderRadius: 12,
       padding: 16,
-      justifyContent: 'center',
     },
     addShotCard: {
       backgroundColor: colors.surface,
@@ -443,6 +442,11 @@ const HoleHistoryModal: React.FC<{
       alignItems: 'center',
     },
     addPuttContainer: {
+      margin: 20,
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    addShotContainer: {
       margin: 20,
       marginTop: 8,
       marginBottom: 8,
@@ -1760,17 +1764,33 @@ const OutcomeGrid: React.FC<{
               const isSelected = selectedOutcome === outcomeValue;
               const isGood = outcomeValue === 'good';
               
+              // Determine cell color based on position
+              const getCellColor = () => {
+                if (isSelected) return colors.primary;
+                if (isGood) return '#E8F5E8'; // Light green for center
+                
+                // Corner cells (bad outcomes) - light red
+                if (outcomeValue === 'left and long' || outcomeValue === 'right and long' || 
+                    outcomeValue === 'left and short' || outcomeValue === 'right and short') {
+                  return '#FFE8E8'; // Light red
+                }
+                
+                // Outer central cells (okay outcomes) - light yellow
+                if (outcomeValue === 'left' || outcomeValue === 'right' || 
+                    outcomeValue === 'long' || outcomeValue === 'short') {
+                  return '#FFF8E1'; // Light yellow
+                }
+                
+                return colors.surface; // Default
+              };
+
               return (
                 <TouchableOpacity
                   key={outcome}
                   style={[
                     styles.cell,
                     {
-                      backgroundColor: isSelected 
-                        ? colors.primary 
-                        : isGood 
-                          ? colors.surface 
-                          : colors.surface,
+                      backgroundColor: getCellColor(),
                       borderColor: isSelected ? colors.primary : colors.border,
                       borderWidth: isSelected ? 2 : 1,
                     }
@@ -2298,7 +2318,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   };
 
   // Calculate shot card height for snap behavior
-  const SHOT_CARD_HEIGHT = 400; // Increased height to accommodate full grids
+  const SHOT_CARD_HEIGHT = 400; // Fixed height for consistent snapping
 
   // Snap to current shot
   const snapToCurrentShot = () => {
@@ -2306,7 +2326,11 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     const currentGlobalIndex = currentShotType === 'iron' ? currentShotIndex : ironShots.length + currentShotIndex;
     const scrollY = currentGlobalIndex * SHOT_CARD_HEIGHT;
     
-    scrollViewRef.current?.scrollTo({ y: scrollY, animated: true });
+    // For putts, add extra offset to account for navigation bar
+    const isPutt = currentShotType === 'putt';
+    const extraOffset = isPutt ? 100 : 0; // Extra space for putts to clear navigation bar
+    
+    scrollViewRef.current?.scrollTo({ y: scrollY + extraOffset, animated: true });
   };
 
   // Advance to next shot with snap
@@ -2322,6 +2346,12 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       // Snap to the next shot
       setTimeout(() => {
         snapToCurrentShot();
+      }, 100);
+    } else {
+      // If this is the last shot, scroll to show the Add Putt button
+      setTimeout(() => {
+        const addPuttButtonY = (allShots.length) * SHOT_CARD_HEIGHT;
+        scrollViewRef.current?.scrollTo({ y: addPuttButtonY, animated: true });
       }, 100);
     }
   };
@@ -2964,7 +2994,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         style={styles.content} 
         showsVerticalScrollIndicator={false}
         snapToInterval={SHOT_CARD_HEIGHT}
-        snapToAlignment="center"
+        snapToAlignment="start"
         decelerationRate="fast"
         onScroll={(event) => {
           const offsetY = event.nativeEvent.contentOffset.y;
@@ -3004,11 +3034,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               {expectedIronShots} shots for par {hole.par}
             </Text>
           </View>
-          {allIronShotsHaveOutcomes && (
-            <TouchableOpacity style={styles.addButton} onPress={addIronShot}>
-              <Text style={styles.addButtonText}>+ Add Iron Shot</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* All Shots - Iron Shots First */}
@@ -3062,6 +3087,14 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           </View>
         ))}
 
+        {/* Add Iron Shot Button */}
+        {allIronShotsHaveOutcomes && (
+          <View style={styles.addShotContainer}>
+            <TouchableOpacity style={styles.addButton} onPress={addIronShot}>
+              <Text style={styles.addButtonText}>+ Add Iron Shot</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Putter Header */}
         <View style={styles.sectionHeader}>
