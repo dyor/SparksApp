@@ -451,13 +451,6 @@ const HoleHistoryModal: React.FC<{
       borderTopColor: colors.border,
       minHeight: 80,
     },
-    shotCard: {
-      backgroundColor: colors.surface,
-      margin: 20,
-      marginBottom: 0,
-      borderRadius: 12,
-      padding: 16,
-    },
     addShotCard: {
       backgroundColor: colors.surface,
       margin: 20,
@@ -477,13 +470,6 @@ const HoleHistoryModal: React.FC<{
       marginTop: 8,
       marginBottom: 8,
     },
-    todaysDistanceCard: {
-      backgroundColor: colors.surface,
-      margin: 20,
-      marginBottom: 0,
-      borderRadius: 12,
-      padding: 16,
-    },
     todaysDistanceContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -498,19 +484,6 @@ const HoleHistoryModal: React.FC<{
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-    },
-    actionButtonsCard: {
-      backgroundColor: colors.surface,
-      margin: 20,
-      marginTop: 4,
-      marginBottom: 0,
-      borderRadius: 12,
-      padding: 16,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
     },
     expectedText: {
       fontSize: 14,
@@ -2909,9 +2882,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       fontSize: 14,
       color: colors.textSecondary,
     },
-    shotList: {
-      gap: 8,
-    },
     shotCard: {
       backgroundColor: colors.surface,
       borderRadius: 12,
@@ -3134,19 +3104,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       borderTopWidth: 1,
       borderTopColor: colors.border,
       minHeight: 60,
-    },
-    historyButton: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-    },
-    historyButtonText: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
     },
     navButton: {
       flex: 1,
@@ -3639,7 +3596,6 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       showHints: true,
       autoAdvance: false,
       clubs: DEFAULT_CLUBS,
-      handicap: undefined,
     },
   });
 
@@ -3664,10 +3620,10 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         courses,
         rounds: savedData.rounds || [],
         settings: {
-          showHints: true,
-          autoAdvance: false,
-          clubs: savedData.settings?.clubs || DEFAULT_CLUBS,
-          ...savedData.settings,
+          showHints: savedData.settings?.showHints ?? true,
+          autoAdvance: savedData.settings?.autoAdvance ?? false,
+          clubs: savedData.settings?.clubs ?? DEFAULT_CLUBS,
+          handicap: savedData.settings?.handicap,
         },
       };
       setData(mergedData);
@@ -3707,12 +3663,16 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
   // Show handicap onboarding when no handicap is set
   useEffect(() => {
-    if (data.settings.handicap === undefined && !showSettings) {
+    if (
+      currentScreen === 'hole-detail' &&
+      data.settings.handicap === undefined &&
+      !showSettings
+    ) {
       setShowHandicapOnboarding(true);
-    } else if (data.settings.handicap !== undefined) {
+    } else if (data.settings.handicap !== undefined || currentScreen !== 'hole-detail') {
       setShowHandicapOnboarding(false);
     }
-  }, [data.settings.handicap, showSettings]);
+  }, [data.settings.handicap, showSettings, currentScreen]);
 
   // Save data whenever it changes
   useEffect(() => {
@@ -4162,12 +4122,14 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         colors={colors}
       />
 
-      <HandicapOnboardingModal
-        visible={showHandicapOnboarding}
-        onClose={() => setShowHandicapOnboarding(false)}
-        onSetHandicap={handleSetHandicap}
-        colors={colors}
-      />
+      {currentScreen === 'hole-detail' && (
+        <HandicapOnboardingModal
+          visible={showHandicapOnboarding}
+          onClose={() => setShowHandicapOnboarding(false)}
+          onSetHandicap={handleSetHandicap}
+          colors={colors}
+        />
+      )}
     </View>
   );
 };
