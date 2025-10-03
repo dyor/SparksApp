@@ -30,6 +30,7 @@ interface SoundChip {
   displayName: string;
   category: string;
   duration: number;
+  // Store RELATIVE path under documentDirectory (e.g., "soundboard/sound_123.m4a")
   filePath: string;
   createdDate: string;
   lastPlayed?: string;
@@ -52,6 +53,17 @@ const parseTaskText = (text: string): { category: string; displayText: string } 
     return { category, displayText };
   }
   return { category: 'General', displayText: text.trim() };
+};
+
+// Persistent storage helpers
+const SOUNDBOARD_DIR_NAME = 'soundboard/';
+const toAbsoluteUri = (relativeOrAbsolute: string): string => {
+  if (relativeOrAbsolute.startsWith('file://')) return relativeOrAbsolute;
+  return `${FileSystem.documentDirectory}${relativeOrAbsolute}`;
+};
+const toRelativePath = (uri: string): string => {
+  const idx = uri.lastIndexOf(SOUNDBOARD_DIR_NAME);
+  return idx !== -1 ? uri.substring(idx) : uri;
 };
 
 const SoundboardSettings: React.FC<{
@@ -121,7 +133,7 @@ const SoundboardSettings: React.FC<{
       const { category, displayText } = parseTaskText(originalName.replace(ext, ''));
 
       const id = Date.now().toString();
-      const soundboardDir = `${FileSystem.documentDirectory}soundboard/`;
+      const soundboardDir = `${FileSystem.documentDirectory}${SOUNDBOARD_DIR_NAME}`;
       await FileSystem.makeDirectoryAsync(soundboardDir, { intermediates: true });
       const newPath = `${soundboardDir}sound_${id}${ext}`;
 
@@ -142,7 +154,7 @@ const SoundboardSettings: React.FC<{
         displayName: displayText,
         category,
         duration,
-        filePath: newPath,
+        filePath: toRelativePath(newPath),
         createdDate: new Date().toISOString(),
         playCount: 0,
       };
@@ -162,7 +174,7 @@ const SoundboardSettings: React.FC<{
         Alert.alert('Share Sound', 'Please select a sound to share.');
         return;
       }
-      const exists = await FileSystem.getInfoAsync(chip.filePath);
+      const exists = await FileSystem.getInfoAsync(toAbsoluteUri(chip.filePath));
       if (!exists.exists) {
         Alert.alert('File Missing', 'The sound file could not be found on disk.');
         return;
@@ -172,7 +184,7 @@ const SoundboardSettings: React.FC<{
         Alert.alert('Sharing Not Available', 'Sharing is not available on this device.');
         return;
       }
-      await Sharing.shareAsync(chip.filePath, { dialogTitle: `Share ${chip.displayName}` });
+      await Sharing.shareAsync(toAbsoluteUri(chip.filePath), { dialogTitle: `Share ${chip.displayName}` });
     } catch (e) {
       console.error('Share failed:', e);
       Alert.alert('Share Failed', 'Could not share this sound.');
@@ -612,7 +624,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         displayName: displayText,
         category,
         duration: recordedDuration,
-        filePath: newPath,
+        filePath: toRelativePath(newPath),
         createdDate: new Date().toISOString(),
         playCount: 0,
       };
@@ -652,7 +664,16 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   useEffect(() => {
     const savedData = getSparkData('soundboard') as SoundboardData;
     if (savedData?.soundChips) {
-      setSoundChips(savedData.soundChips);
+      // TODO TEMPORARY - DELETE AFTER MIGRATION:
+      // Migrate any absolute file:// URIs to relative paths so they survive container moves
+      const migrated = savedData.soundChips.map((chip) => {
+        const rel = chip.filePath.startsWith('file://') ? toRelativePath(chip.filePath) : chip.filePath;
+        return rel !== chip.filePath ? { ...chip, filePath: rel } : chip;
+      });
+      setSoundChips(migrated);
+      if (JSON.stringify(migrated) !== JSON.stringify(savedData.soundChips)) {
+        setSparkData('soundboard', { ...savedData, soundChips: migrated });
+      }
     }
     // Debug file system status
     checkFileSystemStatus();
@@ -705,7 +726,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       }
 
       // Check if file exists
-      const fileInfo = await FileSystem.getInfoAsync(chip.filePath);
+      const fileInfo = await FileSystem.getInfoAsync(toAbsoluteUri(chip.filePath));
       if (!fileInfo.exists) {
         Alert.alert('Error', 'Sound file not found. It may have been deleted.');
         return;
@@ -713,7 +734,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       setCurrentlyPlaying(chip.id);
 
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri: chip.filePath });
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: toAbsoluteUri(chip.filePath) });
       setSound(newSound);
 
       newSound.setOnPlaybackStatusUpdate((status) => {

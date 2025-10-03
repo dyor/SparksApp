@@ -29,7 +29,8 @@ import {
 
 interface FoodPhoto {
   id: string;
-  uri: string; // Local app storage URI
+  // Store RELATIVE path under documentDirectory (e.g., "foodcam/123.jpg")
+  uri: string; // relative path
   originalUri?: string; // Original temporary URI
   mediaLibraryId?: string; // MediaLibrary asset ID
   timestamp: number;
@@ -101,11 +102,30 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
   const [editTime, setEditTime] = useState('');
 
 
+  // Helpers for persistent relative paths
+  const FOOD_DIR_NAME = 'foodcam/';
+  const toAbsoluteUri = (relativeOrAbsolute: string): string => {
+    if (relativeOrAbsolute.startsWith('file://')) return relativeOrAbsolute;
+    return `${FileSystem.documentDirectory}${relativeOrAbsolute}`;
+  };
+  const toRelativePath = (uri: string): string => {
+    const idx = uri.lastIndexOf(FOOD_DIR_NAME);
+    return idx !== -1 ? uri.substring(idx) : uri;
+  };
+
   // Load saved data on mount
   useEffect(() => {
     const savedData = getSparkData('food-cam') as FoodCamData;
     if (savedData?.photos) {
-      setPhotos(savedData.photos);
+      // TODO TEMPORARY - DELETE AFTER MIGRATION
+      const migrated = savedData.photos.map(p => {
+        const rel = p.uri.startsWith('file://') ? toRelativePath(p.uri) : p.uri;
+        return rel !== p.uri ? { ...p, uri: rel } : p;
+      });
+      setPhotos(migrated);
+      if (JSON.stringify(migrated) !== JSON.stringify(savedData.photos)) {
+        setSparkData('food-cam', { photos: migrated });
+      }
     }
     requestPermissions();
     // Debug file system status
@@ -159,7 +179,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
   const saveImagePermanently = async (tempUri: string, photoId: string): Promise<string> => {
     try {
       // Create the FoodCam directory (intermediates: true creates it if it doesn't exist)
-      const foodCamDir = `${FileSystem.documentDirectory}foodcam/`;
+      const foodCamDir = `${FileSystem.documentDirectory}${FOOD_DIR_NAME}`;
       await FileSystem.makeDirectoryAsync(foodCamDir, { intermediates: true });
 
       // Create permanent file path
@@ -232,7 +252,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
         const newPhoto: FoodPhoto = {
           id: photoId,
-          uri: permanentUri, // Use permanent URI
+          uri: toRelativePath(permanentUri),
           originalUri: asset.uri,
           timestamp,
           date,
@@ -325,7 +345,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
             // Try to delete the physical file
             if (photoToDelete?.uri) {
               try {
-                await FileSystem.deleteAsync(photoToDelete.uri, { idempotent: true });
+                await FileSystem.deleteAsync(toAbsoluteUri(photoToDelete.uri), { idempotent: true });
               } catch (error) {
                 console.warn('Failed to delete physical file:', error);
               }
@@ -384,7 +404,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
             // Try to delete the physical file
             try {
-              await FileSystem.deleteAsync(editingPhoto.uri, { idempotent: true });
+              await FileSystem.deleteAsync(toAbsoluteUri(editingPhoto.uri), { idempotent: true });
             } catch (error) {
               console.warn('Failed to delete physical file:', error);
             }
@@ -691,10 +711,10 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
                       </View>
                     ) : (
                       <Image
-                        source={{ uri: photo.uri }}
+                        source={{ uri: toAbsoluteUri(photo.uri) }}
                         style={styles.photo}
                         onError={() => {
-                          console.warn('Image failed to load:', photo.uri);
+                          console.warn('Image failed to load:', toAbsoluteUri(photo.uri));
                           setImageErrors(prev => new Set([...prev, photo.id]));
                         }}
                         resizeMode="cover"
@@ -721,7 +741,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
             {/* Photo preview */}
             {editingPhoto && (
-              <Image source={{ uri: editingPhoto.uri }} style={styles.modalPreview} />
+              <Image source={{ uri: toAbsoluteUri(editingPhoto.uri) }} style={styles.modalPreview} />
             )}
 
             {/* Name field */}
