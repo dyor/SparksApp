@@ -2930,14 +2930,56 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
 
   // Initialize shots when hole changes - load existing data or create defaults
   useEffect(() => {
+    console.log('Shot initialization debug:', {
+      currentHole,
+      hole: hole?.number,
+      par: hole?.par,
+      expectedShots,
+      expectedPutts
+    });
+    
     // Try to load existing data for this hole
     const existingData = onLoadHoleData(currentHole);
     
     if (existingData) {
+      console.log('Loading existing data:', existingData);
       // Load existing data
-      setShots(existingData.shots);
-      setPutts(existingData.putts);
+      const loadedShots = existingData.shots || [];
+      const loadedPutts = existingData.putts || [];
+      
+      // If no shots exist but we expect shots, create default shots
+      if (loadedShots.length === 0 && expectedShots > 0) {
+        console.log('No shots in loaded data, creating default shots');
+        const defaultShots: Shot[] = Array.from({ length: expectedShots }, (_, index) => ({
+          id: `shot-${Date.now()}-${index}`,
+          type: 'shot',
+          lie: index === expectedShots - 1 ? 'green' : 'fairway', // Last shot defaults to green
+          direction: 'good', // Default to good outcome
+          timestamp: Date.now(),
+        }));
+        setShots(defaultShots);
+        console.log('Created default shots:', defaultShots);
+      } else {
+        setShots(loadedShots);
+      }
+      
+      // If no putts exist but we expect putts, create default putts
+      if (loadedPutts.length === 0 && expectedPutts > 0) {
+        console.log('No putts in loaded data, creating default putts');
+        const defaultPutts: Shot[] = Array.from({ length: expectedPutts }, (_, index) => ({
+          id: `putt-${Date.now()}-${index}`,
+          type: 'putt',
+          puttDistance: index === 1 ? '<4ft' : '5-10ft', // Second putt is typically a tap-in
+          direction: 'good', // Default to good outcome
+          timestamp: Date.now(),
+        }));
+        setPutts(defaultPutts);
+        console.log('Created default putts:', defaultPutts);
+      } else {
+        setPutts(loadedPutts);
+      }
     } else {
+      console.log('Creating default shots:', { expectedShots, expectedPutts });
       // Create default shots
       const defaultShots: Shot[] = Array.from({ length: expectedShots }, (_, index) => ({
         id: `shot-${Date.now()}-${index}`,
@@ -2955,6 +2997,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         timestamp: Date.now(),
       }));
 
+      console.log('Created default shots:', defaultShots);
+      console.log('Created default putts:', defaultPutts);
       setShots(defaultShots);
       setPutts(defaultPutts);
     }
@@ -3425,14 +3469,18 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       color: colors.text,
       minHeight: 40,
     },
-    removeButton: {
+    deleteShotButton: {
       backgroundColor: colors.error || '#ff4444',
-      borderRadius: 6,
-      padding: 8,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    removeButtonText: {
+    deleteShotButtonText: {
       color: colors.background,
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
     },
     addButton: {
@@ -3740,24 +3788,12 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     },
     shotNavigationArrows: {
       position: 'absolute',
-      top: '50%',
-      left: 0,
-      right: 0,
+      bottom: 8,
+      left: 16,
+      right: 16,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 16,
-      transform: [{ translateY: -16 }], // Half of arrow button height to center perfectly
-    },
-    holeNavigationArrows: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 8,
-      gap: 16,
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
     },
     shotArrowButton: {
       height: 32,
@@ -3931,10 +3967,10 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               <View style={styles.shotHeader}>
                 <Text style={styles.shotNumber}>{shotInfo.shotLabel}</Text>
                 <TouchableOpacity
-                  style={styles.removeButton}
+                  style={styles.deleteShotButton}
                   onPress={() => removeShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt')}
                 >
-                  <Text style={styles.removeButtonText}>×</Text>
+                  <Text style={styles.deleteShotButtonText}>Delete Shot</Text>
                 </TouchableOpacity>
               </View>
               
@@ -4095,47 +4131,45 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         </View>
       </View>
 
-      {/* Hole Navigation Arrows - Below Shot Navigation */}
-      <View style={styles.holeNavigationArrows}>
-        <TouchableOpacity 
-          style={[
-            styles.button, 
-            styles.arrowButton, 
-            currentHole <= 1 && styles.disabledButton
-          ]} 
-          onPress={currentHole > 1 ? onPreviousHole : undefined}
-          disabled={currentHole <= 1}
-        >
-          <Text style={[
-            styles.buttonText, 
-            styles.arrowButtonText,
-            currentHole <= 1 && styles.disabledButtonText
-          ]}>←</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[
-            styles.button, 
-            styles.arrowButton,
-            currentHole >= 18 && styles.disabledButton
-          ]} 
-          onPress={currentHole < 18 ? handleCompleteHole : undefined}
-          disabled={currentHole >= 18}
-        >
-          <Text style={[
-            styles.buttonText, 
-            styles.arrowButtonText,
-            currentHole >= 18 && styles.disabledButtonText
-          ]}>→</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Permanent Navigation - Fixed above spark bottom navigation */}
       <View style={styles.permanentNavigation}>
         {/* Top Row */}
         <View style={styles.navRow}>
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.arrowButton, 
+              currentHole <= 1 && styles.disabledButton
+            ]} 
+            onPress={currentHole > 1 ? onPreviousHole : undefined}
+            disabled={currentHole <= 1}
+          >
+            <Text style={[
+              styles.buttonText, 
+              styles.arrowButtonText,
+              currentHole <= 1 && styles.disabledButtonText
+            ]}>←</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onShowHistory}>
             <Text style={[styles.buttonText, styles.navButtonText]}>Hole History</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.arrowButton,
+              currentHole >= 18 && styles.disabledButton
+            ]} 
+            onPress={currentHole < 18 ? handleCompleteHole : undefined}
+            disabled={currentHole >= 18}
+          >
+            <Text style={[
+              styles.buttonText, 
+              styles.arrowButtonText,
+              currentHole >= 18 && styles.disabledButtonText
+            ]}>→</Text>
           </TouchableOpacity>
         </View>
         
@@ -4627,9 +4661,13 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   };
 
   const handleLoadHoleData = (holeNumber: number) => {
+    console.log('handleLoadHoleData called for hole:', holeNumber);
+    console.log('tempHoleData:', tempHoleData);
+    
     // First check temporary storage (for current session)
     if (tempHoleData[holeNumber]) {
       const tempData = tempHoleData[holeNumber];
+      console.log('Found temp data for hole', holeNumber, ':', tempData);
       // Migrate putts in temporary storage if needed
       const migratedPutts = (tempData.putts || []).map(putt => ({
         ...putt,
@@ -4638,7 +4676,9 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           (putt as any).feet <= 10 ? '5-10ft' : '10+ft' : 
           undefined
       }));
-      return { ...tempData, shots: tempData.shots || [], putts: migratedPutts };
+      const result = { ...tempData, shots: tempData.shots || [], putts: migratedPutts };
+      console.log('Returning temp data:', result);
+      return result;
     }
 
     // Then check permanent database (for previously saved data)
@@ -4658,6 +4698,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       }
     }
 
+    console.log('No data found for hole', holeNumber, 'returning null');
     return null;
   };
 
