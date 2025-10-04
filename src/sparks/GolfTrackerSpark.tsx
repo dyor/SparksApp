@@ -4304,6 +4304,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 isPoorShot={shotInfo.shot.poorShot === true}
                 onSelect={(outcome) => {
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
+                  // Clear poorShot flag when any cell is selected (except long press)
+                  updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', false);
                 }}
                 onPoopSelect={(outcome) => {
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
