@@ -615,7 +615,7 @@ const HoleHistoryModal: React.FC<{
               {holeHistory.recentRounds.map((round, index) => {
                 const netScore = round.totalScore - round.par;
                 return (
-                  <View key={`recent-${round.id || index}`} style={styles.roundItem}>
+                  <View key={`recent-${round.holeNumber}-${round.courseId}-${index}`} style={styles.roundItem}>
                     <Text style={styles.roundDate}>
                       {formatDate(round.completedAt)}
                     </Text>
@@ -671,10 +671,11 @@ const RoundSummaryScreen: React.FC<{
   round: Round;
   course: Course;
   onClose: () => void;
+  onHolePress?: (holeNumber: number) => void;
   handicap?: number;
   getBumpsForHole: (hole: Hole) => number;
   colors: any;
-}> = ({ round, course, onClose, handicap, getBumpsForHole, colors }) => {
+}> = ({ round, course, onClose, onHolePress, handicap, getBumpsForHole, colors }) => {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -1114,7 +1115,12 @@ const RoundSummaryScreen: React.FC<{
                 const bumps = handicap !== undefined ? getBumpsForHole(hole) : 0;
                 
                 return (
-                  <View key={hole.number} style={styles.holeCard}>
+                  <TouchableOpacity 
+                    key={hole.number} 
+                    style={styles.holeCard}
+                    onPress={() => onHolePress?.(hole.number)}
+                    disabled={!onHolePress}
+                  >
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
@@ -1130,7 +1136,7 @@ const RoundSummaryScreen: React.FC<{
                       {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -1145,7 +1151,12 @@ const RoundSummaryScreen: React.FC<{
                 const bumps = handicap !== undefined ? getBumpsForHole(hole) : 0;
                 
                 return (
-                  <View key={hole.number} style={styles.holeCard}>
+                  <TouchableOpacity 
+                    key={hole.number} 
+                    style={styles.holeCard}
+                    onPress={() => onHolePress?.(hole.number)}
+                    disabled={!onHolePress}
+                  >
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
@@ -1161,7 +1172,7 @@ const RoundSummaryScreen: React.FC<{
                       {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -1181,7 +1192,12 @@ const RoundSummaryScreen: React.FC<{
                 const bumps = handicap !== undefined ? getBumpsForHole(hole) : 0;
                 
                 return (
-                  <View key={hole.number} style={styles.holeCard}>
+                  <TouchableOpacity 
+                    key={hole.number} 
+                    style={styles.holeCard}
+                    onPress={() => onHolePress?.(hole.number)}
+                    disabled={!onHolePress}
+                  >
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
@@ -1197,7 +1213,7 @@ const RoundSummaryScreen: React.FC<{
                       {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -1212,7 +1228,12 @@ const RoundSummaryScreen: React.FC<{
                 const bumps = handicap !== undefined ? getBumpsForHole(hole) : 0;
                 
                 return (
-                  <View key={hole.number} style={styles.holeCard}>
+                  <TouchableOpacity 
+                    key={hole.number} 
+                    style={styles.holeCard}
+                    onPress={() => onHolePress?.(hole.number)}
+                    disabled={!onHolePress}
+                  >
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
@@ -1228,7 +1249,7 @@ const RoundSummaryScreen: React.FC<{
                       {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -1700,9 +1721,12 @@ const GolfTrackerSettings: React.FC<{
   data: GolfTrackerData;
   onUpdateSettings: (settings: Partial<GolfTrackerData['settings']>) => void;
   onEditRound?: (round: Round) => void;
+  onViewRound?: (round: Round) => void;
   onDeleteRound?: (roundId: string) => void;
+  onNavigateToRound?: () => void;
+  onNavigateToCourse?: (courseId: string) => void;
   colors: any;
-}> = ({ onClose, courses, onUpdateCourse, onDeleteCourse, data, onUpdateSettings, onEditRound, onDeleteRound, colors }) => {
+}> = ({ onClose, courses, onUpdateCourse, onDeleteCourse, data, onUpdateSettings, onEditRound, onViewRound, onDeleteRound, onNavigateToRound, onNavigateToCourse, colors }) => {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [newClubName, setNewClubName] = useState('');
   const [showAllRounds, setShowAllRounds] = useState(false);
@@ -1954,6 +1978,102 @@ const GolfTrackerSettings: React.FC<{
       fontSize: 18,
       fontWeight: 'bold',
     },
+    activeRoundNote: {
+      backgroundColor: 'rgba(255, 193, 7, 0.1)',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 193, 7, 0.3)',
+    },
+    activeRoundText: {
+      color: '#FFC107',
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    returnToRoundButton: {
+      backgroundColor: '#FFC107',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      alignItems: 'center',
+    },
+    returnToRoundButtonText: {
+      color: '#000000',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    activeRoundLabel: {
+      fontSize: 12,
+      color: '#4CAF50',
+      fontWeight: '600',
+      marginTop: 4,
+    },
+    disabledButton: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      opacity: 0.5,
+    },
+    disabledButtonText: {
+      color: 'rgba(255, 255, 255, 0.5)',
+    },
+    noRoundsText: {
+      fontStyle: 'italic',
+      textAlign: 'center',
+      marginTop: 20,
+    },
+    roundItem: {
+      flexDirection: 'column',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    roundInfo: {
+      marginBottom: 8,
+    },
+    roundCourse: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      marginBottom: 2,
+    },
+    roundId: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: '#AAAAAA',
+      marginBottom: 2,
+    },
+    roundDate: {
+      fontSize: 14,
+      color: '#CCCCCC',
+      marginBottom: 4,
+    },
+    roundScore: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    incompleteText: {
+      fontSize: 12,
+      color: '#2196F3',
+      fontStyle: 'italic',
+    },
+    roundActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    showMoreButton: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    showMoreText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '500',
+    },
   });
 
   return (
@@ -1967,7 +2087,7 @@ const GolfTrackerSettings: React.FC<{
 
         <SettingsSection title="Handicap">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
-            <SettingsText variant="body" style={{ marginBottom: 12 }}>
+            <SettingsText variant="body">
               Your handicap index for stroke calculations
             </SettingsText>
             <View style={styles.handicapContainer}>
@@ -2003,9 +2123,7 @@ const GolfTrackerSettings: React.FC<{
 
         <SettingsSection title="Clubs">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
-            <SettingsText variant="body" style={{ marginBottom: 12 }}>
-              Manage your golf clubs for shot tracking
-            </SettingsText>
+            
             <View style={styles.clubList}>
               {(localSettings.clubs || DEFAULT_CLUBS).map((club, index) => (
                 <View key={index} style={styles.clubItem}>
@@ -2074,26 +2192,42 @@ const GolfTrackerSettings: React.FC<{
 
         <SettingsSection title="Recent Rounds">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
-            <SettingsText variant="body" style={{ marginBottom: 12 }}>
-              Manage your golf rounds and scores
-            </SettingsText>
+            {data.currentRound && (
+              <View style={styles.activeRoundNote}>
+                <SettingsText variant="body">
+                  Editing a round is disabled until you end the current round
+                </SettingsText>
+                <TouchableOpacity
+                  style={styles.returnToRoundButton}
+                  onPress={onNavigateToRound}
+                >
+                  <Text style={styles.returnToRoundButtonText}>Return to Current Round</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
             {sortedRounds.length === 0 ? (
-              <SettingsText variant="body" style={styles.noRoundsText}>
+              <SettingsText variant="body">
                 No rounds recorded yet
               </SettingsText>
             ) : (
               <>
                 {displayedRounds.map((round, index) => {
+                  console.log('Rendering round:', { id: round.id, courseId: round.courseId, courseName: round.courseName, isComplete: round.isComplete });
                   const course = courses.find(c => c.id === round.courseId);
                   const netScore = round.totalScore - round.totalPar;
                   const isIncomplete = !round.isComplete;
+                  const isActiveRound = data.currentRound?.id === round.id;
+                  const canEdit = !data.currentRound || isActiveRound;
                   
                   return (
                     <View key={`round-${round.id}-${index}`} style={styles.roundItem}>
                       <View style={styles.roundInfo}>
                         <Text style={styles.roundCourse}>
                           {course?.name || 'Unknown Course'}
+                        </Text>
+                        <Text style={styles.roundId}>
+                          Round #{round.id.slice(-6)}
                         </Text>
                         <Text style={styles.roundDate}>
                           {formatDate(round.completedAt || round.startedAt)}
@@ -2109,20 +2243,60 @@ const GolfTrackerSettings: React.FC<{
                             Through {round.holeScores?.length || 0} holes
                           </Text>
                         )}
+                        {isActiveRound && (
+                          <Text style={styles.activeRoundLabel}>
+                            Currently Active
+                          </Text>
+                        )}
                       </View>
                       
-                      <View style={styles.roundActions}>
+                      <View style={[styles.roundActions, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }]}>
                         <TouchableOpacity
-                          style={[styles.actionButton, styles.editButton]}
-                          onPress={() => handleEditRound(round)}
+                          style={[
+                            styles.actionButton,
+                            styles.editButton,
+                            { flex: 1, marginRight: 8 },
+                            !canEdit && styles.disabledButton
+                          ]}
+                          onPress={() => {
+                            if (isActiveRound && onViewRound) {
+                              onViewRound(round);
+                            } else if (canEdit && onEditRound) {
+                              onEditRound(round);
+                            }
+                          }}
+                          disabled={!canEdit}
                         >
-                          <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit</Text>
+                          <Text style={[
+                            styles.actionButtonText, 
+                            styles.editButtonText,
+                            !canEdit && styles.disabledButtonText
+                          ]}>
+                            {isActiveRound ? 'View' : 'Edit'}
+                          </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.actionButton, styles.deleteButton]}
-                          onPress={() => handleDeleteRound(round)}
+                          style={[
+                            styles.actionButton,
+                            styles.deleteButton,
+                            { flex: 1, marginLeft: 8 },
+                            isActiveRound && styles.disabledButton
+                          ]}
+                          onPress={() => {
+                            console.log('Delete button pressed for round:', { id: round.id, courseName: round.courseName, isActiveRound });
+                            if (!isActiveRound && onDeleteRound && round.id) {
+                              onDeleteRound(round.id);
+                            }
+                          }}
+                          disabled={isActiveRound}
                         >
-                          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                          <Text style={[
+                            styles.actionButtonText, 
+                            styles.deleteButtonText,
+                            isActiveRound && styles.disabledButtonText
+                          ]}>
+                            Delete
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -2149,7 +2323,7 @@ const GolfTrackerSettings: React.FC<{
         <SettingsSection title="About">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
             <SettingsText variant="body">
-              Golf Brain helps you record detailed golf rounds with shot-by-shot analysis.{'\n'}
+              Golf Brain helps you record detailed golf rounds with shot-by-shot tracking.{'\n'}
               Track courses, scores, and analyze your performance over time.
             </SettingsText>
           </View>
@@ -2189,16 +2363,14 @@ const GolfTrackerSettingsStyles = StyleSheet.create({
     marginTop: 20,
   },
   roundItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
   },
   roundInfo: {
-    flex: 1,
+    marginBottom: 8,
   },
   roundCourse: {
     fontSize: 16,
@@ -2222,15 +2394,16 @@ const GolfTrackerSettingsStyles = StyleSheet.create({
   },
   roundActions: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     alignItems: 'center',
-    minHeight: 20,
+    justifyContent: 'center',
+    minHeight: 32,
   },
   editButton: {
     backgroundColor: '#2196F3',
@@ -2239,9 +2412,47 @@ const GolfTrackerSettingsStyles = StyleSheet.create({
     backgroundColor: '#F44336',
   },
   actionButtonText: {
-    fontSize: 8,
+    fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  activeRoundNote: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  activeRoundText: {
+    color: '#FFC107',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  returnToRoundButton: {
+    backgroundColor: '#FFC107',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  returnToRoundButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activeRoundLabel: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  disabledButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    opacity: 0.5,
+  },
+  disabledButtonText: {
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   editButtonText: {
     color: '#FFFFFF',
@@ -3210,7 +3421,14 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           style: 'destructive',
           onPress: () => {
             // Save current data before ending round
-            onSaveHoleData(currentHole, shots, putts);
+            console.log('Saving hole data before ending round:', {
+              currentHole,
+              shots: shots || [],
+              putts: putts || [],
+              shotsCount: (shots || []).length,
+              puttsCount: (putts || []).length
+            });
+            onSaveHoleData(currentHole, shots || [], putts || []);
             // Call parent's end round handler
             onEndRound();
           },
@@ -4423,6 +4641,16 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     flames: []
   });
 
+  // Debug useEffect to monitor state changes
+  useEffect(() => {
+    console.log('State changed:', { 
+      currentScreen, 
+      selectedCourse: selectedCourse?.name || 'null', 
+      currentRound: currentRound?.id || 'null',
+      dataCurrentRound: data.currentRound?.id || 'null'
+    });
+  }, [currentScreen, selectedCourse, currentRound, data.currentRound]);
+
   // Load saved data on mount
   useEffect(() => {
     const savedData = getSparkData('golf-brain') as GolfTrackerData;
@@ -4465,9 +4693,13 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       const course = data.courses.find(c => c.id === inProgressRound.courseId);
       if (course) {
         setSelectedCourse(course);
-        setCurrentRound(inProgressRound);
-        setCurrentScreen('hole-detail');
-        return;
+      setCurrentRound(inProgressRound);
+      setData(prev => ({
+        ...prev,
+        currentRound: inProgressRound,
+      }));
+      setCurrentScreen('hole-detail');
+      return;
       }
     }
 
@@ -4514,6 +4746,10 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     };
     
     setCurrentRound(newRound);
+    setData(prev => ({
+      ...prev,
+      currentRound: newRound,
+    }));
     setCurrentScreen('hole-detail');
     HapticFeedback.light();
   };
@@ -4545,23 +4781,16 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     };
 
     setCurrentRound(updatedRound);
+    setData(prev => ({
+      ...prev,
+      currentRound: updatedRound,
+    }));
 
-    // Check if round is complete
-    if (holeScore.holeNumber === 18) {
-      const completedRound = {
-        ...updatedRound,
-        completedAt: Date.now(),
-        isComplete: true,
-      };
-
-      setData(prev => ({
-        ...prev,
-        rounds: [...(prev.rounds || []), completedRound],
-        currentRound: undefined,
-      }));
-
-      setCurrentScreen('round-summary');
-    } else {
+    // Note: Round completion is now handled by handleEndRound() when "End Round" is clicked
+    // This prevents duplicate rounds from being created
+    
+    // Move to next hole if not hole 18
+    if (holeScore.holeNumber < 18) {
       const nextHole = holeScore.holeNumber + 1;
       setCurrentHole(nextHole);
       
@@ -4613,6 +4842,15 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   const holeDetailRef = useRef<{ saveCurrentData: () => void }>(null);
 
   const handleSaveHoleData = (holeNumber: number, shots: Shot[], putts: Shot[]) => {
+    console.log('handleSaveHoleData called:', {
+      holeNumber,
+      shots: shots || [],
+      putts: putts || [],
+      shotsCount: (shots || []).length,
+      puttsCount: (putts || []).length,
+      currentRound: currentRound?.id
+    });
+    
     // Save to temporary storage for navigation
     setTempHoleData(prev => ({
       ...prev,
@@ -4630,6 +4868,8 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         netScore: ((shots || []).length + (putts || []).length) - (selectedCourse?.holes.find(h => h.number === holeNumber)?.par || 4),
         completedAt: Date.now(),
       };
+      
+      console.log('Saving hole score to permanent database:', holeScore);
 
       // Update the current round with this hole's data
       setData(prev => {
@@ -4672,10 +4912,10 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       const migratedPutts = (tempData.putts || []).map(putt => ({
         ...putt,
         puttDistance: putt.puttDistance || (putt as any).feet ? 
-          (putt as any).feet < 4 ? '<4ft' : 
-          (putt as any).feet <= 10 ? '5-10ft' : '10+ft' : 
+          (putt as any).feet < 4 ? '<4ft' as const : 
+          (putt as any).feet <= 10 ? '5-10ft' as const : '10+ft' as const : 
           undefined
-      }));
+      })) as Shot[];
       const result = { ...tempData, shots: tempData.shots || [], putts: migratedPutts };
       console.log('Returning temp data:', result);
       return result;
@@ -4737,8 +4977,11 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   };
 
   const handleEditRound = (round: Round) => {
+    console.log('handleEditRound called with round:', { id: round.id, courseId: round.courseId, courseName: round.courseName });
+    
     // Check if there's an active round
     if (data.currentRound && data.currentRound.id !== round.id) {
+      console.log('Active round in progress, showing alert');
       Alert.alert(
         'Active Round in Progress',
         'You must end your current round before editing another round.',
@@ -4749,30 +4992,77 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       return;
     }
 
-    // Set the round as current and navigate to hole detail
+    console.log('Setting round as current and navigating to round summary');
+    // Set the round as current and navigate to round summary
     setData(prev => ({
       ...prev,
       currentRound: round,
     }));
-    setCurrentScreen('hole-detail');
-    setCurrentHole(1); // Start from hole 1 when editing
-    
-    // Force scroll to top after a brief delay to ensure the screen is rendered
-    setTimeout(() => {
-      // This will be handled by the HoleDetailScreen's useEffect
-    }, 200);
+    // Also update local currentRound state for consistency
+    setCurrentRound(round);
+    const course = data.courses.find(c => c.id === round.courseId);
+    console.log('Found course for round:', { courseId: round.courseId, course: course?.name || 'Not found' });
+    setSelectedCourse(course || null);
+    setCurrentScreen('round-summary');
+    console.log('Navigation state set:', { currentScreen: 'round-summary', selectedCourse: course?.name, currentRound: round.id });
+    // Close settings when navigating to round summary
+    if (onCloseSettings) {
+      onCloseSettings();
+    }
+  };
+
+  const handleViewRound = (round: Round) => {
+    // For active rounds, just navigate to round summary without changing current round
+    setCurrentRound(round);
+    setData(prev => ({
+      ...prev,
+      currentRound: round,
+    }));
+    setSelectedCourse(data.courses.find(c => c.id === round.courseId) || null);
+    setCurrentScreen('round-summary');
+    // Close settings when navigating to round summary
+    if (onCloseSettings) {
+      onCloseSettings();
+    }
   };
 
   const handleDeleteRound = (roundId: string) => {
-    setData(prev => ({
-      ...prev,
-      rounds: (prev.rounds || []).filter(round => round.id !== roundId),
-      // If we're deleting the current round, clear it
-      currentRound: prev.currentRound?.id === roundId ? undefined : prev.currentRound,
-    }));
+    console.log('handleDeleteRound called with roundId:', roundId);
+    console.log('Current rounds before deletion:', (data.rounds || []).map(r => ({ id: r.id, courseName: r.courseName })));
+    
+    // Safety check - if roundId is undefined or empty, don't delete anything
+    if (!roundId) {
+      console.error('handleDeleteRound called with empty roundId');
+      return;
+    }
+    
+    setData(prev => {
+      const filteredRounds = (prev.rounds || []).filter(round => {
+        const shouldKeep = round.id !== roundId;
+        console.log(`Round ${round.id} ${shouldKeep ? 'kept' : 'deleted'} (comparing with ${roundId})`);
+        return shouldKeep;
+      });
+      console.log('Rounds after filtering:', filteredRounds.map(r => ({ id: r.id, courseName: r.courseName })));
+      
+      return {
+        ...prev,
+        rounds: filteredRounds,
+        // If we're deleting the current round, clear it
+        currentRound: prev.currentRound?.id === roundId ? undefined : prev.currentRound,
+      };
+    });
+    // Also clear local currentRound state if we're deleting the current round
+    if (currentRound?.id === roundId) {
+      setCurrentRound(null);
+    }
   };
 
   const handleEndRound = () => {
+    // Save current hole data before ending the round
+    if (holeDetailRef.current) {
+      holeDetailRef.current.saveCurrentData();
+    }
+    
     if (currentRound) {
       const completedRound = {
         ...currentRound,
@@ -4784,9 +5074,15 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         rounds: [...(prev.rounds || []), completedRound],
         currentRound: undefined,
       }));
+      setCurrentRound(null);
     }
     setRoundEnded(true);
     setCurrentScreen('round-summary');
+  };
+
+  const handleHolePress = (holeNumber: number) => {
+    setCurrentHole(holeNumber);
+    setCurrentScreen('hole-detail');
   };
 
   const triggerFlameAnimation = () => {
@@ -4877,6 +5173,10 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     if (course) {
       setSelectedCourse(course);
       setCurrentRound(round);
+      setData(prev => ({
+        ...prev,
+        currentRound: round,
+      }));
       setCurrentHole(round.holeScores.length > 0 ? round.holeScores[round.holeScores.length - 1].holeNumber + 1 : 1);
       setCurrentScreen('hole-detail');
     }
@@ -4894,11 +5194,19 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   };
 
   const handleDeleteCourse = (courseId: string) => {
-    setData(prev => ({
-      ...prev,
-      courses: prev.courses.filter(course => course.id !== courseId),
-      rounds: prev.rounds.filter(round => round.courseId !== courseId),
-    }));
+    console.log('handleDeleteCourse called with courseId:', courseId);
+    console.log('Current rounds before course deletion:', (data.rounds || []).map(r => ({ id: r.id, courseId: r.courseId, courseName: r.courseName })));
+    
+    setData(prev => {
+      const filteredRounds = prev.rounds.filter(round => round.courseId !== courseId);
+      console.log('Rounds after course deletion:', filteredRounds.map(r => ({ id: r.id, courseId: r.courseId, courseName: r.courseName })));
+      
+      return {
+        ...prev,
+        courses: prev.courses.filter(course => course.id !== courseId),
+        rounds: filteredRounds,
+      };
+    });
     HapticFeedback.light();
   };
 
@@ -4927,7 +5235,20 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         data={data}
         onUpdateSettings={handleUpdateSettings}
         onEditRound={handleEditRound}
+        onViewRound={handleViewRound}
         onDeleteRound={handleDeleteRound}
+        onNavigateToRound={() => {
+          setCurrentScreen('round-summary');
+          setSelectedCourse(data.courses.find(c => c.id === data.currentRound?.courseId) || null);
+          // Close settings when navigating to round summary
+          if (onCloseSettings) {
+            onCloseSettings();
+          }
+        }}
+        onNavigateToCourse={(courseId) => {
+          setSelectedCourse(data.courses.find(c => c.id === courseId) || null);
+          setCurrentScreen('hole-detail');
+        }}
         colors={colors}
       />
     );
@@ -4974,10 +5295,20 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           round={currentRound}
           course={selectedCourse}
           onClose={() => setCurrentScreen(roundEnded ? 'course-selection' : 'hole-detail')}
+          onHolePress={handleHolePress}
           handicap={data.settings.handicap}
           getBumpsForHole={getBumpsForHole}
           colors={colors}
         />
+      )}
+      
+      {/* Debug info for round summary rendering */}
+      {currentScreen === 'round-summary' && (
+        <View style={{ position: 'absolute', top: 50, left: 10, backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, borderRadius: 5 }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            Debug: currentScreen={currentScreen}, selectedCourse={selectedCourse?.name || 'null'}, currentRound={currentRound?.id || 'null'}
+          </Text>
+        </View>
       )}
 
       <CreateCourseModal
