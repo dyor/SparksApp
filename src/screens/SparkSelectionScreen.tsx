@@ -73,7 +73,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
       marginBottom: 6,
     },
     sparkTitle: {
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
       color: colors.text,
       textAlign: 'center',
@@ -106,7 +106,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
               >
                 <View style={styles.sparkCardContent}>
                   <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
-                  <Text style={styles.sparkTitle}>{spark.metadata.title}</Text>
+                  <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                 </View>
               </TouchableOpacity>
             );

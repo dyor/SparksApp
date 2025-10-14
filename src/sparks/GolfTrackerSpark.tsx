@@ -2627,29 +2627,26 @@ const OutcomeGrid: React.FC<{
     },
     grid: {
       flexDirection: 'row',
-      gap: 1,
+      gap: 2,
     },
     row: {
       flex: 1,
-      gap: 1,
+      gap: 2,
     },
     cell: {
-      aspectRatio: 1.5, // More compact, less white space
-      borderRadius: 8,
+      aspectRatio: 1, // Square cells, more compact
+      height: 40, // Fixed smaller height
+      borderRadius: 4,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border,
     },
     cellText: {
-      fontSize: 10,
+      fontSize: 8,
       fontWeight: '500',
       textAlign: 'center',
-      lineHeight: 12,
-    },
-    countText: {
-      fontSize: 8,
-      marginTop: 2,
+      lineHeight: 10,
     },
   });
 
@@ -2726,11 +2723,6 @@ const OutcomeGrid: React.FC<{
                   ]}>
                     {outcome === 'good' ? (selectedOutcome === 'fire' ? '🔥' : 'good') : (isSelected && isPoorShot ? `${outcome} 💩` : outcome)}
                   </Text>
-                  {count > 0 && !isSelected && outcome !== 'good' && (
-                    <Text style={[styles.countText, { color: colors.textSecondary }]}>
-                      {count}
-                    </Text>
-                  )}
                 </TouchableOpacity>
               );
             })}
@@ -3672,7 +3664,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: 4,
+      marginTop: 0,
       marginBottom: 20,
       paddingHorizontal: 8,
     },
