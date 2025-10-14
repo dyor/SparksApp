@@ -2627,19 +2627,22 @@ const OutcomeGrid: React.FC<{
     },
     grid: {
       flexDirection: 'row',
-      gap: 2,
+      alignSelf: 'center', // Center horizontally
+      width: 180, // 3 cells * 41px each
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     row: {
       flex: 1,
-      gap: 2,
     },
     cell: {
-      aspectRatio: 1, // Square cells, more compact
-      height: 40, // Fixed smaller height
-      borderRadius: 4,
+      aspectRatio: 1, // Square cells
+      height: 60, // 1px larger than before (40 + 1)
+      borderRadius: 0, // No border radius for touching cells
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 1,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
       borderColor: colors.border,
     },
     cellText: {
@@ -2702,7 +2705,6 @@ const OutcomeGrid: React.FC<{
                     {
                       backgroundColor: isSelected && isPoorShot ? '#D2B48C' : getCellColor(), // Light brown for poor shots
                       borderColor: isSelected ? colors.primary : colors.border,
-                      borderWidth: isSelected ? 2 : 1,
                     }
                   ]}
                   onPress={() => onSelect(outcomeValue)}
