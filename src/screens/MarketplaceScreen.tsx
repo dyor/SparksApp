@@ -50,8 +50,8 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       justifyContent: 'space-between',
     },
     sparkCard: {
-      width: '48%',
-      aspectRatio: 1.3,
+      width: '31%',
+      aspectRatio: 1.1,
       marginBottom: 16,
       backgroundColor: colors.surface,
       borderRadius: 12,
@@ -65,14 +65,14 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 24,
+      padding: 16,
     },
     sparkIcon: {
-      fontSize: 48,
-      marginBottom: 8,
+      fontSize: 36,
+      marginBottom: 6,
     },
     sparkTitle: {
-      fontSize: 18,
+      fontSize: 14,
       fontWeight: '600',
       color: colors.text,
       textAlign: 'center',
@@ -82,8 +82,8 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Spark Marketplace</Text>
-        <Text style={styles.subtitle}>Discover new experiences</Text>
+        <Text style={styles.title}>Discover Sparks</Text>
+        <Text style={styles.subtitle}>Explore new experiences</Text>
       </View>
       <ScrollView>
         <View style={styles.grid}>

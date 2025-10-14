@@ -21,6 +21,11 @@ interface AppState {
   // Current spark state
   currentSparkId: string | null;
   setCurrentSparkId: (sparkId: string | null) => void;
+  
+  // Recent sparks for quick switching
+  recentSparks: string[];
+  addRecentSpark: (sparkId: string) => void;
+  clearRecentSparks: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -35,6 +40,7 @@ export const useAppStore = create<AppState>()(
       },
       isFirstLaunch: true,
       currentSparkId: null,
+      recentSparks: [],
       
       // Actions
       setPreferences: (newPreferences) =>
@@ -45,6 +51,15 @@ export const useAppStore = create<AppState>()(
       setIsFirstLaunch: (isFirst) => set({ isFirstLaunch: isFirst }),
       
       setCurrentSparkId: (sparkId) => set({ currentSparkId: sparkId }),
+      
+      addRecentSpark: (sparkId) =>
+        set((state) => {
+          const filtered = state.recentSparks.filter(id => id !== sparkId);
+          const updated = [sparkId, ...filtered].slice(0, 5); // Keep only 5 most recent
+          return { recentSparks: updated };
+        }),
+      
+      clearRecentSparks: () => set({ recentSparks: [] }),
     }),
     {
       name: 'sparks-app-storage',

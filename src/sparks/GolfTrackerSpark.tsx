@@ -11,6 +11,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -3322,7 +3323,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       id: `shot-${Date.now()}-${Math.random()}`,
       type: 'shot',
       lie: 'green',
-      direction: 'good', // Default to good outcome
+      direction: undefined, // No default outcome - user must select
       timestamp: Date.now(),
     };
     setShots(prev => {
@@ -3352,7 +3353,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       id: `putt-${Date.now()}-${Math.random()}`,
       type: 'putt',
       puttDistance: '5-10ft',
-      direction: 'good', // Default to good outcome
+      direction: undefined, // No default outcome - user must select
       timestamp: Date.now(),
     };
     setPutts(prev => [...prev, newPutt]);
@@ -3666,6 +3667,34 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 8,
+    },
+    shotHeaderWithNavigation: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 4,
+      marginBottom: 20,
+      paddingHorizontal: 8,
+    },
+    shotNavButton: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 60,
+    },
+    disabledShotNavButton: {
+      backgroundColor: colors.border,
+    },
+    shotNavButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.background,
+    },
+    disabledShotNavButtonText: {
+      color: colors.textSecondary,
     },
     shotNumber: {
       fontSize: 16,
@@ -4060,11 +4089,14 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       fontWeight: '500',
     },
     shotGridContainer: {
-      paddingVertical: 8,
-      backgroundColor: colors.surface,
+      paddingVertical: 12,
+      backgroundColor: colors.background,
       borderTopWidth: 1,
       borderTopColor: colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
       position: 'relative',
+      marginTop: 4,
     },
     shotNavigationArrows: {
       position: 'absolute',
@@ -4077,12 +4109,13 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     },
     shotArrowButton: {
       height: 32,
-      width: 32,
+      paddingHorizontal: 12,
       borderRadius: 16,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       marginHorizontal: 4,
+      minWidth: 80,
     },
     disabledShotArrow: {
       backgroundColor: colors.border,
@@ -4109,7 +4142,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       height: 32,
       paddingHorizontal: 16,
       borderRadius: 16,
-      backgroundColor: colors.border,
+      backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
       alignItems: 'center',
@@ -4216,44 +4249,58 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       </View>
 
       {/* Single Shot Display */}
-      <View style={[styles.content, { height: 350 }]}>
-        {(() => {
-          const shotInfo = getCurrentShotInfo();
-          if (!shotInfo) {
-            // No shots yet - show add shot options
-            return (
-              <View style={styles.noShotsContainer}>
-                <Text style={styles.noShotsText}>No shots recorded yet</Text>
-                <View style={styles.addShotButtonsContainer}>
-                  <TouchableOpacity 
-                    style={[styles.addShotButton, styles.addShotButton]}
-                    onPress={addShot}
-                  >
-                    <Text style={[styles.addShotButtonText, styles.addShotButtonText]}>+ Add Shot</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.addShotButton, styles.addPuttButton]}
-                    onPress={addPutt}
-                  >
-                    <Text style={[styles.addShotButtonText, styles.addPuttButtonText]}>+ Add Putt</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
+      <PanGestureHandler
+        onHandlerStateChange={({ nativeEvent }) => {
+          if (nativeEvent.state === State.END) {
+            const { translationX, velocityX } = nativeEvent;
+            const swipeThreshold = 50;
+            const velocityThreshold = 500;
+            
+            // Swipe right to left (Next) - negative translationX or high velocity to the left
+            if (translationX < -swipeThreshold || velocityX < -velocityThreshold) {
+              if (canGoNext) {
+                HapticFeedback.light();
+                goToNextShot();
+              }
+            }
+            // Swipe left to right (Previous) - positive translationX or high velocity to the right
+            else if (translationX > swipeThreshold || velocityX > velocityThreshold) {
+              if (canGoPrevious) {
+                HapticFeedback.light();
+                goToPreviousShot();
+              }
+            }
           }
+        }}
+      >
+        <View style={[styles.content, { height: 350 }]}>
+          {(() => {
+            const shotInfo = getCurrentShotInfo();
+            if (!shotInfo) {
+              // No shots yet - show add shot options
+              return (
+                <View style={styles.noShotsContainer}>
+                  <Text style={styles.noShotsText}>No shots recorded yet</Text>
+                  <View style={styles.addShotButtonsContainer}>
+                    <TouchableOpacity 
+                      style={[styles.addShotButton, styles.addShotButton]}
+                      onPress={addShot}
+                    >
+                      <Text style={[styles.addShotButtonText, styles.addShotButtonText]}>+ Add Shot</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.addShotButton, styles.addPuttButton]}
+                      onPress={addPutt}
+                    >
+                      <Text style={[styles.addShotButtonText, styles.addPuttButtonText]}>+ Add Putt</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }
 
-          return (
-            <View style={styles.shotCard}>
-              <View style={styles.shotHeader}>
-                <Text style={styles.shotNumber}>{shotInfo.shotLabel}</Text>
-                <TouchableOpacity
-                  style={styles.deleteShotButton}
-                  onPress={() => removeShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt')}
-                >
-                  <Text style={styles.deleteShotButtonText}>Delete Shot</Text>
-                </TouchableOpacity>
-              </View>
-              
+            return (
+              <View style={styles.shotCard}>
               <View style={styles.shotFields}>
                 <View style={[styles.shotFieldRow, { flexDirection: 'row', gap: 8 }]}>
                   {shotInfo.isShot ? (
@@ -4303,11 +4350,16 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 selectedOutcome={shotInfo.shot.direction}
                 isPoorShot={shotInfo.shot.poorShot === true}
                 onSelect={(outcome) => {
+                  console.log('GolfTracker: onSelect called with outcome:', outcome);
+                  console.log('GolfTracker: Current shot poorShot before:', shotInfo.shot.poorShot);
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
                   // Clear poorShot flag when any cell is selected (except long press)
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', false);
+                  console.log('GolfTracker: Cleared poorShot flag');
                 }}
                 onPoopSelect={(outcome) => {
+                  console.log('GolfTracker: onPoopSelect called with outcome:', outcome);
+                  console.log('GolfTracker: Setting poorShot to true');
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', true);
                 }}
@@ -4316,10 +4368,51 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 showError={showValidationError && !shotInfo.shot.direction}
                 colors={colors}
               />
+              
+              {/* Shot Header - Moved below outcome grid with Prev/Next buttons */}
+              <View style={styles.shotHeaderWithNavigation}>
+                <TouchableOpacity
+                  style={[
+                    styles.shotNavButton,
+                    !canGoPrevious && styles.disabledShotNavButton
+                  ]}
+                  onPress={goToPreviousShot}
+                  disabled={!canGoPrevious}
+                >
+                  <Text style={[
+                    styles.shotNavButtonText,
+                    !canGoPrevious && styles.disabledShotNavButtonText
+                  ]}>← Prev</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.deleteShotButton}
+                  onPress={() => removeShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt')}
+                >
+                  <Text style={styles.deleteShotButtonText}>
+                    {shotInfo.type === 'shot' ? 'Delete Shot' : 'Delete Putt'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.shotNavButton,
+                    !canGoNext && styles.disabledShotNavButton
+                  ]}
+                  onPress={goToNextShot}
+                  disabled={!canGoNext}
+                >
+                  <Text style={[
+                    styles.shotNavButtonText,
+                    !canGoNext && styles.disabledShotNavButtonText
+                  ]}>Next →</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           );
         })()}
-      </View>
+        </View>
+      </PanGestureHandler>
 
       {/* Shot Grid Navigation */}
       <View style={styles.shotGridContainer}>
@@ -4387,36 +4480,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           </TouchableOpacity>
         </ScrollView>
         
-        {/* Shot Navigation Arrows - At Screen Edges */}
-        <View style={styles.shotNavigationArrows}>
-          <TouchableOpacity
-            style={[
-              styles.shotArrowButton,
-              !canGoPrevious && styles.disabledShotArrow
-            ]}
-            onPress={goToPreviousShot}
-            disabled={!canGoPrevious}
-          >
-            <Text style={[
-              styles.shotArrowText,
-              !canGoPrevious && styles.disabledShotArrowText
-            ]}>←</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.shotArrowButton,
-              !canGoNext && styles.disabledShotArrow
-            ]}
-            onPress={goToNextShot}
-            disabled={!canGoNext}
-          >
-            <Text style={[
-              styles.shotArrowText,
-              !canGoNext && styles.disabledShotArrowText
-            ]}>→</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
 
@@ -4437,7 +4500,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               styles.buttonText, 
               styles.arrowButtonText,
               currentHole <= 1 && styles.disabledButtonText
-            ]}>←</Text>
+            ]}>← Prev Hole</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onShowHistory}>
@@ -4457,7 +4520,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               styles.buttonText, 
               styles.arrowButtonText,
               currentHole >= 18 && styles.disabledButtonText
-            ]}>→</Text>
+            ]}>Next Hole →</Text>
           </TouchableOpacity>
         </View>
         

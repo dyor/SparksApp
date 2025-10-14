@@ -8,6 +8,7 @@ import { getSparkById } from '../components/SparkRegistry';
 import { useSparkStore, useAppStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { QuickSwitchModal } from '../components/QuickSwitchModal';
 
 type SparkScreenNavigationProp = 
   | StackNavigationProp<MySparkStackParamList, 'Spark'>
@@ -25,10 +26,11 @@ interface Props {
 export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const { sparkId } = route.params;
   const { updateSparkProgress, isUserSpark, addSparkToUser, removeSparkFromUser } = useSparkStore();
-  const { setCurrentSparkId } = useAppStore();
+  const { setCurrentSparkId, recentSparks, addRecentSpark } = useAppStore();
   const { colors } = useTheme();
   
   const [showSparkSettings, setShowSparkSettings] = useState(false);
+  const [showQuickSwitch, setShowQuickSwitch] = useState(false);
 
   const styles = StyleSheet.create({
     container: {
@@ -106,6 +108,18 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     removeLabel: {
       color: colors.error,
     },
+    quickSwitchIcon: {
+      color: colors.primary,
+    },
+    quickSwitchLabel: {
+      color: colors.primary,
+    },
+    recentSparkIcon: {
+      color: colors.textSecondary,
+    },
+    recentSparkLabel: {
+      color: colors.textSecondary,
+    },
     settingsIcon: {
       color: colors.primary,
     },
@@ -126,12 +140,14 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     if (spark) {
       // Update play count when spark is accessed
       updateSparkProgress(sparkId, {});
+      // Add to recent sparks for quick switching
+      addRecentSpark(sparkId);
     }
 
     return () => {
       setCurrentSparkId(null);
     };
-  }, [sparkId, spark, setCurrentSparkId, updateSparkProgress]);
+  }, [sparkId, spark, setCurrentSparkId, updateSparkProgress, addRecentSpark]);
 
   const handleClose = () => {
     HapticFeedback.light();
@@ -165,6 +181,45 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleSettings = () => {
     HapticFeedback.light();
     setShowSparkSettings(true);
+  };
+
+  const handleQuickSwitch = () => {
+    console.log('QuickSwitch: Opening modal');
+    console.log('QuickSwitch: Current sparkId:', sparkId);
+    console.log('QuickSwitch: All recent sparks:', recentSparks);
+    console.log('QuickSwitch: Filtered recent sparks:', recentSparks.filter(id => id !== sparkId));
+    HapticFeedback.light();
+    setShowQuickSwitch(true);
+  };
+
+  const handleSelectSpark = (selectedSparkId: string) => {
+    console.log('QuickSwitch: Selected spark ID:', selectedSparkId);
+    console.log('QuickSwitch: Current spark ID:', sparkId);
+    console.log('QuickSwitch: Available sparks:', recentSparks);
+    
+    if (selectedSparkId !== sparkId) {
+      // Verify the spark exists before navigating
+      const targetSpark = getSparkById(selectedSparkId);
+      console.log('QuickSwitch: Target spark found:', targetSpark);
+      
+      if (targetSpark) {
+        navigation.replace('Spark', { sparkId: selectedSparkId });
+      } else {
+        console.error('QuickSwitch: Spark not found:', selectedSparkId);
+      }
+    }
+  };
+
+  const handleRecentSparkPress = () => {
+    if (recentSparks.length > 1) {
+      const previousSpark = recentSparks.find(id => id !== sparkId);
+      if (previousSpark) {
+        HapticFeedback.light();
+        navigation.replace('Spark', { sparkId: previousSpark });
+      }
+    } else {
+      handleQuickSwitch();
+    }
   };
 
   if (!spark) {
@@ -211,6 +266,31 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={[styles.buttonLabel, styles.closeLabel]}>Close</Text>
           </TouchableOpacity>
           
+          {/* Recent Spark Quick Access */}
+          {recentSparks.length > 1 && (
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleRecentSparkPress}
+            >
+              <Text style={[styles.buttonIcon, styles.recentSparkIcon]}>
+                {recentSparks.find(id => id !== sparkId) ? 
+                  getSparkById(recentSparks.find(id => id !== sparkId)!)?.metadata.icon || '⚡️' : 
+                  '⚡️'
+                }
+              </Text>
+              <Text style={[styles.buttonLabel, styles.recentSparkLabel]}>Recent</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Quick Switch Button */}
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleQuickSwitch}
+          >
+            <Text style={[styles.buttonIcon, styles.quickSwitchIcon]}>⚡️</Text>
+            <Text style={[styles.buttonLabel, styles.quickSwitchLabel]}>Switch</Text>
+          </TouchableOpacity>
+          
           {isInUserCollection ? (
             <TouchableOpacity 
               style={styles.actionButton} 
@@ -238,6 +318,14 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       )}
+      
+      {/* Quick Switch Modal */}
+      <QuickSwitchModal
+        visible={showQuickSwitch}
+        onClose={() => setShowQuickSwitch(false)}
+        recentSparks={recentSparks.filter(id => id !== sparkId)}
+        onSelectSpark={handleSelectSpark}
+      />
     </SafeAreaView>
   );
 };
