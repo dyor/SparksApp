@@ -15,6 +15,7 @@ import { TeeTimeTimerSpark } from '../sparks/TeeTimeTimerSpark';
 import { SoundboardSpark } from '../sparks/SoundboardSpark';
 import { GolfTrackerSpark } from '../sparks/GolfTrackerSpark';
 import QuickConvertSpark from '../sparks/QuickConvertSpark';
+import SpanishReaderSpark from '../sparks/SpanishReaderSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -194,6 +195,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           available: true,
         },
         component: QuickConvertSpark,
+      },
+      'spanish-reader': {
+        metadata: {
+          id: 'spanish-reader',
+          title: 'Spanish Reader',
+          description: 'Learn to read Spanish with interleaved English and Spanish text from "To Build a Fire"',
+          icon: '📖',
+          category: 'education',
+          difficulty: 'medium',
+          estimatedTime: 15,
+          available: true,
+        },
+        component: SpanishReaderSpark,
       },
 };
 

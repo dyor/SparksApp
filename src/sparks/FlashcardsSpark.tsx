@@ -582,26 +582,6 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       marginTop: 20,
       marginBottom: 20,
     },
-    headerTop: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      paddingHorizontal: 20,
-      marginBottom: 10,
-    },
-    addPhraseButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-      borderRadius: 25,
-      minWidth: 120,
-    },
-    addPhraseButtonText: {
-      color: colors.background,
-      fontSize: 16,
-      fontWeight: '600',
-    },
     centeredAddButton: {
       backgroundColor: colors.primary,
       paddingHorizontal: 32,
@@ -875,7 +855,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       <FlashcardSettings
         cards={cards}
         onSave={saveCustomCards}
-        onClose={onCloseSettings}
+        onClose={onCloseSettings || (() => {})}
       />
     );
   }
@@ -883,15 +863,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>🃏 Spanish Flashcards</Text>
-          <TouchableOpacity 
-            style={styles.addPhraseButton}
-            onPress={() => setShowAddPhraseModal(true)}
-          >
-            <Text style={styles.addPhraseButtonText}>+ Add Phrase</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.title}>🃏 Spanish Flashcards</Text>
         <Text style={styles.subtitle}>Learn Spanish. Easy. </Text>
         
         <View style={styles.progressBars}>
