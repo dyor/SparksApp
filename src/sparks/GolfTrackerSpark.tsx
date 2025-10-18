@@ -253,17 +253,91 @@ const Dropdown: React.FC<{
 }> = ({ options, selectedValue, onSelect, placeholder, style, textStyle }) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  // For Android, use a different approach when there are many options
+  const shouldUseModal = options.length >= 5;
+
   return (
     <View style={{ position: 'relative' }}>
       <TouchableOpacity
         onPress={() => setIsOpen(!isOpen)}
         style={[style, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+        activeOpacity={0.7}
       >
         <Text style={textStyle}>{selectedValue || placeholder}</Text>
         <Text style={[textStyle, { fontSize: 12 }]}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       
-      {isOpen && (
+      {isOpen && shouldUseModal ? (
+        <Modal
+          visible={isOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsOpen(false)}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            activeOpacity={1}
+            onPress={() => setIsOpen(false)}
+          >
+            <View
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                margin: 20,
+                maxHeight: '70%',
+                minWidth: '80%',
+                elevation: 5,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+              }}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', textAlign: 'center' }}>
+                  {placeholder || 'Select Option'}
+                </Text>
+              </View>
+              <ScrollView
+                style={{ maxHeight: 300 }}
+                showsVerticalScrollIndicator={true}
+                bounces={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {options?.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    onPress={() => {
+                      onSelect(option);
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      padding: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#eee',
+                      backgroundColor: selectedValue === option ? '#f0f8ff' : 'transparent',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[textStyle, { 
+                      color: selectedValue === option ? '#007AFF' : '#333',
+                      fontWeight: selectedValue === option ? '600' : '400'
+                    }]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      ) : isOpen ? (
         <View style={{
           position: 'absolute',
           top: '100%',
@@ -274,9 +348,22 @@ const Dropdown: React.FC<{
           borderColor: '#ddd',
           borderRadius: 6,
           zIndex: 1000,
+          elevation: 5, // For Android
+          shadowColor: '#000', // For iOS
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
           maxHeight: 200,
+          marginTop: 2, // Small gap from trigger
         }}>
-          <ScrollView style={{ maxHeight: 200 }}>
+          <ScrollView 
+            style={{ maxHeight: 200 }}
+            nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={true}
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+          >
             {options?.map((option) => (
               <TouchableOpacity
                 key={option}
@@ -288,14 +375,16 @@ const Dropdown: React.FC<{
                   padding: 12,
                   borderBottomWidth: 1,
                   borderBottomColor: '#eee',
+                  minHeight: 44, // Ensure touchable area
                 }}
+                activeOpacity={0.7}
               >
                 <Text style={[textStyle, { color: '#333' }]}>{option}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
-      )}
+      ) : null}
     </View>
   );
 };

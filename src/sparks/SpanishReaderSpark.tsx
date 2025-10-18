@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
+import * as Speech from 'expo-speech';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -163,6 +164,7 @@ const SpanishReaderSpark: React.FC<SpanishReaderSparkProps> = ({
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [settings, setSettings] = useState<SpanishReaderSettings>({
     readingOrder: 'english-first'
   });
@@ -203,6 +205,11 @@ const SpanishReaderSpark: React.FC<SpanishReaderSparkProps> = ({
 
   const goToPreviousSentence = () => {
     if (currentSentenceIndex > 0) {
+      // Stop any ongoing speech when navigating
+      if (isSpeaking) {
+        Speech.stop();
+        setIsSpeaking(false);
+      }
       setCurrentSentenceIndex(currentSentenceIndex - 1);
       HapticFeedback.light();
     }
@@ -210,8 +217,39 @@ const SpanishReaderSpark: React.FC<SpanishReaderSparkProps> = ({
 
   const goToNextSentence = () => {
     if (currentSentenceIndex < SENTENCES.length - 1) {
+      // Stop any ongoing speech when navigating
+      if (isSpeaking) {
+        Speech.stop();
+        setIsSpeaking(false);
+      }
       setCurrentSentenceIndex(currentSentenceIndex + 1);
       HapticFeedback.light();
+    }
+  };
+
+  const speakSpanish = async (text: string) => {
+    try {
+      if (isSpeaking) {
+        Speech.stop();
+        setIsSpeaking(false);
+        return;
+      }
+
+      setIsSpeaking(true);
+      Speech.speak(text, {
+        language: 'es-ES',
+        rate: 0.7,
+        pitch: 1.1,
+        onDone: () => {
+          setIsSpeaking(false);
+        },
+        onError: () => {
+          setIsSpeaking(false);
+        },
+      });
+    } catch (error) {
+      console.error('Error in speakSpanish:', error);
+      setIsSpeaking(false);
     }
   };
 
@@ -228,15 +266,35 @@ const SpanishReaderSpark: React.FC<SpanishReaderSparkProps> = ({
             <Text style={[styles.englishText, { color: colors.text }]}>
               {sentence.english}
             </Text>
-            <Text style={[styles.spanishText, { color: colors.primary }]}>
-              {sentence.spanish}
-            </Text>
+            <View style={styles.spanishContainer}>
+              <Text style={[styles.spanishText, { color: colors.primary }]}>
+                {sentence.spanish}
+              </Text>
+              <TouchableOpacity
+                style={[styles.playButton, { backgroundColor: colors.primary }]}
+                onPress={() => speakSpanish(sentence.spanish)}
+              >
+                <Text style={[styles.playButtonText, { color: colors.background }]}>
+                  {isSpeaking ? '⏸️' : '▶️'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
-            <Text style={[styles.spanishText, { color: colors.primary }]}>
-              {sentence.spanish}
-            </Text>
+            <View style={styles.spanishContainer}>
+              <Text style={[styles.spanishText, { color: colors.primary }]}>
+                {sentence.spanish}
+              </Text>
+              <TouchableOpacity
+                style={[styles.playButton, { backgroundColor: colors.primary }]}
+                onPress={() => speakSpanish(sentence.spanish)}
+              >
+                <Text style={[styles.playButtonText, { color: colors.background }]}>
+                  {isSpeaking ? '⏸️' : '▶️'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text style={[styles.englishText, { color: colors.text }]}>
               {sentence.english}
             </Text>
@@ -431,6 +489,24 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontWeight: '600',
     textAlign: 'left',
+    flex: 1,
+  },
+  spanishContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  playButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   navigationContainer: {
     flexDirection: 'row',

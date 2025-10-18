@@ -116,13 +116,19 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     },
     sparkCardContent: {
       flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 12,
+    },
+    sparkCardContentWithRating: {
+      flex: 1,
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 16,
+      padding: 12,
     },
     sparkIcon: {
-      fontSize: 36,
-      marginBottom: 6,
+      fontSize: 32,
+      marginBottom: 4,
     },
     sparkTitle: {
       fontSize: 12,
@@ -177,9 +183,8 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 2,
-      marginBottom: 8,
-      flex: 1,
+      marginTop: 4,
+      marginBottom: 0,
     },
     starsContainer: {
       flexDirection: 'row',
@@ -264,15 +269,14 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                 ]}
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
-                <View style={styles.sparkCardContent}>
+                <View style={styles.sparkCardContentWithRating}>
                   <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                   <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                   <View style={styles.ratingContainer}>
-          
                     <View style={styles.starsContainer}>
                       {renderStars(spark.metadata.rating)}
                     </View>
-                    <Text style={styles.ratingNumber}>{spark.metadata.rating}</Text>
+                    <Text style={styles.ratingNumber}>{spark.metadata.rating.toFixed(1)}</Text>
                   </View>
                 </View>
               </TouchableOpacity>

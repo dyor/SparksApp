@@ -9,7 +9,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium", 
+        "simulator": true
       },
       "android": {
         "resourceClass": "medium"
@@ -39,6 +40,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "releaseStatus": "draft"
+      }
+    }
   }
 }
