@@ -319,6 +319,74 @@ export const SettingsScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Spark Management Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>My Sparks</Text>
+          {userSparkIds.length > 1 && (
+            <TouchableOpacity
+              style={[styles.reorderButton, { backgroundColor: isReordering ? colors.primary : colors.secondary }]}
+              onPress={() => setIsReordering(!isReordering)}
+            >
+              <Text style={[styles.reorderButtonText, { color: colors.background }]}>
+                {isReordering ? 'Done' : 'Reorder'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {userSparkIds.length === 0 ? (
+          <Text style={styles.emptyText}>No sparks in your collection yet</Text>
+        ) : (
+          <View style={styles.sparkList}>
+            {userSparkIds.map((sparkId, index) => {
+              const spark = getSparkById(sparkId);
+              if (!spark) return null;
+              
+              return (
+                <View key={sparkId} style={styles.sparkCard}>
+                  <View style={styles.sparkCardContent}>
+                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    <View style={styles.sparkInfo}>
+                      <Text style={styles.sparkTitle}>{spark.metadata.title}</Text>
+                      <Text style={styles.sparkDescription}>{spark.metadata.description}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.sparkActions}>
+                    {isReordering && (
+                      <View style={styles.reorderControls}>
+                        <TouchableOpacity
+                          style={[styles.reorderButton, { opacity: index > 0 ? 1 : 0.3 }]}
+                          onPress={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                        >
+                          <Text style={styles.reorderButtonText}>↑</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.reorderButton, { opacity: index < userSparkIds.length - 1 ? 1 : 0.3 }]}
+                          onPress={() => handleMoveDown(index)}
+                          disabled={index === userSparkIds.length - 1}
+                        >
+                          <Text style={styles.reorderButtonText}>↓</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    
+                    <TouchableOpacity
+                      style={[styles.removeButton, { backgroundColor: colors.error }]}
+                      onPress={() => handleRemoveSpark(sparkId, spark.metadata.title)}
+                    >
+                      <Text style={[styles.removeButtonText, { color: colors.background }]}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacy & Analytics</Text>
         
@@ -582,5 +650,80 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 12,
     fontStyle: 'italic',
     lineHeight: 16,
+  },
+  
+  // Spark management styles
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reorderButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  reorderButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginVertical: 20,
+  },
+  sparkList: {
+    gap: 12,
+  },
+  sparkCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sparkCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sparkIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  sparkInfo: {
+    flex: 1,
+  },
+  sparkTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  sparkDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  sparkActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reorderControls: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  removeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  removeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MySparkStackParamList, MarketplaceStackParamList } from '../types/navigation';
 import { getSparkById } from '../components/SparkRegistry';
@@ -102,12 +102,6 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     addLabel: {
       color: colors.primary,
     },
-    removeIcon: {
-      color: colors.error,
-    },
-    removeLabel: {
-      color: colors.error,
-    },
     quickSwitchIcon: {
       color: colors.primary,
     },
@@ -154,24 +148,6 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.goBack();
   };
 
-  const handleRemove = () => {
-    Alert.alert(
-      "Remove Spark",
-      `Are you sure you want to remove "${spark?.metadata.title}" from your collection?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            HapticFeedback.medium();
-            removeSparkFromUser(sparkId);
-            navigation.goBack();
-          }
-        }
-      ]
-    );
-  };
 
   const handleAdd = () => {
     HapticFeedback.success();
@@ -291,15 +267,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={[styles.buttonLabel, styles.quickSwitchLabel]}>Switch</Text>
           </TouchableOpacity>
           
-          {isInUserCollection ? (
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleRemove}
-            >
-              <Text style={[styles.buttonIcon, styles.removeIcon]}>➖</Text>
-              <Text style={[styles.buttonLabel, styles.removeLabel]}>Remove</Text>
-            </TouchableOpacity>
-          ) : (
+          {!isInUserCollection && (
             <TouchableOpacity 
               style={styles.actionButton} 
               onPress={handleAdd}

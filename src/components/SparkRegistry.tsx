@@ -17,6 +17,7 @@ import { GolfTrackerSpark } from '../sparks/GolfTrackerSpark';
 import QuickConvertSpark from '../sparks/QuickConvertSpark';
 import SpanishReaderSpark from '../sparks/SpanishReaderSpark';
 import TripStorySpark from '../sparks/TripStorySpark';
+import ShortSaverSpark from '../sparks/ShortSaverSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -179,7 +180,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   'soundboard': {
     metadata: {
       id: 'soundboard',
-      title: 'Soundboard',
+      title: 'Sound Board',
       description: 'Record and play custom sound clips with categories',
       icon: '🎛️',
       category: 'utility',
@@ -250,6 +251,21 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           rating: 4.5,
         },
         component: TripStorySpark,
+      },
+      'short-saver': {
+        metadata: {
+          id: 'short-saver',
+          title: 'Short Saver',
+          description: 'Save and organize your favorite YouTubes',
+          icon: '🎬',
+          category: 'media',
+          difficulty: 'easy',
+          estimatedTime: 3,
+          available: true,
+          createdAt: '2024-01-15T00:00:00.000Z',
+          rating: 4.3,
+        },
+        component: ShortSaverSpark,
       },
 };
 

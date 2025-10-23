@@ -36,8 +36,8 @@ export class FeedbackNotificationService {
 
   // Admin device IDs - you can add your device IDs here
   private static readonly ADMIN_DEVICE_IDS = [
-    'admin_device_1', // Replace with your actual device ID
-    'admin_device_2', // Add more if needed
+    'device_1761188124738_43laovhht', // Replace with your actual device ID
+    'device_1761108969148_hwegb6ecb', // Add more if needed
   ];
 
   /**
