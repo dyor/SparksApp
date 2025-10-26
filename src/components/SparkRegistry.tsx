@@ -268,12 +268,12 @@ export const sparkRegistry: Record<string, BaseSpark> = {
         },
         component: ShortSaverSpark,
       },
-      'spark-spark': {
+      'spark-wizard': {
         metadata: {
-          id: 'spark-spark',
-          title: 'Spark Spark',
+          id: 'spark-wizard',
+          title: 'Spark Wizard',
           description: 'Submit your own Spark idea and become a product manager',
-          icon: '✨',
+          icon: '🧙‍♂️',
           category: 'utility',
           difficulty: 'easy',
           estimatedTime: 5,

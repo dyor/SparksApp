@@ -8,6 +8,7 @@ import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useAppStore } from './src/store';
 import { NotificationService } from './src/utils/notifications';
 import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
+import { ServiceFactory } from './src/services/ServiceFactory';
 
 // Initialize Firebase
 let firebaseApp: any = null;
@@ -71,7 +72,32 @@ function AppContent() {
       }
     });
 
-    return () => subscription?.remove();
+    // Start listening for new feedback responses in real-time
+    let feedbackListenerCleanup: (() => void) | null = null;
+    const startFeedbackListener = async () => {
+      try {
+        const AnalyticsService = ServiceFactory.getAnalyticsService();
+        const sessionInfo = AnalyticsService.getSessionInfo();
+        const deviceId = sessionInfo.userId || sessionInfo.sessionId || 'anonymous';
+        
+        console.log('👂 Starting feedback response listener for device:', deviceId);
+        feedbackListenerCleanup = FeedbackNotificationService.startListeningForNewResponses(deviceId);
+      } catch (error) {
+        console.error('❌ Error starting feedback listener:', error);
+      }
+    };
+    
+    // Start the listener after a short delay to ensure Firebase is initialized
+    const listenerTimeout = setTimeout(startFeedbackListener, 2000);
+    startFeedbackListener();
+
+    return () => {
+      subscription?.remove();
+      if (feedbackListenerCleanup) {
+        feedbackListenerCleanup();
+      }
+      clearTimeout(listenerTimeout);
+    };
   }, [preferences.dailyNotificationsEnabled]);
   
   return (

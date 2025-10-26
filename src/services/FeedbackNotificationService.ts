@@ -78,6 +78,39 @@ export class FeedbackNotificationService {
   }
 
   /**
+   * Start listening for new feedback responses in real-time
+   */
+  static startListeningForNewResponses(deviceId: string): () => void {
+    try {
+      // Import WebFirebaseService dynamically to avoid circular dependencies
+      const WebFirebaseService = require('./WebFirebaseService').WebFirebaseService;
+      
+      // Only start listener if Firebase is initialized
+      if (!WebFirebaseService.isInitialized()) {
+        console.log('⚠️ Firebase not initialized, cannot start feedback listener');
+        return () => {};
+      }
+
+      // Set up the real-time listener
+      const unsubscribe = WebFirebaseService.startFeedbackResponseListener(
+        deviceId,
+        (feedbackId: string, sparkId: string, sparkName: string) => {
+          console.log('📬 Real-time feedback response received:', { feedbackId, sparkId, sparkName });
+          
+          // Add as pending response (which will send a notification)
+          this.addPendingResponse(deviceId, feedbackId, sparkId, sparkName);
+        }
+      );
+
+      console.log('✅ Started real-time feedback response listener');
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Error starting feedback response listener:', error);
+      return () => {};
+    }
+  }
+
+  /**
    * Check if a device is an admin device
    */
   static isAdminDevice(deviceId: string): boolean {

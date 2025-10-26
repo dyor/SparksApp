@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, User } from 'firebase/auth';
-import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { 
   User as AnalyticsUser, 
   SparkFeedback, 
@@ -653,6 +653,65 @@ export class WebFirebaseService {
     } catch (error) {
       console.error('❌ Error getting spark submissions:', error);
       return [];
+    }
+  }
+
+  /**
+   * Set up a real-time listener for feedback responses for a specific user
+   * This will notify when admin adds a response to the user's feedback
+   */
+  static startFeedbackResponseListener(userId: string, onNewResponse: (feedbackId: string, sparkId: string, sparkName: string) => void): () => void {
+    try {
+      if (!WebFirebaseService.db) {
+        console.error('Firestore not initialized');
+        return () => {}; // Return empty cleanup function
+      }
+
+      console.log('👂 Starting feedback response listener for user:', userId);
+      
+      // Listen to feedback where this user has submitted feedback
+      const feedbackQuery = query(
+        collection(WebFirebaseService.db, 'feedback'),
+        where('userId', '==', userId)
+      );
+
+      const unsubscribe = onSnapshot(
+        feedbackQuery,
+        (snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'modified') {
+              const data = change.doc.data();
+              
+              // Check if an admin response was just added
+              if (data.response && !change.doc.metadata.hasPendingWrites) {
+                // New response detected!
+                const sparkId = data.sparkId || 'unknown';
+                const sparkName = data.sparkName || 'Unknown Spark';
+                const feedbackId = change.doc.id;
+                
+                console.log('📬 New feedback response detected:', {
+                  feedbackId,
+                  sparkId,
+                  sparkName,
+                  response: data.response
+                });
+                
+                // Notify the callback
+                onNewResponse(feedbackId, sparkId, sparkName);
+              }
+            }
+          });
+        },
+        (error) => {
+          console.error('❌ Error in feedback response listener:', error);
+        }
+      );
+
+      // Return the unsubscribe function
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Error setting up feedback response listener:', error);
+      return () => {}; // Return empty cleanup function
     }
   }
 }

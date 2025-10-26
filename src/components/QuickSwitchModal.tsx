@@ -70,7 +70,8 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
     HapticFeedback.light();
     onClose();
     if (navigation) {
-      navigation.navigate('SparkSelection');
+      // Close the modal and navigate back (same as close X)
+      navigation.goBack();
     }
   };
 
