@@ -550,16 +550,16 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     },
     flameContainer: {
       position: 'absolute',
-      bottom: 50,
+      bottom: 0,
       alignSelf: 'center',
-      width: 120,
-      height: 120,
+      width: 200,
+      height: 200,
       alignItems: 'center',
       justifyContent: 'center',
       pointerEvents: 'none',
     },
     flameEmoji: {
-      fontSize: 120,
+      fontSize: 180,
     },
   });
 
@@ -720,12 +720,17 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
               transform: [{
                 translateY: flameAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0, -screenHeight - 200],
+                  outputRange: [screenHeight + 100, -screenHeight - 200], // Start from below screen, go way above
+                })
+              }, {
+                scale: flameAnim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [0.3, 1.5, 2], // Scale from small to huge
                 })
               }],
               opacity: flameAnim.interpolate({
-                inputRange: [0, 0.5, 1],
-                outputRange: [1, 1, 0],
+                inputRange: [0, 0.2, 0.8, 1],
+                outputRange: [0, 1, 1, 0],
               }),
             },
           ]}

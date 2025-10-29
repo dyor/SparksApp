@@ -2576,8 +2576,8 @@ const GolfTrackerSettings: React.FC<{
               <>
                 {displayedRounds.map((round, index) => {
                   const course = courses.find(c => c.id === round.courseId);
-                  const holesPlayed = round.holeScores?.length || 0;
-                  const totalParPlayed = (round.holeScores || []).reduce((sum, hs) => sum + hs.par, 0);
+                  const holesPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).length;
+                  const totalParPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).reduce((sum, hs) => sum + hs.par, 0);
                   const netScore = round.totalScore - totalParPlayed;
                   const isIncomplete = !round.isComplete;
                   const isActiveRound = data.currentRound?.id === round.id;
@@ -2786,8 +2786,8 @@ const GolfTrackerSettings: React.FC<{
               <>
                 {displayedRounds.map((round, index) => {
                   const course = courses.find(c => c.id === round.courseId);
-                  const holesPlayed = round.holeScores?.length || 0;
-                  const totalParPlayed = (round.holeScores || []).reduce((sum, hs) => sum + hs.par, 0);
+                  const holesPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).length;
+                  const totalParPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).reduce((sum, hs) => sum + hs.par, 0);
                   const netScore = round.totalScore - totalParPlayed;
                   const isIncomplete = !round.isComplete;
                   const isActiveRound = data.currentRound?.id === round.id;
@@ -3944,9 +3944,10 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       id: `shot-${Date.now()}-${Math.random()}`,
       type: 'shot',
       lie: 'green',
-      direction: undefined, // No default outcome - user must select
+      direction: 'good', // Default to good outcome
       club: getDefaultClub(),
       timestamp: Date.now(),
+      poorShot: false,
     };
     setShots(prev => {
       const newShots = [...prev, newShot];
@@ -3975,8 +3976,9 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       id: `putt-${Date.now()}-${Math.random()}`,
       type: 'putt',
       puttDistance: '5-10ft',
-      direction: undefined, // No default outcome - user must select
+      direction: 'good', // Default to good outcome
       timestamp: Date.now(),
+      poorShot: false,
     };
     setPutts(prev => [...prev, newPutt]);
     
@@ -5976,17 +5978,21 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
     // Also save to permanent database if we have a current round
     if (currentRound) {
-      const holeScore: HoleScore = {
-        holeNumber,
-        courseId: currentRound.courseId,
-        shots: [...(shots || []), ...(putts || [])],
-        totalScore: (shots || []).length + (putts || []).length,
-        par: selectedCourse?.holes.find(h => h.number === holeNumber)?.par || 4,
-        netScore: ((shots || []).length + (putts || []).length) - (selectedCourse?.holes.find(h => h.number === holeNumber)?.par || 4),
-        completedAt: Date.now(),
-      };
+      const totalShots = (shots || []).length + (putts || []).length;
       
-      console.log('Saving hole score to permanent database:', holeScore);
+      // Only save holes that have shots
+      if (totalShots > 0) {
+        const holeScore: HoleScore = {
+          holeNumber,
+          courseId: currentRound.courseId,
+          shots: [...(shots || []), ...(putts || [])],
+          totalScore: totalShots,
+          par: selectedCourse?.holes.find(h => h.number === holeNumber)?.par || 4,
+          netScore: totalShots - (selectedCourse?.holes.find(h => h.number === holeNumber)?.par || 4),
+          completedAt: Date.now(),
+        };
+        
+        console.log('Saving hole score to permanent database:', holeScore);
 
       // Update the current round with this hole's data
       setData(prev => {
@@ -6034,6 +6040,39 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           ]
         };
       });
+      } else {
+        // Remove empty hole from database
+        console.log('Removing empty hole from database:', holeNumber);
+        
+        setData(prev => {
+          const updatedRounds = (prev.rounds || []).map(round => 
+            round.id === currentRound.id 
+              ? {
+                  ...round,
+                  holeScores: (round.holeScores || []).filter(hs => hs.holeNumber !== holeNumber)
+                }
+              : round
+          );
+
+          return {
+            ...prev,
+            rounds: updatedRounds,
+            currentRound: {
+              ...currentRound,
+              holeScores: (currentRound.holeScores || []).filter(hs => hs.holeNumber !== holeNumber)
+            }
+          };
+        });
+
+        // Also update local currentRound state to stay in sync
+        setCurrentRound(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            holeScores: (prev.holeScores || []).filter(hs => hs.holeNumber !== holeNumber)
+          };
+        });
+      }
     }
   };
 
