@@ -161,11 +161,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   
   // Sticky header state
   const [stickyDayDate, setStickyDayDate] = useState<string | null>(null);
-  const [stickyActivityId, setStickyActivityId] = useState<string | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const dayPositions = useRef<Map<string, number>>(new Map());
   const activityPositions = useRef<Map<string, number>>(new Map());
   const scrollViewRef = useRef<any>(null);
+  const currentScrollPosition = useRef<number>(0);
+  
+  // Refs for horizontal image scroll views (one per row)
+  const dayPhotoScrollRefs = useRef<Map<string, any>>(new Map());
+  const activityPhotoScrollRefs = useRef<Map<string, any>>(new Map());
 
   useEffect(() => {
     loadTrips();
@@ -187,8 +191,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       // Get document directory
       const documentDir = (FileSystem as any).documentDirectory;
       if (!documentDir) {
-        console.error('❌ Document directory not available');
-        throw new Error('Document directory not available');
+        console.warn('⚠️ Document directory not available (likely simulator/web), using original URI');
+        // In simulator/web, documentDirectory might not be available
+        // Return original URI as-is - it should still work for display
+        return photoUri;
       }
       
       // Create trips directory if it doesn't exist
@@ -573,20 +579,25 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             : trip
         );
 
+        // Capture current scroll position before state update
+        const savedScrollPosition = currentScrollPosition.current;
+        
         await saveTrips(updatedTrips);
         const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
         setCurrentTrip(updatedTrip);
         
         setShowPhotoCapture(false);
         
-        // Scroll to the photo location after layout updates
+        // Restore scroll position after state update completes
+        // This prevents the ScrollView from jumping when content is added
         setTimeout(() => {
-          if (newPhoto.activityId) {
-            scrollToActivity(newPhoto.activityId);
-          } else if (dateToUse) {
-            scrollToDay(dateToUse);
+          if (scrollViewRef.current && savedScrollPosition > 0) {
+            scrollViewRef.current.scrollTo({ 
+              y: savedScrollPosition, 
+              animated: false 
+            });
           }
-        }, 500);
+        }, 50);
         
         setSelectedActivity(null);
         setSelectedDate('');
@@ -677,6 +688,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         console.log('Before save - currentTrip photos count:', currentTrip?.photos.length);
         console.log('New photo being added from gallery:', newPhoto);
         
+        // Capture current scroll position before state update
+        const savedScrollPosition = currentScrollPosition.current;
+        
         await saveTrips(updatedTrips);
         const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
         setCurrentTrip(updatedTrip);
@@ -686,14 +700,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         
         setShowPhotoCapture(false);
         
-        // Scroll to the photo location after layout updates
+        // Restore scroll position after state update completes
+        // This prevents the ScrollView from jumping when content is added
         setTimeout(() => {
-          if (newPhoto.activityId) {
-            scrollToActivity(newPhoto.activityId);
-          } else if (dateToUse) {
-            scrollToDay(dateToUse);
+          if (scrollViewRef.current && savedScrollPosition > 0) {
+            scrollViewRef.current.scrollTo({ 
+              y: savedScrollPosition, 
+              animated: false 
+            });
           }
-        }, 500);
+        }, 50);
         
         setSelectedActivity(null);
         setSelectedDate('');
@@ -1296,7 +1312,7 @@ Created with TripStory ✈️
           </View>
 
           <View style={styles.inputRow}>
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Start Date *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
@@ -1306,7 +1322,7 @@ Created with TripStory ✈️
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>End Date *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
@@ -1319,7 +1335,7 @@ Created with TripStory ✈️
           </View>
 
           <View style={styles.inputRow}>
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Origin *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
@@ -1329,7 +1345,7 @@ Created with TripStory ✈️
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
-            <View style={styles.inputGroup}>
+            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Destination *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
@@ -2207,11 +2223,11 @@ Created with TripStory ✈️
   const handleScroll = (event: any) => {
     if (!currentTrip) return;
     const scrollOffset = event.nativeEvent.contentOffset.y;
+    currentScrollPosition.current = scrollOffset; // Track current scroll position
     const tripDates = getTripDates();
     
-    // Find which day should be sticky
+    // Find which day should be sticky - only track days, not activities
     let currentStickyDay: string | null = null;
-    let currentStickyActivity: string | null = null;
     
     // Find the current day we're viewing
     for (let i = 0; i < tripDates.length; i++) {
@@ -2229,64 +2245,237 @@ Created with TripStory ✈️
         
         // This is the current day
         currentStickyDay = date;
-        
-        // Find which activity should be sticky for this day
-        const dayActivities = currentTrip.activities
-          .filter(activity => activity.startDate === date)
-          .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
-        
-        // Find the current activity we're viewing
-        let foundCurrentActivity = false;
-        for (let j = 0; j < dayActivities.length; j++) {
-          const activity = dayActivities[j];
-          const activityY = activityPositions.current.get(activity.id);
-          const nextActivity = dayActivities[j + 1];
-          const nextActivityY = nextActivity ? activityPositions.current.get(nextActivity.id) : undefined;
-          
-          if (activityY !== undefined && scrollOffset >= activityY) {
-            // Check if we've scrolled past this activity
-            if (nextActivityY !== undefined && scrollOffset >= nextActivityY) {
-              // We've scrolled past this activity, continue to next activity
-              continue;
-            }
-            
-            // This is the current activity we're viewing
-            currentStickyActivity = activity.id;
-            foundCurrentActivity = true;
-            break; // Found the current activity, stop searching
-          } else {
-            // Haven't reached this activity yet, no activity should be sticky
-            break;
-          }
-        }
-        
-        // If we've scrolled past all activities or past the day, clear activity
-        if (!foundCurrentActivity || (nextDayY !== undefined && scrollOffset >= nextDayY)) {
-          currentStickyActivity = null;
-        }
-        
-        // If we found the day but no activity, that's fine - activity stays null
         break; // Found the current day, stop searching
       }
     }
     
     setStickyDayDate(currentStickyDay);
-    setStickyActivityId(currentStickyActivity);
   };
 
   const scrollToDay = (date: string) => {
     const dayY = dayPositions.current.get(date);
     if (dayY !== undefined && scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: dayY - 160, animated: true }); // 160 is paddingTop
+      scrollViewRef.current.scrollTo({ y: dayY - 140, animated: true }); // Account for sticky headers
     }
   };
 
   const scrollToActivity = (activityId: string) => {
     const activityY = activityPositions.current.get(activityId);
     if (activityY !== undefined && scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: activityY - 160, animated: true });
+      scrollViewRef.current.scrollTo({ y: activityY - 140, animated: true }); // Account for sticky headers
     }
   };
+
+  // Helper functions for horizontal image scrolling
+  const scrollImageRow = (ref: any, direction: 'prev' | 'next', imageWidth: number) => {
+    if (!ref?.current) return;
+    
+    ref.current.getScrollResponder()?.getScrollableNode()?.scrollBy({
+      x: direction === 'prev' ? -imageWidth : imageWidth,
+      animated: true,
+    });
+  };
+
+  const scrollImageRowToStart = (ref: any) => {
+    if (!ref?.current) return;
+    ref.current.scrollTo({ x: 0, animated: false });
+  };
+
+  // Refs for tracking scroll state per row
+  const imageRowScrollState = useRef<Map<string, { position: number; canPrev: boolean; canNext: boolean }>>(new Map());
+  const previousPhotoCounts = useRef<Map<string, number>>(new Map());
+
+  // Component for horizontal image row with prev/next buttons
+  const HorizontalImageRow: React.FC<{
+    photos: TripPhoto[];
+    rowId: string;
+    imageWidth?: number;
+    imageHeight?: number;
+  }> = React.memo(({ photos, rowId, imageWidth = screenWidth - 80, imageHeight = screenWidth - 80 }) => {
+    if (photos.length === 0) return null;
+
+    // Get or create ref for this row
+    if (!dayPhotoScrollRefs.current.has(rowId) && !activityPhotoScrollRefs.current.has(rowId)) {
+      const ref = React.createRef<ScrollView>();
+      if (rowId.startsWith('day-')) {
+        dayPhotoScrollRefs.current.set(rowId, ref);
+      } else {
+        activityPhotoScrollRefs.current.set(rowId, ref);
+      }
+      // Initialize scroll state
+      imageRowScrollState.current.set(rowId, { position: 0, canPrev: false, canNext: photos.length > 1 });
+      previousPhotoCounts.current.set(rowId, photos.length);
+    }
+    
+    const scrollRef = rowId.startsWith('day-') 
+      ? dayPhotoScrollRefs.current.get(rowId)
+      : activityPhotoScrollRefs.current.get(rowId);
+
+    const [scrollState, setScrollState] = useState(
+      imageRowScrollState.current.get(rowId) || { position: 0, canPrev: false, canNext: photos.length > 1 }
+    );
+    const [scrollViewWidth, setScrollViewWidth] = useState(screenWidth);
+
+    const handleScroll = (event: any) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const contentWidth = event.nativeEvent.contentSize.width;
+      const layoutWidth = event.nativeEvent.layoutMeasurement.width;
+      
+      const newState = {
+        position: offsetX,
+        canPrev: offsetX > 10,
+        canNext: offsetX < contentWidth - layoutWidth - 10,
+      };
+      
+      setScrollState(newState);
+      imageRowScrollState.current.set(rowId, newState);
+    };
+
+    const scrollPrev = () => {
+      if (scrollRef?.current) {
+        const currentState = imageRowScrollState.current.get(rowId);
+        const newX = Math.max(0, (currentState?.position || 0) - imageWidth);
+        scrollRef.current.scrollTo({
+          x: newX,
+          animated: true,
+        });
+      }
+    };
+
+    const scrollNext = () => {
+      if (scrollRef?.current) {
+        const currentState = imageRowScrollState.current.get(rowId);
+        const currentX = currentState?.position || 0;
+        scrollRef.current.scrollTo({
+          x: currentX + imageWidth,
+          animated: true,
+        });
+      }
+    };
+
+    // Handle scroll position when photos change
+    useEffect(() => {
+      if (scrollRef?.current) {
+        const previousCount = previousPhotoCounts.current.get(rowId) || 0;
+        const currentCount = photos.length;
+        
+        // Only do something if the count actually changed
+        if (currentCount !== previousCount) {
+          // If a new photo was added (count increased), scroll to center the last photo
+          if (currentCount > previousCount && currentCount > 1) {
+            // Wait for vertical scroll to complete, then scroll horizontally
+            setTimeout(() => {
+              if (scrollRef?.current) {
+                // Calculate position to center the last image
+                const imageGap = 8; // marginRight from horizontalImageItem style
+                const lastImageIndex = currentCount - 1;
+                const lastImageStartX = lastImageIndex * (imageWidth + imageGap);
+                
+                // Center the image: scroll so the image center aligns with ScrollView center
+                // ScrollView center is at scrollViewWidth / 2
+                // Image center is at lastImageStartX + imageWidth / 2
+                // Scroll position = imageCenter - scrollViewCenter
+                const scrollX = lastImageStartX + (imageWidth / 2) - (scrollViewWidth / 2);
+                
+                // Make sure we don't scroll past the beginning or end
+                const totalContentWidth = currentCount * (imageWidth + imageGap);
+                const maxScroll = Math.max(0, totalContentWidth - scrollViewWidth);
+                const finalScrollX = Math.max(0, Math.min(scrollX, maxScroll));
+                
+                scrollRef.current.scrollTo({ x: finalScrollX, animated: true });
+                
+                // Update scroll state after scrolling
+                setTimeout(() => {
+                  const newState = {
+                    position: finalScrollX,
+                    canPrev: finalScrollX > 10,
+                    canNext: finalScrollX < maxScroll - 10,
+                  };
+                  setScrollState(newState);
+                  imageRowScrollState.current.set(rowId, newState);
+                }, 300);
+              }
+            }, 800); // Wait for vertical scroll (500ms) + buffer
+          } else if (currentCount === 1 && previousCount === 0) {
+            // Only reset to start if it's the very first photo (row was empty)
+            setTimeout(() => {
+              if (scrollRef?.current) {
+                scrollRef.current.scrollTo({ x: 0, animated: false });
+                const newState = { position: 0, canPrev: false, canNext: currentCount > 1 };
+                setScrollState(newState);
+                imageRowScrollState.current.set(rowId, newState);
+              }
+            }, 100);
+          }
+          // If count decreased (photo deleted), don't change scroll position - keep current position
+          
+          // Update previous count
+          previousPhotoCounts.current.set(rowId, currentCount);
+        }
+        // If count didn't change, do nothing - preserve current scroll position
+      }
+    }, [rowId, photos.length]);
+
+    return (
+      <View style={styles.horizontalImageRowContainer}>
+        {/* Prev Button */}
+        {scrollState.canPrev && (
+          <TouchableOpacity
+            style={[styles.imageNavButton, styles.imageNavButtonLeft, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={scrollPrev}
+          >
+            <Text style={[styles.imageNavButtonText, { color: colors.text }]}>‹</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Horizontal ScrollView */}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.horizontalImageScrollView}
+          contentContainerStyle={styles.horizontalImageScrollContent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          pagingEnabled={false}
+          decelerationRate="fast"
+          snapToInterval={imageWidth + 8}
+          snapToAlignment="start"
+          disableIntervalMomentum={true}
+          onLayout={(event) => {
+            const { width } = event.nativeEvent.layout;
+            if (width > 0) {
+              setScrollViewWidth(width);
+            }
+          }}
+        >
+          {photos.map((photo) => (
+            <TouchableOpacity
+              key={photo.id}
+              onPress={() => handlePhotoPress(photo)}
+              style={styles.horizontalImageItem}
+            >
+              <Image
+                source={{ uri: photo.uri }}
+                style={[styles.horizontalImage, { width: imageWidth, height: imageHeight }]}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Next Button */}
+        {scrollState.canNext && (
+          <TouchableOpacity
+            style={[styles.imageNavButton, styles.imageNavButtonRight, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={scrollNext}
+          >
+            <Text style={[styles.imageNavButtonText, { color: colors.text }]}>›</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  });
 
   const renderTripDetailView = () => {
     if (!currentTrip) return null;
@@ -2319,25 +2508,15 @@ Created with TripStory ✈️
           </View>
         </View>
 
-        {/* Sticky Headers - Date and Activity */}
+        {/* Sticky Header - Day Only */}
         <View style={[styles.stickyHeaderContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           {stickyDayDate && (
-            <TouchableOpacity onPress={() => scrollToDay(stickyDayDate)}>
+            <TouchableOpacity onPress={() => scrollToDay(stickyDayDate!)}>
               <Text style={[styles.stickyDayTitle, { color: colors.text }]}>
                 {formatDateWithDayNumber(stickyDayDate, tripDates.indexOf(stickyDayDate) + 1, tripDates.length)}
               </Text>
             </TouchableOpacity>
           )}
-          {stickyActivityId && (() => {
-            const activity = currentTrip.activities.find(a => a.id === stickyActivityId);
-            return activity ? (
-              <TouchableOpacity onPress={() => scrollToActivity(stickyActivityId)}>
-                <Text style={[styles.stickyActivityTitle, { color: colors.text }]}>
-                  {activity.name}
-                </Text>
-              </TouchableOpacity>
-            ) : null;
-          })()}
         </View>
 
         <Animated.ScrollView 
@@ -2348,6 +2527,9 @@ Created with TripStory ✈️
             { useNativeDriver: false, listener: handleScroll }
           )}
           scrollEventThrottle={16}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+          }}
         >
           {tripDates.map((date, index) => {
             const dayActivities = currentTrip.activities
@@ -2378,6 +2560,21 @@ Created with TripStory ✈️
                     <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Day photos (not associated with activities) - show before activities */}
+                {dayPhotos.filter(photo => !photo.activityId).length > 0 && (
+                  <View style={styles.dayPhotos}>
+                    <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
+                      Day Photos ({dayPhotos.filter(photo => !photo.activityId).length})
+                    </Text>
+                    <HorizontalImageRow
+                      photos={dayPhotos.filter(photo => !photo.activityId)}
+                      rowId={`day-${date}`}
+                      imageWidth={screenWidth - 80}
+                      imageHeight={screenWidth - 80}
+                    />
+                  </View>
+                )}
 
                 {/* Day-level buttons - only show when day is active and matches current trip */}
                 {activeDayDate === date && activeTripId === currentTrip.id && (
@@ -2430,25 +2627,6 @@ Created with TripStory ✈️
                 </View>
                 )}
 
-                {/* Day photos (not associated with activities) - show before activities */}
-                {dayPhotos.filter(photo => !photo.activityId).length > 0 && (
-                  <View style={styles.dayPhotos}>
-                    <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
-                      Day Photos ({dayPhotos.filter(photo => !photo.activityId).length})
-                    </Text>
-                    <View style={styles.dayPhotosGrid}>
-                      {dayPhotos
-                        .filter(photo => !photo.activityId)
-                        .map((photo) => (
-                          <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
-                            <Image source={{ uri: photo.uri }} style={styles.dayPhoto} />
-                          </TouchableOpacity>
-                        ))
-                      }
-                    </View>
-                  </View>
-                )}
-
                 {/* Activities for this day */}
                 {dayActivities.map((activity) => (
                   <View 
@@ -2462,12 +2640,6 @@ Created with TripStory ✈️
                     <View style={styles.activityHeader}>
                       <View style={styles.activityTitleContainer}>
                         <Text style={[styles.activityName, { color: colors.text }]}>{activity.name}</Text>
-                        <TouchableOpacity
-                          style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
-                          onPress={() => activateActivity(activity.id)}
-                        >
-                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
-                        </TouchableOpacity>
                         {activeActivityId === activity.id && activeTripId === currentTrip.id && (
                           <TouchableOpacity 
                             style={styles.editButton}
@@ -2476,6 +2648,12 @@ Created with TripStory ✈️
                             <Text style={styles.editButtonText}>✏️</Text>
                           </TouchableOpacity>
                         )}
+                        <TouchableOpacity
+                          style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
+                          onPress={() => activateActivity(activity.id)}
+                        >
+                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
+                        </TouchableOpacity>
                       </View>
                       {activity.time && (
                         <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
@@ -2518,14 +2696,12 @@ Created with TripStory ✈️
                     {/* Activity photos */}
                     {dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
                       <View style={styles.activityPhotos}>
-                        {dayPhotos
-                          .filter(photo => photo.activityId === activity.id)
-                          .map((photo) => (
-                            <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
-                              <Image source={{ uri: photo.uri }} style={styles.activityPhoto} />
-                            </TouchableOpacity>
-                          ))
-                        }
+                        <HorizontalImageRow
+                          photos={dayPhotos.filter(photo => photo.activityId === activity.id)}
+                          rowId={`activity-${activity.id}`}
+                          imageWidth={screenWidth - 80}
+                          imageHeight={screenWidth - 80}
+                        />
                       </View>
                     )}
 
@@ -2859,6 +3035,9 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 20,
+  },
+  inputGroupHalf: {
+    flex: 1,
   },
   inputRow: {
     flexDirection: 'row',
@@ -3408,6 +3587,51 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     padding: 20,
+  },
+  // Horizontal Image Row Styles
+  horizontalImageRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    marginVertical: 8,
+  },
+  horizontalImageScrollView: {
+    flex: 1,
+  },
+  horizontalImageScrollContent: {
+    paddingHorizontal: 0,
+  },
+  horizontalImageItem: {
+    marginRight: 8,
+  },
+  horizontalImage: {
+    borderRadius: 8,
+  },
+  imageNavButton: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  imageNavButtonLeft: {
+    left: 4,
+  },
+  imageNavButtonRight: {
+    right: 4,
+  },
+  imageNavButtonText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    lineHeight: 28,
   },
 });
 

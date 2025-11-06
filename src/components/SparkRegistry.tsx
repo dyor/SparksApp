@@ -20,6 +20,7 @@ import TripStorySpark from '../sparks/TripStorySpark';
 import ShortSaverSpark from '../sparks/ShortSaverSpark';
 import SparkSpark from '../sparks/SparkSpark';
 import { MinuteMinderSpark } from '../sparks/MinuteMinderSpark';
+import { BuzzyBingoSpark } from '../sparks/BuzzyBingoSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -298,6 +299,21 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           rating: 4.0,
         },
         component: MinuteMinderSpark,
+      },
+      'buzzy-bingo': {
+        metadata: {
+          id: 'buzzy-bingo',
+          title: 'Buzzy Bingo',
+          description: 'Buzzword bingo game - mark squares as you hear tech terms',
+          icon: '🎯',
+          category: 'game',
+          difficulty: 'easy',
+          estimatedTime: 2,
+          available: true,
+          createdAt: new Date().toISOString(),
+          rating: 4.5,
+        },
+        component: BuzzyBingoSpark as React.ComponentType<any>,
       },
 };
 
