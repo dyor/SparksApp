@@ -52,8 +52,10 @@ interface ThemeColors {
 
 const lightTheme: ThemeColors = {
   primary: '#007AFF',
-  secondary: '#5856D6',
-  background: '#f5f5f5',
+  secondary: '#007AFF',
+  // dyor background
+  background: '#ffffff',
+// dyor top nav
   surface: '#ffffff',
   text: '#333333',
   textSecondary: '#666666',
@@ -68,6 +70,7 @@ const darkTheme: ThemeColors = {
   primary: '#0A84FF',
   secondary: '#5E5CE6',
   background: '#000000',
+  // dyor: top nav color
   surface: '#1C1C1E',
   text: '#FFFFFF',
   textSecondary: '#AEAEB2',

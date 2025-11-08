@@ -89,7 +89,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
-  onComplete,
 }) => {
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
@@ -190,37 +189,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   }, [trips, currentTrip, selectedDate, selectedActivity, onStateChange]);
 
-  // Scroll to current date when Add Activity modal opens
-  useEffect(() => {
-    if (showAddActivity && currentTrip && dateScrollViewRef.current) {
-      // Determine which date to scroll to: selectedDate if exists, otherwise today's date
-      const today = new Date().toISOString().split('T')[0];
-      const tripDates = getTripDates();
-      
-      // Set selectedDate to today if not already set and today is in the trip dates
-      if (!selectedDate && tripDates.includes(today)) {
-        setSelectedDate(today);
-      }
-      
-      const dateToScrollTo = selectedDate || today;
-      const dateIndex = tripDates.indexOf(dateToScrollTo);
-      
-      if (dateIndex >= 0 && dateScrollViewRef.current) {
-        // Calculate approximate scroll position
-        // Each date button is approximately: paddingHorizontal (16*2) + marginRight (8) + text width (~80-100px)
-        // Using a rough estimate of 120px per button
-        const buttonWidth = 120; // Approximate width per date button
-        const scrollX = Math.max(0, (dateIndex * buttonWidth) - 40); // Offset by 40px to center it slightly
-        
-        // Use setTimeout to ensure the ScrollView is fully rendered
-        setTimeout(() => {
-          if (dateScrollViewRef.current) {
-            dateScrollViewRef.current.scrollTo({ x: scrollX, animated: true });
-          }
-        }, 300); // Increased delay to ensure layout is complete
-      }
-    }
-  }, [showAddActivity, currentTrip]);
 
   const savePhotoPermanently = async (photoUri: string, tripId: string, photoId: string): Promise<string> => {
     try {
@@ -348,6 +316,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
+  // agentToDo - I think this should be deleted. 
   const migrateAllPhotos = async (tripsToMigrate: Trip[]): Promise<Trip[]> => {
     try {
       console.log('🔄 Starting photo migration for', tripsToMigrate.length, 'trips');
@@ -803,6 +772,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           uri: permanentUri,
           timestamp: photoDate,
           location: location || undefined,
+          // todo: can we have this auto populate the name of the place
           caption: '',
           createdAt: new Date().toISOString(),
         };
@@ -816,12 +786,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               }
             : trip
         );
-
-        console.log('Before save - currentTrip photos count:', currentTrip?.photos.length);
-        console.log('New photo being added from gallery:', newPhoto);
         
-        // Capture current scroll position before state update
-        const savedScrollPosition = currentScrollPosition.current;
         
         await saveTrips(updatedTrips);
         const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
@@ -832,16 +797,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         
         setShowPhotoCapture(false);
         
-        // Restore scroll position after state update completes
-        // This prevents the ScrollView from jumping when content is added
-        setTimeout(() => {
-          if (scrollViewRef.current && savedScrollPosition > 0) {
-            scrollViewRef.current.scrollTo({ 
-              y: savedScrollPosition, 
-              animated: false 
-            });
-          }
-        }, 50);
         
         setSelectedActivity(null);
         setSelectedDate('');
@@ -867,9 +822,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const updatePhotoDetails = async () => {
     if (!selectedPhoto || !currentTrip) return;
-
-    // Capture current scroll position before state update to prevent unwanted scrolling
-    const savedScrollPosition = currentScrollPosition.current;
 
     // Build location object if we have address or coordinates
     let location: { latitude: number; longitude: number; address?: string } | undefined = undefined;
@@ -910,24 +862,12 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setShowPhotoDetail(false);
     setSelectedPhoto(null);
     
-    // Restore scroll position after state update to prevent unwanted scrolling
-    setTimeout(() => {
-      if (scrollViewRef.current && savedScrollPosition > 0) {
-        scrollViewRef.current.scrollTo({ 
-          y: savedScrollPosition, 
-          animated: false 
-        });
-      }
-    }, 50);
     
     HapticFeedback.success();
   };
 
   const deletePhoto = async () => {
     if (!selectedPhoto || !currentTrip) return;
-
-    // Capture current scroll position before showing alert to prevent unwanted scrolling
-    const savedScrollPosition = currentScrollPosition.current;
 
     Alert.alert(
       'Delete Photo',
@@ -953,15 +893,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             setShowPhotoDetail(false);
             setSelectedPhoto(null);
             
-            // Restore scroll position after state update to prevent unwanted scrolling
-            setTimeout(() => {
-              if (scrollViewRef.current && savedScrollPosition > 0) {
-                scrollViewRef.current.scrollTo({ 
-                  y: savedScrollPosition, 
-                  animated: false 
-                });
-              }
-            }, 50);
             
             HapticFeedback.success();
           }
@@ -1153,18 +1084,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         }
       ]
     );
-  };
-
-  const openInMaps = () => {
-    if (!selectedPhoto?.location) return;
-    
-    const { latitude, longitude } = selectedPhoto.location;
-    const url = `https://maps.google.com/maps?q=${latitude},${longitude}`;
-    
-    Linking.openURL(url).catch(err => {
-      console.error('Error opening maps:', err);
-      Alert.alert('Error', 'Could not open maps application');
-    });
   };
 
   const selectActivityForPhoto = (activityId: string | null) => {
@@ -1555,6 +1474,7 @@ Created with TripStory ✈️
         }}
         activeOpacity={0.7}
       >
+        {/* dyornote: this is the trip card */}
         <View style={styles.tripHeader}>
           <Text style={[styles.tripTitle, { color: colors.text }]}>{trip.title}</Text>
           <View style={styles.tripHeaderRight}>
@@ -2635,7 +2555,7 @@ Created with TripStory ✈️
                             />
                             <View style={styles.markerLabel}>
                               <Text style={styles.markerText} numberOfLines={1}>
-                                {marker.activity?.name || 'Photo'}
+                                {marker.activity?.name || 'x'}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -2661,7 +2581,7 @@ Created with TripStory ✈️
 
               <View style={styles.mapActivityList}>
                 <Text style={[styles.activityListTitle, { color: colors.text }]}>
-                  Markers on Map ({allMarkers.length}):
+                  Make this filterable by days ({allMarkers.length}):
                 </Text>
                 {allMarkers.map((marker, index) => (
                   <View key={`${marker.type}-${marker.id}`} style={[styles.activityListItem, { borderColor: colors.border }]}>
@@ -2699,7 +2619,7 @@ Created with TripStory ✈️
   const scrollToDay = useCallback((date: string) => {
     const dayY = dayPositions.current.get(date);
     if (dayY !== undefined && scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: dayY - 140, animated: true }); // Account for sticky headers
+      scrollViewRef.current.scrollTo({ y: dayY - 40, animated: true }); // Account for sticky headers
     }
   }, []);
   
@@ -2714,52 +2634,12 @@ Created with TripStory ✈️
     if (!currentTrip) return;
     const scrollOffset = event.nativeEvent.contentOffset.y;
     currentScrollPosition.current = scrollOffset; // Track current scroll position
-    // TEMPORARILY DISABLED STICKY NAVIGATION LOGIC FOR FLICKERING TEST
-    // // Use memoized tripDates if available, otherwise calculate
-    // const dates = tripDates.length > 0 ? tripDates : getTripDates();
-    // 
-    // // Find which day should be sticky - only track days, not activities
-    // let currentStickyDay: string | null = null;
-    // 
-    // // Find the current day we're viewing
-    // for (let i = 0; i < dates.length; i++) {
-    //   const date = dates[i];
-    //   const dayY = dayPositions.current.get(date);
-    //   const nextDay = dates[i + 1];
-    //   const nextDayY = nextDay ? dayPositions.current.get(nextDay) : undefined;
-    //   
-    //   if (dayY !== undefined && scrollOffset >= dayY) {
-    //     // Check if we've scrolled past this day
-    //     if (nextDayY !== undefined && scrollOffset >= nextDayY) {
-    //       // We've scrolled past this day, continue to next day
-    //       continue;
-    //     }
-    //     
-    //     // This is the current day
-    //     currentStickyDay = date;
-    //     break; // Found the current day, stop searching
-    //   }
-    // }
-    // 
-    // // Only update state if the sticky day actually changed AND is different from last known value
-    // // This prevents flickering from rapid state updates
-    // if (currentStickyDay !== lastStickyDayRef.current) {
-    //   lastStickyDayRef.current = currentStickyDay;
-    //   // Update state directly - the ref check ensures we only update when truly changed
-    //   setStickyDayDate(currentStickyDay);
-    // }
   };
 
   const scrollToActivity = (activityId: string) => {
     const activityY = activityPositions.current.get(activityId);
     if (activityY !== undefined && scrollViewRef.current) {
-      // Scroll so the activity header (with + button) is visible just below the sticky trip title
-      // activityY is the position of the activity container in the ScrollView content
-      // The ScrollView has paddingTop: 160, and the sticky trip title overlays ~100px from top
-      // We want the activity to appear just below the sticky header (similar to scrollToDay logic)
-      // The sticky header is approximately 100px tall (top: 18 + minHeight: 60 + padding)
-      // Use the same offset as scrollToDay for consistency
-      const stickyTitleHeight = 100;
+      const stickyTitleHeight = 40;
       const scrollToY = Math.max(0, activityY - stickyTitleHeight);
       scrollViewRef.current.scrollTo({ 
         y: scrollToY, 
@@ -2906,7 +2786,7 @@ Created with TripStory ✈️
                   imageRowScrollState.current.set(rowId, newState);
                 }, 300);
               }
-            }, 800); // Wait for vertical scroll (500ms) + buffer
+            }, 800); // Wait for vertical scroll (500ms) + buffer dyor: this seems like it should not exist
           } else if (currentCount === 1 && previousCount === 0) {
             // Only reset to start if it's the very first photo (row was empty)
             setTimeout(() => {
@@ -3002,9 +2882,10 @@ Created with TripStory ✈️
     if (!currentTrip) return null;
     
     return (
+      // dyor: controls the outer scroll view
       <View style={[styles.tripDetailContainer, { backgroundColor: colors.background }]}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
-        {/* Sticky Trip Title - Always visible at top */}
+        {/* this is just a little shim layer to prevent bleed */}
         <View style={[styles.statusBarBackground, { backgroundColor: colors.surface }]} />
         <View style={[styles.stickyTripTitleContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.tripTitleRow}>
@@ -3084,7 +2965,7 @@ Created with TripStory ✈️
                     style={[styles.plusButton, { backgroundColor: (activeDayDate === date && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
                     onPress={() => activateDay(date)}
                   >
-                    <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
+                    <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{(activeDayDate === date && activeTripId === currentTrip.id) ? '-': '+' }</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -3222,7 +3103,7 @@ Created with TripStory ✈️
                           style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
                           onPress={() => activateActivity(activity.id)}
                         >
-                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
+                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{ (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '-' : '+' }</Text>
                         </TouchableOpacity>
                       </View>
                       {activity.time && (
@@ -3344,7 +3225,7 @@ Created with TripStory ✈️
             }}
           >
             <Text style={[styles.bottomButtonText, { color: colors.background }]}>
-              📤 Share
+              Share Story
             </Text>
           </TouchableOpacity>
           
@@ -3356,7 +3237,7 @@ Created with TripStory ✈️
             }}
           >
             <Text style={[styles.bottomButtonText, { color: colors.background }]}>
-              🗺️ Map
+              Map Story
             </Text>
           </TouchableOpacity>
         </View>
@@ -3380,7 +3261,7 @@ Created with TripStory ✈️
           <SettingsHeader
             title="TripStory Settings"
             subtitle="Manage your trip documentation preferences"
-            icon="📸✈️"
+            icon="✈️"
           />
           
           <SettingsFeedbackSection sparkName="TripStory" sparkId="trip-story" />
@@ -3403,9 +3284,9 @@ Created with TripStory ✈️
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>📸✈️ TripStory</Text>
+        <Text style={[styles.title, { color: colors.text }]}>✈️ TripStory</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Capture and share your trip
+          Plan, remember, and share your trip
         </Text>
       </View>
 
@@ -3469,6 +3350,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    
   },
   tripHeaderRight: {
     flexDirection: 'row',
@@ -3534,24 +3416,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 20,
+
   },
   tripTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 0,
   },
   statusBarBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 44, // Status bar height on iOS
+    height: 10, // Status bar height on iOS
     zIndex: 1002,
   },
   stickyTripTitleContainer: {
     position: 'absolute',
-    top: 44, // Below status bar
+    top: 10, // Below status bar
     left: 0,
     right: 0,
     zIndex: 1001,
@@ -3567,6 +3450,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     // Ensure background is fully opaque and covers the area
     overflow: 'hidden',
+    
   },
   addButtonContainer: {
     position: 'absolute',
@@ -3763,12 +3647,6 @@ const styles = StyleSheet.create({
   tripDetailContainer: {
     flex: 1,
   },
-  tripDetailHeader: {
-    padding: 0,
-    paddingLeft: 32,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
@@ -3778,6 +3656,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
+
   },
   addActivityButton: {
     padding: 8,
@@ -3789,7 +3668,7 @@ const styles = StyleSheet.create({
   tripDetailContent: {
     flex: 1,
     padding: 4,
-    paddingTop: 120, // Enough space to clear status bar (44px) + sticky navigation bar (60px + padding)
+    paddingTop: 80, // Enough space to clear status bar (44px) + sticky navigation bar (60px + padding)
   },
   dayContainer: {
     marginBottom: 8,
@@ -4055,13 +3934,16 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0E0E0',
     gap: 12,
   },
+  // dyor buttons
   bottomButton: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
     alignItems: 'center',
   },
+
+  
   bottomButtonText: {
     fontSize: 18,
     fontWeight: '600',

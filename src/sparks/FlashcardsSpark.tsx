@@ -1303,7 +1303,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
             <Text style={styles.centeredAddButtonText}>+ Add New Phrase</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.startButton} onPress={startNewSession}>
-            <Text style={styles.startButtonText}>Start Learning</Text>
+            <Text style={styles.startButtonText}>🧠 Start Learning</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.autoLearnButton} onPress={startAutoPlay}>
             <Text style={styles.autoLearnButtonText}>🚗 Auto Learn</Text>

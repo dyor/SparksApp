@@ -244,7 +244,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
         metadata: {
           id: 'trip-story',
           title: 'TripStory',
-          description: 'Capture and share your trip with photos, activities, and visual stories',
+          description: 'Plan, remember, and share your trip with pics...lots and lots of picsS',
           icon: '✈️',
           category: 'utility',
           difficulty: 'medium',

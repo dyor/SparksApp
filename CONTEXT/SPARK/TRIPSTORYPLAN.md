@@ -2,8 +2,8 @@
 
 ## Overview
 **Name:** TripStory  
-**Tagline:** Capture and share your trip.  
-**Icon:** 📸✈️  
+**Tagline:** Plan, remember, and share your trip.  
+**Icon:** ✈️  
 **Category:** Travel/Photography  
 **Difficulty:** Medium  
 **Estimated Time:** 20 minutes  
