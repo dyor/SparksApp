@@ -111,6 +111,10 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       });
       setTodos(migratedTodos);
     }
+    // Restore selected category if it was saved
+    if (savedData.selectedCategory !== undefined) {
+      setSelectedCategory(savedData.selectedCategory);
+    }
   }, [getSparkData]);
 
   // Initialize session tracking
@@ -132,11 +136,29 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
 
   // Save data whenever todos change
   useEffect(() => {
+    const savedData = getSparkData('todo');
     setSparkData('todo', {
+      ...savedData,
       todos,
       lastUpdated: new Date().toISOString(),
     });
-  }, [todos, setSparkData]);
+  }, [todos, getSparkData, setSparkData]);
+
+  // Save selected category whenever it changes
+  useEffect(() => {
+    const savedData = getSparkData('todo');
+    setSparkData('todo', {
+      ...savedData,
+      selectedCategory,
+    });
+  }, [selectedCategory, getSparkData, setSparkData]);
+
+  // Pre-fill input with category prefix when category is selected (only if input is empty)
+  useEffect(() => {
+    if (selectedCategory && !newTaskText.trim()) {
+      setNewTaskText(`${selectedCategory}: `);
+    }
+  }, [selectedCategory]);
 
   // Helper functions for category parsing
   const parseTaskText = (text: string) => {
@@ -1019,28 +1041,53 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
             <View style={styles.quickDateSection}>
               <Text style={styles.quickDateTitle}>Due Date</Text>
               <View style={styles.quickDateButtons}>
-                {[
-                  { label: 'Today', days: 0 },
-                  { label: '+1 Day', days: 1 },
-                  { label: '+1 Week', days: 7 },
-                ].map((option) => {
-                  const optionDate = new Date();
-                  optionDate.setDate(optionDate.getDate() + option.days);
-                  const optionDateString = optionDate.toISOString().split('T')[0];
-                  const isSelected = selectedDate === optionDateString;
+                {(() => {
+                  const today = new Date();
+                  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                  
+                  // Build base options
+                  const baseOptions = [
+                    { label: 'Today', days: 0 },
+                    { label: '+1 Day', days: 1 },
+                    { label: '+1 Week', days: 7 },
+                  ];
+                  
+                  // Add logical date buttons based on current day
+                  const logicalOptions: Array<{ label: string; days: number }> = [];
+                  
+                  // If Monday (1) to Thursday (4), add Saturday button
+                  if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+                    const daysUntilSaturday = 6 - dayOfWeek; // Saturday is day 6
+                    logicalOptions.push({ label: 'Saturday', days: daysUntilSaturday });
+                  }
+                  // If Saturday (6), add Monday button
+                  else if (dayOfWeek === 6) {
+                    const daysUntilMonday = 8 - dayOfWeek; // Monday is day 1, so 8 - 6 = 2 days
+                    logicalOptions.push({ label: 'Monday', days: daysUntilMonday });
+                  }
+                  
+                  // Combine base options with logical options
+                  const allOptions = [...baseOptions, ...logicalOptions];
+                  
+                  return allOptions.map((option) => {
+                    const optionDate = new Date();
+                    optionDate.setDate(optionDate.getDate() + option.days);
+                    const optionDateString = optionDate.toISOString().split('T')[0];
+                    const isSelected = selectedDate === optionDateString;
 
-                  return (
-                    <TouchableOpacity
-                      key={option.label}
-                      style={[styles.quickDateButton, isSelected && styles.selectedDateButton]}
-                      onPress={() => selectQuickDate(option.days)}
-                    >
-                      <Text style={[styles.quickDateButtonText, isSelected && styles.selectedDateButtonText]}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity
+                        key={option.label}
+                        style={[styles.quickDateButton, isSelected && styles.selectedDateButton]}
+                        onPress={() => selectQuickDate(option.days)}
+                      >
+                        <Text style={[styles.quickDateButtonText, isSelected && styles.selectedDateButtonText]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
               </View>
 
               {/* Manual Date Input */}
