@@ -10,11 +10,9 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  FlatList,
   Linking,
   Share,
   Animated,
-  InteractionManager,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
@@ -85,15 +83,6 @@ interface TripPhoto {
   };
   caption?: string;
   createdAt: string;
-}
-
-interface Lodging {
-  id: string;
-  tripId: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  description?: string;
 }
 
 const TripStorySpark: React.FC<TripStorySparkProps> = ({
