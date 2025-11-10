@@ -223,6 +223,10 @@ PODS:
     - ExpoModulesCore
   - ExpoHaptics (15.0.7):
     - ExpoModulesCore
+  - ExpoImageManipulator (14.0.7):
+    - EXImageLoader
+    - ExpoModulesCore
+    - SDWebImageWebPCoder
   - ExpoImagePicker (17.0.8):
     - ExpoModulesCore
   - ExpoKeepAwake (15.0.7):
@@ -272,6 +276,18 @@ PODS:
   - hermes-engine (0.81.4):
     - hermes-engine/Pre-built (= 0.81.4)
   - hermes-engine/Pre-built (0.81.4)
+  - libwebp (1.5.0):
+    - libwebp/demux (= 1.5.0)
+    - libwebp/mux (= 1.5.0)
+    - libwebp/sharpyuv (= 1.5.0)
+    - libwebp/webp (= 1.5.0)
+  - libwebp/demux (1.5.0):
+    - libwebp/webp
+  - libwebp/mux (1.5.0):
+    - libwebp/demux
+  - libwebp/sharpyuv (1.5.0)
+  - libwebp/webp (1.5.0):
+    - libwebp/sharpyuv
   - RCTDeprecation (0.81.4)
   - RCTRequired (0.81.4)
   - RCTTypeSafety (0.81.4):
@@ -2274,6 +2290,10 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - SDWebImage/Core (5.21.3)
+  - SDWebImageWebPCoder (0.15.0):
+    - libwebp (~> 1.0)
+    - SDWebImage/Core (~> 5.17)
   - UMAppLoader (6.0.7)
   - Yoga (0.0.0)
 
@@ -2296,6 +2316,7 @@ DEPENDENCIES:
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
+  - ExpoImageManipulator (from `../node_modules/expo-image-manipulator/ios`)
   - ExpoImagePicker (from `../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
@@ -2385,6 +2406,12 @@ DEPENDENCIES:
   - UMAppLoader (from `../node_modules/unimodules-app-loader/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
+SPEC REPOS:
+  trunk:
+    - libwebp
+    - SDWebImage
+    - SDWebImageWebPCoder
+
 EXTERNAL SOURCES:
   EXApplication:
     :path: "../node_modules/expo-application/ios"
@@ -2422,6 +2449,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-font/ios"
   ExpoHaptics:
     :path: "../node_modules/expo-haptics/ios"
+  ExpoImageManipulator:
+    :path: "../node_modules/expo-image-manipulator/ios"
   ExpoImagePicker:
     :path: "../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
@@ -2617,6 +2646,7 @@ SPEC CHECKSUMS:
   ExpoFileSystem: b79eadbda7b7f285f378f95f959cc9313a1c9c61
   ExpoFont: cf9d90ec1d3b97c4f513211905724c8171f82961
   ExpoHaptics: 807476b0c39e9d82b7270349d6487928ce32df84
+  ExpoImageManipulator: ead6e7cca441603bfaecc898a69a093adef8b4ef
   ExpoImagePicker: d251aab45a1b1857e4156fed88511b278b4eee1c
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
@@ -2630,6 +2660,7 @@ SPEC CHECKSUMS:
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: 9e0cd874afd81d9a4d36679daca991b58b260d42
   hermes-engine: 35c763d57c9832d0eef764316ca1c4d043581394
+  libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   RCTDeprecation: 7487d6dda857ccd4cb3dd6ecfccdc3170e85dcbc
   RCTRequired: 54128b7df8be566881d48c7234724a78cb9b6157
   RCTTypeSafety: d2b07797a79e45d7b19e1cd2f53c79ab419fe217
@@ -2702,6 +2733,8 @@ SPEC CHECKSUMS:
   RNScreens: 33bbd1d0f86ed957557620dc94054b71db0a94ee
   RNSVG: ac3047fdd9c0ebac9d0b731a352bddf216af6242
   RNWorklets: e2f21d10699f21634e4b9583c10e3596e6d3b353
+  SDWebImage: 16309af6d214ba3f77a7c6f6fdda888cb313a50a
+  SDWebImageWebPCoder: 0e06e365080397465cc73a7a9b472d8a3bd0f377
   UMAppLoader: e1234c45d2b7da239e9e90fc4bbeacee12afd5b6
   Yoga: 2c1f55d9d91a1cec2fb8cc6dd27da33199ffdb52
 

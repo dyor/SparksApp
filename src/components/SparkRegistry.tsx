@@ -21,6 +21,7 @@ import ShortSaverSpark from '../sparks/ShortSaverSpark';
 import SparkSpark from '../sparks/SparkSpark';
 import { MinuteMinderSpark } from '../sparks/MinuteMinderSpark';
 import { BuzzyBingoSpark } from '../sparks/BuzzyBingoSpark';
+import { CardScoreSpark } from '../sparks/CardScoreSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -71,7 +72,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       estimatedTime: 10,
       available: true,
       createdAt: '2024-01-02T00:00:00.000Z',
-      rating: 4.5,
+      rating: 4.6,
     },
     component: FlashcardsSpark,
   },
@@ -206,7 +207,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           estimatedTime: 20,
           available: true,
           createdAt: '2024-01-11T00:00:00.000Z',
-          rating: 4.8,
+          rating: 4.6,
         },
         component: GolfTrackerSpark,
       },
@@ -251,7 +252,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           estimatedTime: 20,
           available: true,
           createdAt: '2024-01-14T00:00:00.000Z',
-          rating: 4.5,
+          rating: 4.8,
         },
         component: TripStorySpark,
       },
@@ -314,6 +315,21 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           rating: 4.5,
         },
         component: BuzzyBingoSpark as React.ComponentType<any>,
+      },
+      'card-score': {
+        metadata: {
+          id: 'card-score',
+          title: 'CardScore',
+          description: 'Fast, simple scorekeeping for card games',
+          icon: '♠️',
+          category: 'utility',
+          difficulty: 'medium',
+          estimatedTime: 2,
+          available: true,
+          createdAt: new Date().toISOString(),
+          rating: 4.0,
+        },
+        component: CardScoreSpark,
       },
 };
 

@@ -25,6 +25,7 @@ import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -109,6 +110,38 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [mapLoadError, setMapLoadError] = useState(false);
   const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
   const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
+  const [showCustomPhotoPicker, setShowCustomPhotoPicker] = useState(false);
+  const [customPickerPhotos, setCustomPickerPhotos] = useState<MediaLibrary.Asset[]>([]);
+  const [customPickerPhotoUris, setCustomPickerPhotoUris] = useState<Map<string, string>>(new Map());
+  const [selectedPickerPhotos, setSelectedPickerPhotos] = useState<Set<string>>(new Set());
+  const [customPickerDate, setCustomPickerDate] = useState<string | null>(null);
+  const [customPickerAllowMultiple, setCustomPickerAllowMultiple] = useState(false);
+  const [customPickerActivity, setCustomPickerActivity] = useState<Activity | undefined>(undefined);
+  const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null); // Track which date/activity is loading
+  const borderAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Animate border color when loading
+  useEffect(() => {
+    if (loadingPhotosByDate) {
+      // Create pulsing animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(borderAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(borderAnimation, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    } else {
+      borderAnimation.setValue(0);
+    }
+  }, [loadingPhotosByDate, borderAnimation]);
   const [showEditActivity, setShowEditActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editActivityName, setEditActivityName] = useState('');
@@ -209,6 +242,21 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         return photoUri;
       }
       
+      // Check if source file exists (for file:// URIs)
+      if (photoUri.startsWith('file://')) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(photoUri);
+          if (!fileInfo.exists) {
+            console.warn('⚠️ Source file does not exist, using original URI as fallback:', photoUri);
+            // Return original URI - it might still work for display if it's a data URI or external URL
+            return photoUri;
+          }
+        } catch (infoError) {
+          // If we can't check file info, continue and try to save anyway
+          console.warn('⚠️ Could not check file existence, proceeding with save attempt:', infoError);
+        }
+      }
+      
       // Create trips directory if it doesn't exist
       const tripsDir = `${documentDir}trips/`;
       const tripDir = `${tripsDir}${tripId}/`;
@@ -229,6 +277,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       console.log('📸 Attempting to save photo:', { photoUri, permanentUri });
       
       // Try different methods based on URI type
+      if (photoUri.startsWith('ph://') || photoUri.startsWith('assets-library://')) {
+        // iOS photo library URI - need to use MediaLibrary to get actual file
+        // This should have been handled before calling this function, but just in case
+        console.warn('⚠️ Received photo library URI, this should have been converted to localUri');
+        // Return original URI as fallback instead of throwing
+        return photoUri;
+      }
+      
       if (photoUri.startsWith('content://')) {
         // Android content URI - use downloadAsync
         try {
@@ -240,7 +296,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             throw new Error(`Download failed with status ${downloadResult.status}`);
           }
         } catch (downloadError) {
-          console.error('❌ Download failed, trying copyAsync:', downloadError);
+          console.warn('⚠️ Download failed, trying copyAsync:', downloadError);
           // Fall through to try copyAsync
         }
       }
@@ -254,7 +310,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         console.log('✅ Photo saved permanently (via copyAsync):', permanentUri);
         return permanentUri;
       } catch (copyError) {
-        console.error('❌ copyAsync failed:', copyError);
+        // Only try base64 if copyAsync fails - but don't try if file doesn't exist
+        const errorMessage = copyError instanceof Error ? copyError.message : String(copyError);
+        if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
+          console.warn('⚠️ Source file does not exist, using original URI as fallback');
+          return photoUri;
+        }
+        
+        console.warn('⚠️ copyAsync failed, trying base64 method:', copyError);
         // Try reading as base64 and writing
         try {
           const base64 = await FileSystem.readAsStringAsync(photoUri, {
@@ -266,12 +329,24 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           console.log('✅ Photo saved permanently (via base64):', permanentUri);
           return permanentUri;
         } catch (base64Error) {
-          console.error('❌ All save methods failed:', base64Error);
-          throw base64Error;
+          const base64ErrorMessage = base64Error instanceof Error ? base64Error.message : String(base64Error);
+          if (base64ErrorMessage.includes('does not exist') || base64ErrorMessage.includes('No such file')) {
+            console.warn('⚠️ Source file does not exist, using original URI as fallback');
+            return photoUri;
+          }
+          // Only log as error if it's not a "file doesn't exist" error
+          console.warn('⚠️ All save methods failed, using original URI as fallback:', base64Error);
+          return photoUri;
         }
       }
     } catch (error) {
-      console.error('❌ Error saving photo permanently:', error, 'Original URI:', photoUri);
+      // Only log as error if it's not a "file doesn't exist" error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
+        console.warn('⚠️ Source file does not exist, using original URI as fallback');
+      } else {
+        console.warn('⚠️ Error saving photo permanently, using original URI as fallback:', error);
+      }
       // Return original URI as fallback
       return photoUri;
     }
@@ -700,8 +775,108 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
+  // Load photos from media library filtered by date
+  const loadPhotosByDate = async (targetDate: string): Promise<MediaLibrary.Asset[]> => {
+    try {
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant photo library access to filter photos by date.');
+        return [];
+      }
+
+      // Calculate date range (start and end of target date)
+      const startOfDay = new Date(targetDate + 'T00:00:00');
+      const endOfDay = new Date(targetDate + 'T23:59:59.999');
+      const startTimestamp = startOfDay.getTime(); // Milliseconds
+      const endTimestamp = endOfDay.getTime(); // Milliseconds
+
+      // Query photos from media library
+      const assets = await MediaLibrary.getAssetsAsync({
+        mediaType: MediaLibrary.MediaType.photo,
+        first: 1000, // Get up to 1000 photos
+        sortBy: MediaLibrary.SortBy.creationTime,
+        createdAfter: startTimestamp,
+        createdBefore: endTimestamp,
+      });
+
+      console.log(`📷 Found ${assets.assets.length} photos for date ${targetDate}`);
+      return assets.assets;
+    } catch (error) {
+      console.error('Error loading photos by date:', error);
+      Alert.alert('Error', 'Failed to load photos. Please try again.');
+      return [];
+    }
+  };
+
   const addFromGallery = async (activity?: Activity, date?: string, allowMultiple: boolean = false) => {
     console.log('📷 addFromGallery called with activity:', activity?.id, activity?.name, 'date:', date, 'allowMultiple:', allowMultiple);
+    
+    // Only use custom picker for "Add Many" (multiple selection) with date filtering
+    // For "Add 1", use regular picker which allows cropping
+    const dateToUse = date || activity?.startDate;
+    if (dateToUse && allowMultiple) {
+      // Create a unique key for this loading operation
+      const loadingKey = dateToUse + (activity?.id || '');
+      setLoadingPhotosByDate(loadingKey);
+      
+      try {
+        // Load photos for the target date
+        const photos = await loadPhotosByDate(dateToUse);
+        
+        if (photos.length === 0) {
+          setLoadingPhotosByDate(null);
+          Alert.alert(
+            'No Photos Found',
+            `No photos found for ${dateToUse}. Would you like to browse all photos instead?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Browse All', 
+                onPress: () => addFromGallery(activity, undefined, allowMultiple) // Fallback to regular picker
+              }
+            ]
+          );
+          return;
+        }
+
+        // Load URIs for display (thumbnails)
+        const uriMap = new Map<string, string>();
+        for (const photo of photos) {
+          try {
+            const assetInfo = await MediaLibrary.getAssetInfoAsync(photo);
+            // Use localUri for display if available, otherwise use uri
+            const displayUri = assetInfo.localUri || assetInfo.uri || photo.uri;
+            if (displayUri) {
+              uriMap.set(photo.id, displayUri);
+            }
+          } catch (error) {
+            console.warn('⚠️ Could not get URI for asset:', photo.id, error);
+            // Fallback to asset.uri
+            if (photo.uri) {
+              uriMap.set(photo.id, photo.uri);
+            }
+          }
+        }
+
+        // Show custom picker for multiple selection
+        setCustomPickerPhotos(photos);
+        setCustomPickerPhotoUris(uriMap);
+        setSelectedPickerPhotos(new Set());
+        setCustomPickerDate(dateToUse);
+        setCustomPickerAllowMultiple(allowMultiple);
+        setCustomPickerActivity(activity);
+        setShowCustomPhotoPicker(true);
+        setLoadingPhotosByDate(null);
+        return;
+      } catch (error) {
+        console.error('Error loading photos by date:', error);
+        setLoadingPhotosByDate(null);
+        // Fall through to regular picker
+      }
+    }
+
+    // Fallback to regular image picker (no date filter)
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -808,6 +983,138 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     } catch (error) {
       console.error('Error adding photo from gallery:', error);
       Alert.alert('Error', 'Failed to add photo from gallery.');
+    }
+  };
+
+  // Handle photo selection from custom picker
+  const handleCustomPickerSelection = async () => {
+    if (selectedPickerPhotos.size === 0) {
+      Alert.alert('No Selection', 'Please select at least one photo.');
+      return;
+    }
+
+    if (!customPickerDate || !currentTrip) return;
+
+    // Get selected assets
+    const selectedAssets = customPickerPhotos.filter(photo => 
+      selectedPickerPhotos.has(photo.id)
+    );
+
+    // Get location once (will be same for all photos in bulk add)
+    let location = null;
+    try {
+      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+      if (locationStatus === 'granted') {
+        const locationData = await Location.getCurrentPositionAsync({});
+        location = {
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+        };
+      }
+    } catch (error) {
+      console.log('Location not available:', error);
+    }
+
+    // Process all selected assets
+    const newPhotos: TripPhoto[] = [];
+    for (let i = 0; i < selectedAssets.length; i++) {
+      const asset = selectedAssets[i];
+      
+      try {
+        // Get the full URI for the asset - request localUri which is the actual file path
+        const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
+        
+        // Use localUri if available (this is the actual file path)
+        let photoUri = assetInfo.localUri;
+        
+        // If localUri is not available, we need to handle it differently
+        if (!photoUri) {
+          // Try to get the URI from the asset directly
+          // On iOS, we might need to use a different approach
+          if (Platform.OS === 'ios') {
+            // For iOS, try to use the asset's URI and convert it
+            // We'll need to use copyAssetToAlbumAsync or similar, but for now let's try the uri
+            photoUri = asset.uri;
+            console.warn('⚠️ No localUri found, using asset.uri:', photoUri);
+          } else {
+            // Android - use the uri directly
+            photoUri = asset.uri;
+          }
+        }
+        
+        // Ensure we have a valid URI
+        if (!photoUri) {
+          console.error('❌ No valid URI found for asset:', asset.id);
+          continue;
+        }
+        
+        // If we still have a ph:// URI, we need to handle it specially
+        if (photoUri.startsWith('ph://')) {
+          console.warn('⚠️ Received ph:// URI, attempting to get localUri with download option');
+          // Try again with download option
+          const assetInfoWithDownload = await MediaLibrary.getAssetInfoAsync(asset, {
+            shouldDownloadFromNetwork: true,
+          });
+          photoUri = assetInfoWithDownload.localUri || assetInfoWithDownload.uri;
+          
+          if (!photoUri || photoUri.startsWith('ph://')) {
+            console.error('❌ Could not get valid file URI for asset:', asset.id);
+            continue;
+          }
+        }
+        
+        // Save photo permanently with unique ID
+        const photoId = `${Date.now()}-${i}`;
+        const permanentUri = await savePhotoPermanently(photoUri, currentTrip.id, photoId);
+      
+        // Create timestamp at noon UTC for the target date
+        const photoDate = new Date(customPickerDate + 'T12:00:00Z').toISOString();
+        
+        const newPhoto: TripPhoto = {
+          id: photoId,
+          tripId: currentTrip.id,
+          activityId: (customPickerActivity || selectedActivity)?.id,
+          uri: permanentUri,
+          timestamp: photoDate,
+          location: location || undefined,
+          caption: '',
+          createdAt: new Date().toISOString(),
+        };
+        
+        newPhotos.push(newPhoto);
+      } catch (error) {
+        console.error(`❌ Error processing asset ${asset.id}:`, error);
+        // Continue with next asset instead of failing completely
+      }
+    }
+
+    // Add all photos at once
+    const updatedTrips = trips.map(trip => 
+      trip.id === currentTrip.id 
+        ? { 
+            ...trip, 
+            photos: [...trip.photos, ...newPhotos], 
+            updatedAt: new Date().toISOString() 
+          }
+        : trip
+    );
+    
+    await saveTrips(updatedTrips);
+    const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
+    setCurrentTrip(updatedTrip);
+    
+    // Close picker and reset state
+    setShowCustomPhotoPicker(false);
+    setSelectedPickerPhotos(new Set());
+    setCustomPickerPhotos([]);
+    setCustomPickerPhotoUris(new Map());
+    setShowPhotoCapture(false);
+    setSelectedActivity(null);
+    setSelectedDate('');
+    HapticFeedback.success();
+    
+    if (newPhotos.length > 1) {
+      Alert.alert('Success', `Added ${newPhotos.length} photos to ${customPickerActivity?.name || 'the activity'}.`);
     }
   };
 
@@ -1098,43 +1405,112 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     if (!currentTrip) return;
 
     try {
+      console.log('📄 Starting PDF generation for trip:', currentTrip.title);
+      console.log('📊 Trip stats:', {
+        photoCount: currentTrip.photos.length,
+        activityCount: currentTrip.activities.length,
+        tripDays: getTripDates().length,
+      });
+
+      // Show loading alert
+      Alert.alert(
+        'Generating PDF',
+        `Processing ${currentTrip.photos.length} photos... This may take a moment.`,
+        [{ text: 'OK' }]
+      );
+
+      // Helper function to resize and compress image for PDF
+      const resizeImageForPDF = async (photoUri: string): Promise<string> => {
+        try {
+          // Resize image to max 400px width (maintains aspect ratio)
+          // Compress to 0.7 quality to reduce file size
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            photoUri,
+            [{ resize: { width: 400 } }], // Max width 400px, height auto
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          return manipulatedImage.uri;
+        } catch (error) {
+          console.warn('⚠️ Could not resize image, using original:', error);
+          return photoUri; // Return original if resize fails
+        }
+      };
+
       // Helper function to convert photo URI to base64 data URI
-      const photoToDataUri = async (photoUri: string): Promise<string> => {
+      const photoToDataUri = async (photoUri: string, photoIndex: number, totalPhotos: number): Promise<string> => {
         try {
           // Check if it's already a data URI
           if (photoUri.startsWith('data:')) {
+            console.log(`✅ Photo ${photoIndex + 1}/${totalPhotos}: Already data URI`);
             return photoUri;
           }
           
-          // Try to read the file directly - if it fails, the file doesn't exist or isn't accessible
-          // This avoids using the deprecated getInfoAsync
+          // Resize and compress image first to reduce memory usage
+          console.log(`🔄 Photo ${photoIndex + 1}/${totalPhotos}: Resizing and compressing...`);
+          const resizedUri = await resizeImageForPDF(photoUri);
+          
+          // Try to read the resized file - if it fails, the file doesn't exist or isn't accessible
           try {
-            const base64 = await FileSystem.readAsStringAsync(photoUri, {
+            console.log(`🔄 Photo ${photoIndex + 1}/${totalPhotos}: Converting to base64...`);
+            const base64 = await FileSystem.readAsStringAsync(resizedUri, {
               encoding: 'base64' as any,
             });
+            
+            const dataUriSize = base64.length;
+            console.log(`✅ Photo ${photoIndex + 1}/${totalPhotos}: Converted (${(dataUriSize / 1024).toFixed(1)}KB base64)`);
             
             // Return as data URI
             return `data:image/jpeg;base64,${base64}`;
           } catch (readError) {
-            console.warn(`⚠️ Photo file does not exist or cannot be read: ${photoUri}`, readError);
+            console.warn(`⚠️ Photo ${photoIndex + 1}/${totalPhotos}: File does not exist or cannot be read: ${resizedUri}`, readError);
             return ''; // Return empty string for broken images
           }
         } catch (error) {
-          console.error(`❌ Error converting photo to base64: ${photoUri}`, error);
+          console.error(`❌ Photo ${photoIndex + 1}/${totalPhotos}: Error converting to base64: ${photoUri}`, error);
           return ''; // Return empty string on error
         }
       };
 
-      // Convert all photos to base64 data URIs
+      // Convert all photos to base64 data URIs with progress tracking
+      console.log('🔄 Starting photo conversion...');
       const photoDataUriMap = new Map<string, string>();
+      const totalPhotos = currentTrip.photos.length;
+      let processedCount = 0;
+      let successCount = 0;
+      let errorCount = 0;
+      
       for (const photo of currentTrip.photos) {
         if (photo.uri) {
-          const dataUri = await photoToDataUri(photo.uri);
-          photoDataUriMap.set(photo.id, dataUri);
+          const dataUri = await photoToDataUri(photo.uri, processedCount, totalPhotos);
+          if (dataUri) {
+            photoDataUriMap.set(photo.id, dataUri);
+            successCount++;
+          } else {
+            errorCount++;
+          }
         }
+        processedCount++;
+        
+        // Log progress every 10 photos
+        if (processedCount % 10 === 0 || processedCount === totalPhotos) {
+          console.log(`📊 Progress: ${processedCount}/${totalPhotos} photos processed (${successCount} success, ${errorCount} errors)`);
+        }
+      }
+      
+      console.log(`✅ Photo conversion complete: ${successCount} successful, ${errorCount} errors`);
+      
+      // Calculate total HTML size estimate
+      const estimatedHtmlSize = Array.from(photoDataUriMap.values()).reduce((sum, uri) => sum + uri.length, 0);
+      console.log(`📏 Estimated HTML size: ${(estimatedHtmlSize / 1024 / 1024).toFixed(2)}MB (after compression)`);
+      
+      if (estimatedHtmlSize > 20 * 1024 * 1024) { // 20MB (reduced from 50MB since we're compressing)
+        console.warn('⚠️ WARNING: HTML size is very large, may cause memory issues');
+      } else {
+        console.log('✅ HTML size is within safe limits');
       }
 
       // Create a simple HTML template for the trip story
+      console.log('🔄 Generating HTML template...');
       const tripDates = getTripDates();
       const html = `
         <!DOCTYPE html>
@@ -1142,6 +1518,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <head>
           <meta charset="utf-8">
           <style>
+            @page {
+              size: A4;
+              margin: 0;
+            }
             body { 
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               margin: 0;
@@ -1149,16 +1529,65 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               background: white;
               color: #333;
             }
-            .header { text-align: center; margin-bottom: 30px; }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px;
+              page-break-after: avoid;
+              break-after: avoid;
+            }
             .title { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
             .dates { font-size: 16px; color: #666; }
-            .day { margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; }
-            .day-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
-            .activity { margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; }
-            .activity-name { font-weight: bold; margin-bottom: 5px; }
+            .day { 
+              margin-bottom: 30px; 
+              border: 1px solid #e0e0e0; 
+              border-radius: 8px; 
+              padding: 15px;
+              page-break-inside: avoid;
+              break-inside: avoid;
+              page-break-before: auto;
+              break-before: auto;
+            }
+            .day-title { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin-bottom: 15px;
+              page-break-after: avoid;
+              break-after: avoid;
+            }
+            .activity { 
+              margin-bottom: 15px; 
+              padding: 10px; 
+              background: #f8f9fa; 
+              border-radius: 6px;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .activity-name { 
+              font-weight: bold; 
+              margin-bottom: 5px;
+              page-break-after: avoid;
+              break-after: avoid;
+            }
             .activity-time { color: #666; font-size: 14px; }
-            .photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-            .photo { width: 200px; height: 200px; object-fit: cover; border-radius: 8px; }
+            .photos { 
+              display: flex; 
+              flex-wrap: wrap; 
+              gap: 10px; 
+              margin-top: 10px;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .photo { 
+              max-width: 400px; 
+              max-height: 400px; 
+              width: auto; 
+              height: auto; 
+              object-fit: contain; 
+              border-radius: 8px;
+              page-break-inside: avoid;
+              break-inside: avoid;
+              display: block;
+            }
           </style>
         </head>
         <body>
@@ -1209,9 +1638,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       `;
 
       // Generate PDF using expo-print
+      console.log('🔄 Generating PDF from HTML...');
+      console.log(`📏 HTML length: ${(html.length / 1024 / 1024).toFixed(2)}MB`);
+      
       try {
+        const startTime = Date.now();
         const { uri } = await Print.printToFileAsync({ html });
-        console.log('✅ PDF generated at:', uri);
+        const generationTime = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`✅ PDF generated at: ${uri} (took ${generationTime}s)`);
         
         // Rename PDF to trip name
         const sanitizedTripName = currentTrip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -1269,6 +1703,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         
       } catch (printError) {
         console.error('❌ Print/Share error:', printError);
+        console.error('❌ Error details:', {
+          message: printError instanceof Error ? printError.message : 'Unknown error',
+          stack: printError instanceof Error ? printError.stack : undefined,
+          name: printError instanceof Error ? printError.name : undefined,
+        });
         Alert.alert(
           'PDF Generation Error',
           `Failed to generate or share PDF: ${printError instanceof Error ? printError.message : 'Unknown error'}. Please try again.`,
@@ -1277,7 +1716,18 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       }
     } catch (error) {
       console.error('❌ Error generating trip story:', error);
-      Alert.alert('Error', 'Failed to generate trip story. Please try again.');
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+        tripTitle: currentTrip?.title,
+        photoCount: currentTrip?.photos.length,
+      });
+      Alert.alert(
+        'Error',
+        `Failed to generate trip story: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -2163,13 +2613,13 @@ Created with TripStory ✈️
               style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
               onPress={deletePhoto}
             >
-              <Text style={[styles.deleteButtonText, { color: 'white' }]}>🗑️ Delete Photo</Text>
+              <Text style={[styles.deleteButtonText, { color: 'white' }]}>Delete Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary }]}
+              style={[styles.deleteButton, { backgroundColor: colors.primary }]}
               onPress={updatePhotoDetails}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Save Changes</Text>
+              <Text style={[styles.deleteButtonText, { color: colors.background }]}>Save Changes</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2420,6 +2870,145 @@ Created with TripStory ✈️
       </View>
     </Modal>
   );
+
+  const renderCustomPhotoPickerModal = () => {
+    const photoSize = (screenWidth - 48) / 3; // 3 columns with padding
+
+    const togglePhotoSelection = (photoId: string) => {
+      setSelectedPickerPhotos(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(photoId)) {
+          newSet.delete(photoId);
+        } else {
+          if (!customPickerAllowMultiple && newSet.size > 0) {
+            // Single selection mode - replace selection
+            newSet.clear();
+          }
+          newSet.add(photoId);
+        }
+        return newSet;
+      });
+    };
+
+    return (
+      <Modal 
+        visible={showCustomPhotoPicker} 
+        animationType="slide" 
+        presentationStyle="pageSheet"
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Select Photos {customPickerDate ? `(${formatDate(customPickerDate)})` : ''}
+            </Text>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {customPickerPhotos.length === 0 ? (
+              <View style={[styles.emptyState, { padding: 40 }]}>
+                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                  Loading photos...
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.photoGrid}>
+                {customPickerPhotos.map((asset) => {
+                  const isSelected = selectedPickerPhotos.has(asset.id);
+                  // Get the display URI from our map, fallback to asset.uri
+                  const imageUri = customPickerPhotoUris.get(asset.id) || asset.uri;
+                  return (
+                    <TouchableOpacity
+                      key={asset.id}
+                      style={[
+                        styles.photoGridItem,
+                        { 
+                          width: photoSize, 
+                          height: photoSize,
+                          borderWidth: isSelected ? 3 : 1,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: colors.border + '40', // Light background for empty boxes
+                        }
+                      ]}
+                      onPress={() => togglePhotoSelection(asset.id)}
+                    >
+                      {imageUri ? (
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={[styles.photoGridImage, { width: photoSize, height: photoSize }]}
+                          resizeMode="cover"
+                          onError={(error) => {
+                            console.error('❌ Error loading thumbnail for asset:', asset.id, imageUri, error);
+                          }}
+                        />
+                      ) : (
+                        <View style={[styles.photoGridPlaceholder, { width: photoSize, height: photoSize }]}>
+                          <Text style={{ color: colors.textSecondary, fontSize: 24 }}>📷</Text>
+                        </View>
+                      )}
+                      {isSelected && (
+                        <View style={[styles.photoGridCheckmark, { backgroundColor: colors.primary }]}>
+                          <Text style={[styles.photoGridCheckmarkText, { color: colors.background }]}>
+                            ✓
+                          </Text>
+                        </View>
+                      )}
+                      {customPickerAllowMultiple && (
+                        <View style={[styles.photoGridBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={[styles.photoGridBadgeText, { color: colors.background }]}>
+                            {Array.from(selectedPickerPhotos).indexOf(asset.id) + 1}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+            <TouchableOpacity
+              style={[
+                styles.modalFooterButton,
+                { 
+                  backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
+                  opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
+                  flex: 1,
+                  marginRight: 8,
+                }
+              ]}
+              onPress={handleCustomPickerSelection}
+              disabled={selectedPickerPhotos.size === 0}
+            >
+              <Text style={[styles.modalFooterButtonText, { color: colors.background }]}>
+                Add {selectedPickerPhotos.size > 0 ? `(${selectedPickerPhotos.size})` : ''}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modalFooterButton,
+                { 
+                  backgroundColor: colors.border,
+                  flex: 1,
+                  marginLeft: 8,
+                }
+              ]}
+              onPress={() => {
+                setShowCustomPhotoPicker(false);
+                setSelectedPickerPhotos(new Set());
+                setCustomPickerPhotos([]);
+                setCustomPickerPhotoUris(new Map());
+              }}
+            >
+              <Text style={[styles.modalFooterButtonText, { color: colors.textSecondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const renderMapViewModal = () => {
     if (!currentTrip) return null;
@@ -3146,16 +3735,44 @@ Created with TripStory ✈️
                         >
                           <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, true);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                        </TouchableOpacity>
+                        {(() => {
+                          const isLoading = loadingPhotosByDate === (date + '');
+                          const animatedBorderColor = isLoading 
+                            ? borderAnimation.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [colors.primary, colors.secondary],
+                              })
+                            : colors.primary;
+                          return (
+                            <Animated.View style={{ 
+                              borderColor: animatedBorderColor, 
+                              borderWidth: isLoading ? 2 : 1,
+                              borderRadius: 9999,
+                              overflow: 'hidden',
+                            }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.addButton, 
+                                  { 
+                                    backgroundColor: '#f5f5f5', 
+                                    borderWidth: 0,
+                                    opacity: isLoading ? 0.7 : 1,
+                                  }
+                                ]}
+                                onPress={() => {
+                                  setSelectedDate(date);
+                                  setSelectedActivity(null);
+                                  addFromGallery(undefined, date, true);
+                                }}
+                                disabled={isLoading}
+                              >
+                                <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                </Text>
+                              </TouchableOpacity>
+                            </Animated.View>
+                          );
+                        })()}
                       </View>
                     )}
                     
@@ -3189,16 +3806,44 @@ Created with TripStory ✈️
                         >
                           <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, true);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                        </TouchableOpacity>
+                        {(() => {
+                          const isLoading = loadingPhotosByDate === (date + '');
+                          const animatedBorderColor = isLoading 
+                            ? borderAnimation.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [colors.primary, colors.secondary],
+                              })
+                            : colors.primary;
+                          return (
+                            <Animated.View style={{ 
+                              borderColor: animatedBorderColor, 
+                              borderWidth: isLoading ? 2 : 1,
+                              borderRadius: 8,
+                              overflow: 'hidden',
+                            }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.addButton, 
+                                  { 
+                                    backgroundColor: '#f5f5f5', 
+                                    borderWidth: 0,
+                                    opacity: isLoading ? 0.7 : 1,
+                                  }
+                                ]}
+                                onPress={() => {
+                                  setSelectedDate(date);
+                                  setSelectedActivity(null);
+                                  addFromGallery(undefined, date, true);
+                                }}
+                                disabled={isLoading}
+                              >
+                                <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                </Text>
+                              </TouchableOpacity>
+                            </Animated.View>
+                          );
+                        })()}
                       </View>
                     )}
                   </View>
@@ -3227,16 +3872,44 @@ Created with TripStory ✈️
                     >
                       <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        setSelectedActivity(null);
-                        addFromGallery(undefined, date, true);
-                      }}
-                    >
-                      <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                    </TouchableOpacity>
+                    {(() => {
+                      const isLoading = loadingPhotosByDate === (date + '');
+                      const animatedBorderColor = isLoading 
+                        ? borderAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [colors.primary, colors.secondary],
+                          })
+                        : colors.primary;
+                      return (
+                        <Animated.View style={{ 
+                          borderColor: animatedBorderColor, 
+                          borderWidth: isLoading ? 2 : 1,
+                          borderRadius: 9999,
+                          overflow: 'hidden',
+                        }}>
+                          <TouchableOpacity
+                            style={[
+                              styles.addButton, 
+                              { 
+                                backgroundColor: '#f5f5f5', 
+                                borderWidth: 0,
+                                opacity: isLoading ? 0.7 : 1,
+                              }
+                            ]}
+                            onPress={() => {
+                              setSelectedDate(date);
+                              setSelectedActivity(null);
+                              addFromGallery(undefined, date, true);
+                            }}
+                            disabled={isLoading}
+                          >
+                            <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                              {isLoading ? 'Searching...' : 'Add Many'}
+                            </Text>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })()}
                   </View>
                 )}
 
@@ -3314,16 +3987,44 @@ Created with TripStory ✈️
                             >
                               <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                addFromGallery(activity, undefined, true);
-                              }}
-                            >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                            </TouchableOpacity>
+                            {(() => {
+                              const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
+                              const animatedBorderColor = isLoading 
+                                ? borderAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [colors.primary, colors.secondary],
+                                  })
+                                : colors.primary;
+                              return (
+                                <Animated.View style={{ 
+                                  borderColor: animatedBorderColor, 
+                                  borderWidth: isLoading ? 2 : 1,
+                                  borderRadius: 9999,
+                                  overflow: 'hidden',
+                                }}>
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.addButton, 
+                                      { 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderWidth: 0,
+                                        opacity: isLoading ? 0.7 : 1,
+                                      }
+                                    ]}
+                                    onPress={() => {
+                                      setSelectedActivity(activity);
+                                      setSelectedDate(activity.startDate);
+                                      addFromGallery(activity, undefined, true);
+                                    }}
+                                    disabled={isLoading}
+                                  >
+                                    <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                      {isLoading ? 'Searching...' : 'Add Many'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </Animated.View>
+                              );
+                            })()}
                           </View>
                         )}
                         
@@ -3357,16 +4058,44 @@ Created with TripStory ✈️
                             >
                               <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                addFromGallery(activity, undefined, true);
-                              }}
-                            >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                            </TouchableOpacity>
+                            {(() => {
+                              const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
+                              const animatedBorderColor = isLoading 
+                                ? borderAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [colors.primary, colors.secondary],
+                                  })
+                                : colors.primary;
+                              return (
+                                <Animated.View style={{ 
+                                  borderColor: animatedBorderColor, 
+                                  borderWidth: isLoading ? 2 : 1,
+                                  borderRadius: 9999,
+                                  overflow: 'hidden',
+                                }}>
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.addButton, 
+                                      { 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderWidth: 0,
+                                        opacity: isLoading ? 0.7 : 1,
+                                      }
+                                    ]}
+                                    onPress={() => {
+                                      setSelectedActivity(activity);
+                                      setSelectedDate(activity.startDate);
+                                      addFromGallery(activity, undefined, true);
+                                    }}
+                                    disabled={isLoading}
+                                  >
+                                    <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                      {isLoading ? 'Searching...' : 'Add Many'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </Animated.View>
+                              );
+                            })()}
                           </View>
                         )}
                       </View>
@@ -3454,6 +4183,7 @@ Created with TripStory ✈️
         {renderManageActivitiesModal()}
         {renderPhotoCaptureModal()}
         {renderPhotoDetailModal()}
+        {renderCustomPhotoPickerModal()}
         {renderMapViewModal()}
         {renderEditActivityModal()}
         {renderEditTripModal()}
@@ -3590,6 +4320,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
   },
+  emptyStateText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
@@ -3678,6 +4412,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    padding: 16,
+  },
+  photoGridItem: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  photoGridImage: {
+    borderRadius: 8,
+  },
+  photoGridPlaceholder: {
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  photoGridCheckmark: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoGridCheckmarkText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  photoGridBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoGridBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   photoThumbnail: {
     width: (width - 60) / 3,
@@ -3773,6 +4551,23 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalFooterText: {
+    fontSize: 14,
+  },
+  modalFooterButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalFooterButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   createButton: {
     paddingVertical: 16,
@@ -3790,7 +4585,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    flexDirection: 'row',
   },
   deleteButtonText: {
     fontSize: 16,
