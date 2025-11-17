@@ -79,15 +79,15 @@ Need to remove simulator true for production builds (or not:)
 1. **Build for Android**
    ```bash
    # Development build
-   eas build --platform android --profile development
+   npx eas build --platform android --profile development
    
    # Production build for Play Store
-   eas build --platform android --profile production
+   npx eas build --platform android --profile production
    ```
 
 2. **Submit to Google Play**
    ```bash
-   eas submit --platform android
+   npx eas submit --platform android
    ```
 
 ### Google Play Console Configuration

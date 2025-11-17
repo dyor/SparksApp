@@ -1001,7 +1001,21 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     // Cancel any existing activity notifications first
     await NotificationService.cancelAllActivityNotifications();
     
-    // Schedule notifications for each activity
+    const now = new Date();
+    
+    // Schedule notification for tee time itself
+    if (teeTime.getTime() > now.getTime()) {
+      await NotificationService.scheduleActivityNotification(
+        'Tee Time!',
+        teeTime,
+        'tee-time',
+        'Tee Time Timer',
+        'tee-time-timer',
+        '⛳'
+      );
+    }
+    
+    // Schedule notifications for each activity at its START time
     for (let i = 0; i < activities.length; i++) {
       const activity = activities[i];
       
@@ -1009,15 +1023,21 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       const minutesFromStart = activities
         .slice(i + 1)
         .reduce((sum, activity) => sum + activity.duration, 0);
+      
+      // Create a new Date object for the activity start time
       const activityStartTime = new Date(startTime.getTime() + minutesFromStart * 60 * 1000);
       
       // Only schedule if the activity is in the future
-      const now = new Date();
       if (activityStartTime.getTime() > now.getTime()) {
+        // Ensure we pass a proper Date object
+        const futureDate = new Date(activityStartTime);
         await NotificationService.scheduleActivityNotification(
           activity.name,
-          activityStartTime,
-          activity.id
+          futureDate,
+          activity.id,
+          'Tee Time Timer',
+          'tee-time-timer',
+          '⛳'
         );
       }
     }

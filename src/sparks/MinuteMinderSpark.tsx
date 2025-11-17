@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions, Modal } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { NotificationService } from '../utils/notifications';
 import Svg, { Circle } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -114,6 +115,14 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const [showFlameAnimations, setShowFlameAnimations] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(0);
   const flameAnim = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const activityRefs = useRef<{ [key: number]: View | null }>({});
+  const lastCompletedIndex = useRef<number | null>(null);
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const [editingBreak, setEditingBreak] = useState<{ prevIndex: number; nextIndex: number; gap: number } | null>(null);
+  const [breakActivityName, setBreakActivityName] = useState('');
+  const [breakStartTime, setBreakStartTime] = useState('');
+  const [breakDuration, setBreakDuration] = useState('');
 
   // Load saved data on mount
   useEffect(() => {
@@ -249,7 +258,27 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 
   // Get activity status based on today's schedule
   const getActivityStatus = (activityIndex: number): 'completed' | 'current' | 'future' => {
-    if (!timerState.isActive || parsedActivities.length === 0) return 'future';
+    if (parsedActivities.length === 0) return 'future';
+    
+    // When timer is not active, all activities are considered 'future' for display purposes
+    // (they'll be shown as completed based on time, but we want to show them all)
+    if (!timerState.isActive) {
+      // Still determine if they're actually completed based on time
+      const now = currentTime;
+      const activity = parsedActivities[activityIndex];
+      const [hours, minutes] = activity.startTime.split(':').map(Number);
+      const activityStartDate = new Date();
+      activityStartDate.setHours(hours, minutes, 0, 0);
+      const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
+      
+      if (now.getTime() >= activityEndDate.getTime()) {
+        return 'completed';
+      }
+      if (now.getTime() >= activityStartDate.getTime() && now.getTime() < activityEndDate.getTime()) {
+        return 'current';
+      }
+      return 'future';
+    }
 
     // First check if manually marked as completed
     if (timerState.completedActivities.has(activityIndex)) return 'completed';
@@ -334,27 +363,105 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
     if (parsedActivities.length === 0) {
       Alert.alert('No Activities', 'Please add at least one activity before starting.');
       return;
     }
     
+    // Cancel any existing activity notifications first
+    await NotificationService.cancelAllActivityNotifications();
+    
     // Determine which activities are already completed based on current time
     const now = new Date();
     const completedActivities = new Set<number>();
+    const futureActivities: Array<{ index: number; startDate: Date }> = [];
+    const pastActivities: Array<{ index: number; startDate: Date }> = [];
     
+    // First pass: categorize activities as future (today) or past
     parsedActivities.forEach((activity, index) => {
       const [hours, minutes] = activity.startTime.split(':').map(Number);
       const activityStartDate = new Date();
       activityStartDate.setHours(hours, minutes, 0, 0);
+      
       const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
       
       // If the activity end time has already passed, mark as completed
       if (now.getTime() >= activityEndDate.getTime()) {
         completedActivities.add(index);
+      } else if (activityStartDate.getTime() > now.getTime()) {
+        // Activity is in the future today
+        futureActivities.push({ index, startDate: activityStartDate });
+      } else {
+        // Activity start time has passed today
+        pastActivities.push({ index, startDate: activityStartDate });
       }
     });
+    
+    // If all activities are past, ask user if they want to schedule for tomorrow
+    if (futureActivities.length === 0 && pastActivities.length > 0) {
+      Alert.alert(
+        'All Activities Past',
+        'All activities have already started today. Would you like to schedule reminders for tomorrow?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => {
+            setTimerState({
+              isActive: true,
+              startDate: new Date(),
+              currentActivityIndex: 0,
+              completedActivities,
+            });
+            HapticFeedback.success();
+          }},
+          { text: 'Schedule for Tomorrow', onPress: async () => {
+            // Schedule all past activities for tomorrow
+            for (const { index, startDate } of pastActivities) {
+              const tomorrowDate = new Date(startDate);
+              tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+              
+              const activityEndDate = new Date(tomorrowDate.getTime() + parsedActivities[index].duration * 60 * 1000);
+              
+              // Only schedule if the activity hasn't ended even tomorrow
+              if (now.getTime() < activityEndDate.getTime()) {
+                NotificationService.scheduleActivityNotification(
+                  parsedActivities[index].name,
+                  tomorrowDate,
+                  `minute-minder-${index}`,
+                  'Minute Minder',
+                  'minute-minder',
+                  '⏳'
+                ).catch(error => {
+                  console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
+                });
+              }
+            }
+            
+            setTimerState({
+              isActive: true,
+              startDate: new Date(),
+              currentActivityIndex: 0,
+              completedActivities,
+            });
+            HapticFeedback.success();
+          }}
+        ]
+      );
+      return;
+    }
+    
+    // Schedule notifications for future activities (today)
+    for (const { index, startDate } of futureActivities) {
+      NotificationService.scheduleActivityNotification(
+        parsedActivities[index].name,
+        startDate,
+        `minute-minder-${index}`,
+        'Minute Minder',
+        'minute-minder',
+        '⏳'
+      ).catch(error => {
+        console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
+      });
+    }
     
     setTimerState({
       isActive: true,
@@ -366,7 +473,10 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     HapticFeedback.success();
   };
 
-  const handleStopTimer = () => {
+  const handleStopTimer = async () => {
+    // Cancel all activity notifications
+    await NotificationService.cancelAllActivityNotifications();
+    
     setTimerState({
       isActive: false,
       startDate: null,
@@ -403,6 +513,196 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     }
   };
 
+  // Get gap in minutes between two activities (by original index)
+  const getGapBetweenActivities = (activityIndex1: number, activityIndex2: number): number | null => {
+    if (activityIndex1 < 0 || activityIndex2 >= parsedActivities.length || activityIndex1 >= activityIndex2) return null;
+    
+    const activity1 = parsedActivities[activityIndex1];
+    const activity2 = parsedActivities[activityIndex2];
+    
+    const [hours1, minutes1] = activity1.startTime.split(':').map(Number);
+    const [hours2, minutes2] = activity2.startTime.split(':').map(Number);
+    
+    const start1 = new Date();
+    start1.setHours(hours1, minutes1, 0, 0);
+    const end1 = new Date(start1.getTime() + activity1.duration * 60 * 1000);
+    
+    const start2 = new Date();
+    start2.setHours(hours2, minutes2, 0, 0);
+    
+    const gapMs = start2.getTime() - end1.getTime();
+    const gapMinutes = Math.floor(gapMs / (60 * 1000));
+    
+    return gapMinutes > 0 ? gapMinutes : null;
+  };
+
+  // Get start time for a break (end time of previous activity)
+  const getBreakStartTime = (prevIndex: number): string => {
+    if (prevIndex < 0 || prevIndex >= parsedActivities.length) return '';
+    const activity = parsedActivities[prevIndex];
+    const [hours, minutes] = activity.startTime.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+    const endDate = new Date(startDate.getTime() + activity.duration * 60 * 1000);
+    return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+  };
+
+  // Handle break edit
+  const handleBreakEdit = (prevIndex: number, nextIndex: number, gap: number) => {
+    const startTime = getBreakStartTime(prevIndex);
+    setEditingBreak({ prevIndex, nextIndex, gap });
+    setBreakStartTime(startTime);
+    setBreakDuration(gap.toString());
+    setBreakActivityName('');
+    setShowBreakModal(true);
+  };
+
+  // Save break as new activity
+  const handleSaveBreak = () => {
+    if (!editingBreak) return;
+
+    const duration = parseInt(breakDuration);
+    if (isNaN(duration) || duration <= 0) {
+      Alert.alert('Invalid Duration', 'Please enter a valid positive number for duration.');
+      return;
+    }
+
+    if (!breakActivityName.trim()) {
+      Alert.alert('Missing Name', 'Please enter an activity name.');
+      return;
+    }
+
+    // Validate time format
+    if (!/^\d{2}:\d{2}$/.test(breakStartTime)) {
+      Alert.alert('Invalid Time', 'Please enter time in HH:MM format.');
+      return;
+    }
+
+    // Create new activity
+    const newActivity: Activity = {
+      startTime: breakStartTime,
+      duration,
+      name: breakActivityName.trim(),
+      order: editingBreak.nextIndex, // Insert before next activity
+    };
+
+    // Insert the new activity into parsedActivities
+    const updatedActivities = [...parsedActivities];
+    updatedActivities.splice(editingBreak.nextIndex, 0, newActivity);
+
+    // Reassign order numbers
+    updatedActivities.forEach((activity, index) => {
+      activity.order = index;
+    });
+
+    // Update activities text and re-parse to ensure proper sorting
+    const newActivitiesText = updatedActivities
+      .map(activity => `${activity.startTime}, ${activity.duration}, ${activity.name}`)
+      .join('\n');
+
+    setActivitiesText(newActivitiesText);
+    // Re-parse to ensure proper sorting by time
+    const reParsed = parseActivities(newActivitiesText);
+    setParsedActivities(reParsed);
+    setShowBreakModal(false);
+    setEditingBreak(null);
+    setBreakActivityName('');
+    setBreakStartTime('');
+    setBreakDuration('');
+    HapticFeedback.success();
+  };
+
+  // Get organized activities: completed above, current/next at top, future below
+  // While timer is active: only show current/next and future (hide completed)
+  // When timer is stopped: show all including completed
+  const getOrganizedActivities = (): Array<{ activity: Activity; index: number; status: 'completed' | 'current' | 'future' }> => {
+    if (parsedActivities.length === 0) return [];
+    
+    const completed: Array<{ activity: Activity; index: number; status: 'completed' }> = [];
+    const currentOrNext: Array<{ activity: Activity; index: number; status: 'current' | 'future' }> = [];
+    const future: Array<{ activity: Activity; index: number; status: 'future' }> = [];
+    
+    parsedActivities.forEach((activity, index) => {
+      const status = getActivityStatus(index);
+      const item = { activity, index, status };
+      
+      // While timer is active, filter out completed activities
+      if (timerState.isActive && status === 'completed') {
+        return; // Skip completed activities when timer is active
+      }
+      
+      if (status === 'completed') {
+        completed.push(item as { activity: Activity; index: number; status: 'completed' });
+      } else if (status === 'current' || (status === 'future' && currentOrNext.length === 0)) {
+        // Current activity or first future activity (next)
+        currentOrNext.push(item as { activity: Activity; index: number; status: 'current' | 'future' });
+      } else {
+        future.push(item as { activity: Activity; index: number; status: 'future' });
+      }
+    });
+    
+    // Reverse completed so most recent is at top
+    completed.reverse();
+    
+    // When timer is active, only return current/next and future (no completed)
+    if (timerState.isActive) {
+      return [...currentOrNext, ...future];
+    }
+    
+    // When timer is stopped, return all including completed
+    return [...completed, ...currentOrNext, ...future];
+  };
+
+  // Auto-scroll when activity completes - keep current/next activity at top
+  useEffect(() => {
+    if (!timerState.isActive || !scrollViewRef.current || parsedActivities.length === 0) return;
+    
+    const organized = getOrganizedActivities();
+    if (organized.length === 0) return;
+    
+    const currentIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'current');
+    const nextIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'future');
+    
+    const targetIndex = currentIndex >= 0 ? currentIndex : nextIndex;
+    
+    if (targetIndex >= 0 && targetIndex !== lastCompletedIndex.current) {
+      // Find the position of this activity in the organized list
+      const organizedIndex = organized.findIndex(item => item.index === targetIndex);
+      
+      if (organizedIndex >= 0) {
+        // Estimate scroll position based on item height (approximately 80px per item including margins)
+        // Scroll to position the current/next activity at the top of the scroll view
+        const estimatedY = organizedIndex * 80;
+        
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, estimatedY - 20), animated: true });
+        }, 200);
+      }
+      
+      lastCompletedIndex.current = targetIndex;
+    }
+  }, [currentTime, timerState.isActive, parsedActivities]);
+
+  // Initial scroll to current/next activity when timer starts
+  useEffect(() => {
+    if (timerState.isActive && scrollViewRef.current && parsedActivities.length > 0) {
+      const organized = getOrganizedActivities();
+      const currentIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'current');
+      const nextIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'future');
+      const targetIndex = currentIndex >= 0 ? currentIndex : nextIndex;
+      
+      if (targetIndex >= 0) {
+        const organizedIndex = organized.findIndex(item => item.index === targetIndex);
+        if (organizedIndex >= 0) {
+          setTimeout(() => {
+            const estimatedY = organizedIndex * 80;
+            scrollViewRef.current?.scrollTo({ y: Math.max(0, estimatedY - 20), animated: false });
+          }, 300);
+        }
+      }
+    }
+  }, [timerState.isActive]);
+
   const styles = StyleSheet.create({
     fullScreenContainer: {
       flex: 1,
@@ -411,9 +711,20 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       flex: 1,
       backgroundColor: colors.background,
     },
+    fixedHeader: {
+      backgroundColor: colors.background,
+      paddingTop: 20,
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
     scrollContainer: {
       flexGrow: 1,
       padding: 20,
+    },
+    scrollView: {
+      flex: 1,
     },
     header: {
       alignItems: 'center',
@@ -511,6 +822,93 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     activityCardCompleted: {
       opacity: 0.6,
     },
+    breakDivider: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.surface,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+      marginVertical: 8,
+      borderRadius: 8,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    breakDividerText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+      flex: 1,
+    },
+    breakEditIcon: {
+      fontSize: 18,
+      color: colors.primary,
+      marginLeft: 8,
+    },
+    breakModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    breakModalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+    },
+    breakModalTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    breakModalInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 16,
+      backgroundColor: colors.background,
+    },
+    breakModalLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    breakModalButtonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 8,
+    },
+    breakModalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    breakModalSaveButton: {
+      backgroundColor: colors.primary,
+    },
+    breakModalCancelButton: {
+      backgroundColor: colors.border,
+    },
+    breakModalButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    breakModalCancelButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
     activityInfo: {
       flex: 1,
     },
@@ -585,46 +983,80 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   }
 
   const current = getCurrentActivity();
+  const organizedActivities = getOrganizedActivities();
 
   return (
     <View style={styles.fullScreenContainer}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
+      {/* Fixed header with clock */}
+      <View style={styles.fixedHeader}>
         <View style={styles.header}>
-              <Text style={styles.title}>⏳ Minute Minder</Text>
+          <Text style={styles.title}>⏳ Minute Minder</Text>
           <Text style={styles.subtitle}>Make every minute matter</Text>
         </View>
 
-        {!isEditing ? (
-        <>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => setIsEditing(true)}
-          >
-            <Text style={styles.editButtonText}>✏️ Edit</Text>
-          </TouchableOpacity>
+        {!isEditing && (
+          <>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => setIsEditing(true)}
+            >
+              <Text style={styles.editButtonText}>✏️ Edit</Text>
+            </TouchableOpacity>
 
-          {timerState.isActive && current && (
-            <View style={styles.timerSection}>
-              <TeeTimeCircularProgress
-                progress={getCurrentActivityProgress()}
-                size={200}
-                strokeWidth={12}
-              >
-                <View style={styles.circleContent}>
-                  <Text style={styles.activityNameText}>
-                    {current.status === 'current' ? current.activity.name : `${current.activity.name} starts in`}
-                  </Text>
-                  <Text style={styles.timeText}>
-                    {showFlameAnimations && countdownSeconds > 0 ? countdownSeconds : formatTime(getActivityTime(current.activity, current.status))}
-                  </Text>
-                  <Text style={styles.activityInfoText}>
-                    {showFlameAnimations ? 'seconds' : current.status === 'current' ? 'remaining' : 'minutes'}
-                  </Text>
-                </View>
-              </TeeTimeCircularProgress>
-            </View>
-          )}
+            {timerState.isActive && current && (
+              <View style={styles.timerSection}>
+                <TeeTimeCircularProgress
+                  progress={getCurrentActivityProgress()}
+                  size={200}
+                  strokeWidth={12}
+                >
+                  <View style={styles.circleContent}>
+                    <Text style={styles.activityNameText}>
+                      {current.status === 'current' ? current.activity.name : `${current.activity.name} starts in`}
+                    </Text>
+                    <Text style={styles.timeText}>
+                      {showFlameAnimations && countdownSeconds > 0 ? countdownSeconds : formatTime(getActivityTime(current.activity, current.status))}
+                    </Text>
+                    <Text style={styles.activityInfoText}>
+                      {showFlameAnimations ? 'seconds' : current.status === 'current' ? 'remaining' : 'minutes'}
+                    </Text>
+                  </View>
+                </TeeTimeCircularProgress>
+              </View>
+            )}
 
+            {!timerState.isActive && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={handleStartTimer}
+                >
+                  <Text style={styles.buttonText}>Start Timer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {timerState.isActive && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.dangerButton]}
+                  onPress={handleStopTimer}
+                >
+                  <Text style={styles.buttonText}>Stop Timer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* Scrollable activities list */}
+      {!isEditing ? (
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContainer}
+        >
           {!timerState.isActive && parsedActivities.length === 0 && (
             <View style={styles.inputContainer}>
               <Text style={styles.helpText}>
@@ -635,82 +1067,96 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
             </View>
           )}
 
-          {parsedActivities.length > 0 && (
+          {organizedActivities.length > 0 && (
             <View style={styles.activitiesContainer}>
-              {parsedActivities.map((activity, index) => {
-                const status = getActivityStatus(index);
+              {organizedActivities.map((item, organizedIndex) => {
+                const { activity, index: originalIndex, status } = item;
+                const prevItem = organizedIndex > 0 ? organizedActivities[organizedIndex - 1] : null;
+                
+                // Check for gap before this activity
+                // Show gap if the previous activity in the organized list ends before this one starts
+                // and they are consecutive in the original time-ordered list
+                let gap: number | null = null;
+                if (prevItem) {
+                  const sortedIndices = [prevItem.index, originalIndex].sort((a, b) => a - b);
+                  // Only show gap if activities are consecutive in original order
+                  if (sortedIndices[1] - sortedIndices[0] === 1) {
+                    gap = getGapBetweenActivities(sortedIndices[0], sortedIndices[1]);
+                  }
+                }
+                
                 return (
-                  <View
-                    key={index}
-                    style={[
-                      styles.activityCard,
-                      status === 'current' && styles.activityCardCurrent,
-                      status === 'completed' && styles.activityCardCompleted,
-                    ]}
-                  >
-                    <View style={styles.activityInfo}>
-                      <Text style={styles.activityName}>{activity.name}</Text>
+                  <View key={`${originalIndex}-${organizedIndex}`}>
+                    {/* Show break divider if there's a gap */}
+                    {gap !== null && gap > 0 && prevItem && (
+                      <TouchableOpacity 
+                        style={styles.breakDivider}
+                        onPress={() => handleBreakEdit(prevItem.index, originalIndex, gap!)}
+                      >
+                        <Text style={styles.breakDividerText}>
+                          {gap} minute{gap !== 1 ? 's' : ''} break
+                        </Text>
+                        <Text style={styles.breakEditIcon}>✎</Text>
+                      </TouchableOpacity>
+                    )}
+                    
+                    <View
+                      ref={(ref) => {
+                        activityRefs.current[originalIndex] = ref;
+                      }}
+                      style={[
+                        styles.activityCard,
+                        status === 'current' && styles.activityCardCurrent,
+                        status === 'completed' && styles.activityCardCompleted,
+                      ]}
+                    >
+                      <View style={styles.activityInfo}>
+                        <Text style={styles.activityName}>{activity.name}</Text>
+                      </View>
+                      <Text style={styles.activityTime}>{getActivityDisplayStatus(originalIndex)}</Text>
                     </View>
-                    <Text style={styles.activityTime}>{getActivityDisplayStatus(index)}</Text>
                   </View>
                 );
               })}
             </View>
           )}
-
-          <View style={styles.buttonContainer}>
-            {!timerState.isActive ? (
+        </ScrollView>
+      ) : (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              value={activitiesText}
+              onChangeText={setActivitiesText}
+              placeholder="08:30, 30, Breakfast&#10;09:00, 30, Drive to Work&#10;10:30, 30, Meeting with Dave"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              autoFocus
+            />
+            <Text style={styles.helpText}>
+              Format: HH:MM, duration (minutes), Activity Name{'\n'}
+              One activity per line
+            </Text>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: colors.border }]}
+                onPress={() => {
+                  setIsEditing(false);
+                  setActivitiesText(getSparkData('minute-minder').activitiesText || '');
+                }}
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton]}
-                onPress={handleStartTimer}
+                onPress={handleSaveActivities}
               >
-                <Text style={styles.buttonText}>Start Timer</Text>
+                <Text style={styles.buttonText}>Save</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.button, styles.dangerButton]}
-                onPress={handleStopTimer}
-              >
-                <Text style={styles.buttonText}>Stop Timer</Text>
-              </TouchableOpacity>
-            )}
+            </View>
           </View>
-        </>
-      ) : (
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={activitiesText}
-            onChangeText={setActivitiesText}
-            placeholder="08:30, 30, Breakfast&#10;09:00, 30, Drive to Work&#10;10:30, 30, Meeting with Dave"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            autoFocus
-          />
-          <Text style={styles.helpText}>
-            Format: HH:MM, duration (minutes), Activity Name{'\n'}
-            One activity per line
-          </Text>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: colors.border }]}
-              onPress={() => {
-                setIsEditing(false);
-                setActivitiesText(getSparkData('minute-minder').activitiesText || '');
-              }}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
-              onPress={handleSaveActivities}
-            >
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </ScrollView>
       )}
-      </ScrollView>
       
       {/* Flame animation during final 10 seconds - positioned absolutely over everything */}
       {showFlameAnimations && timerState.isActive && current && (
@@ -739,6 +1185,71 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           <Text style={styles.flameEmoji}>🔥</Text>
         </Animated.View>
       )}
+
+      {/* Break Edit Modal */}
+      <Modal
+        visible={showBreakModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBreakModal(false)}
+      >
+        <View style={styles.breakModalOverlay}>
+          <View style={styles.breakModalContent}>
+            <Text style={styles.breakModalTitle}>Fill Break</Text>
+            
+            <Text style={styles.breakModalLabel}>Activity Name</Text>
+            <TextInput
+              style={styles.breakModalInput}
+              value={breakActivityName}
+              onChangeText={setBreakActivityName}
+              placeholder="e.g., Coffee Break"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+            />
+
+            <Text style={styles.breakModalLabel}>Start Time (HH:MM)</Text>
+            <TextInput
+              style={styles.breakModalInput}
+              value={breakStartTime}
+              onChangeText={setBreakStartTime}
+              placeholder="21:15"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.breakModalLabel}>Duration (minutes)</Text>
+            <TextInput
+              style={styles.breakModalInput}
+              value={breakDuration}
+              onChangeText={setBreakDuration}
+              placeholder="18"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+
+            <View style={styles.breakModalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.breakModalButton, styles.breakModalCancelButton]}
+                onPress={() => {
+                  setShowBreakModal(false);
+                  setEditingBreak(null);
+                  setBreakActivityName('');
+                  setBreakStartTime('');
+                  setBreakDuration('');
+                }}
+              >
+                <Text style={styles.breakModalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.breakModalButton, styles.breakModalSaveButton]}
+                onPress={handleSaveBreak}
+              >
+                <Text style={styles.breakModalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

@@ -14,7 +14,7 @@ try {
   isNotificationsAvailable = true;
   console.log('✅ Expo Notifications available');
 } catch (error) {
-  console.log('⚠️ Expo Notifications not available:', error.message);
+  console.log('⚠️ Expo Notifications not available:', error instanceof Error ? error.message : String(error));
   isNotificationsAvailable = false;
 }
 
@@ -24,28 +24,62 @@ try {
   isTaskManagerAvailable = true;
   console.log('✅ Expo TaskManager available');
 } catch (error) {
-  console.log('⚠️ Expo TaskManager not available:', error.message);
+  console.log('⚠️ Expo TaskManager not available:', error instanceof Error ? error.message : String(error));
   isTaskManagerAvailable = false;
 }
 
 // Configure how notifications should be handled when the app is running
 if (isNotificationsAvailable && Notifications) {
   Notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
+    handleNotification: async (notification: any) => {
+      // The notification handler is only called when a notification is actually being displayed
       const now = new Date();
-      console.log('=== NOTIFICATION HANDLER CALLED ===');
-      console.log('Time:', now.toLocaleTimeString());
-      console.log('Title:', notification.request.content.title);
-      console.log('Body:', notification.request.content.body);
-      console.log('Data:', notification.request.content.data);
-      console.log('Trigger:', notification.request.trigger);
-      console.log('App State:', 'foreground'); // Notification handler only called when app is in foreground
+      const trigger = notification.request.trigger;
       
-      // Check if this is a scheduled notification that fired immediately (Expo Go limitation)
-      if (notification.request.trigger === null && notification.request.content.data?.type === 'test-scheduled') {
-        console.log('⚠️  SCHEDULED NOTIFICATION FIRED IMMEDIATELY');
-        console.log('This is a known Expo Go limitation - scheduled notifications may fire immediately.');
-        console.log('For proper testing, use a development build or standalone app.');
+      // Extract trigger time for debugging
+      let triggerTime = 'unknown';
+      let isScheduledForFuture = false;
+      
+      if (trigger) {
+        if (trigger.date) {
+          const triggerDate = new Date(trigger.date);
+          triggerTime = triggerDate.toLocaleString();
+          isScheduledForFuture = triggerDate.getTime() > now.getTime();
+        } else if (trigger.seconds) {
+          const futureTime = new Date(now.getTime() + trigger.seconds * 1000);
+          triggerTime = futureTime.toLocaleString();
+          isScheduledForFuture = trigger.seconds > 0;
+        }
+      }
+      
+      // Log detailed info about when notification was supposed to fire
+      console.log('📬 Notification handler called:', {
+        title: notification.request.content.title,
+        body: notification.request.content.body,
+        currentTime: now.toLocaleString(),
+        triggerTime: triggerTime,
+        trigger: JSON.stringify(trigger),
+        scheduledTime: notification.request.content.data?.scheduledTime,
+        isScheduledForFuture: isScheduledForFuture,
+        isPremature: isScheduledForFuture,
+      });
+      
+      // CRITICAL: If notification is scheduled for the future, suppress it
+      // Scheduled notifications should NOT trigger the handler until their scheduled time
+      // If we're seeing this, iOS is incorrectly firing scheduled notifications immediately
+      if (isScheduledForFuture) {
+        console.error('🚨 ERROR: Scheduled notification is firing immediately!');
+        console.error('🚨 This notification was scheduled for:', triggerTime);
+        console.error('🚨 Current time is:', now.toLocaleString());
+        console.error('🚨 Suppressing this notification - it should fire later');
+        
+        // Suppress the notification - it should fire at its scheduled time, not now
+        return {
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
       }
       
       // Show all notifications normally (even when app is in foreground)
@@ -59,23 +93,47 @@ if (isNotificationsAvailable && Notifications) {
   });
   
   // Also listen for notifications when app is in background/killed
-  Notifications.addNotificationReceivedListener((notification) => {
+  Notifications.addNotificationReceivedListener((notification: any) => {
+    // This listener is called when notifications are actually received/fired
+    const now = new Date();
+    const trigger = notification.request?.trigger || notification.trigger;
+    
+    // Log the FULL notification structure to see what we're getting
+    console.log('🔍 FULL notification structure:', JSON.stringify(notification, null, 2));
+    console.log('🔍 notification.request:', JSON.stringify(notification.request, null, 2));
+    console.log('🔍 notification.request.trigger:', JSON.stringify(trigger, null, 2));
+    
+    // Extract trigger time for debugging
+    let triggerTime = 'unknown';
+    if (trigger) {
+      if (trigger.date) {
+        triggerTime = new Date(trigger.date).toLocaleString();
+      } else if (trigger.seconds) {
+        const futureTime = new Date(now.getTime() + trigger.seconds * 1000);
+        triggerTime = futureTime.toLocaleString();
+      }
+    }
+    
     console.log('📬 Notification received (background/killed state):', {
-      title: notification.request.content.title,
-      body: notification.request.content.body,
-      data: notification.request.content.data,
+      title: notification.request?.content?.title || notification.content?.title,
+      body: notification.request?.content?.body || notification.body,
+      currentTime: now.toLocaleString(),
+      triggerTime: triggerTime,
+      trigger: JSON.stringify(trigger),
+      scheduledTime: notification.request?.content?.data?.scheduledTime || notification.data?.scheduledTime,
+      isPremature: trigger?.date ? new Date(trigger.date).getTime() > now.getTime() : 'unknown',
+      data: notification.request?.content?.data || notification.data,
     });
   });
 } else {
   console.log('⚠️ Notifications not available, skipping notification handler setup');
 }
 
-const DAILY_NOTIFICATION_IDENTIFIER = 'daily-sparks-reminder';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
 // Define background task for handling notifications
 if (isTaskManagerAvailable && TaskManager) {
-  TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
+  TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }: { data: any; error: any; executionInfo: any }) => {
     console.log('Background notification task executed:', { data, error, executionInfo });
     
     if (error) {
@@ -154,16 +212,6 @@ export class NotificationService {
         showBadge: true,
       });
 
-      // Create daily reminders channel
-      await Notifications.setNotificationChannelAsync('daily-reminders', {
-        name: 'Daily Reminders',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2E86AB',
-        sound: 'default',
-        enableVibrate: true,
-        showBadge: true,
-      });
     }
 
     return true;
@@ -173,80 +221,6 @@ export class NotificationService {
     }
   }
 
-  // Schedule daily notification at 8 AM
-  static async scheduleDailyNotification(): Promise<void> {
-    try {
-      // Cancel any existing daily notification
-      await this.cancelDailyNotification();
-
-      // Request permissions first
-      const hasPermissions = await this.requestPermissions();
-      if (!hasPermissions) {
-        console.log('Notification permissions not granted');
-        return;
-      }
-
-      // Schedule the daily notification
-      await Notifications.scheduleNotificationAsync({
-        identifier: DAILY_NOTIFICATION_IDENTIFIER,
-        content: {
-          title: '✨ New Sparks Await!',
-          body: 'Discover something new today - check out the latest sparks in the marketplace!',
-          data: { 
-            screen: 'Marketplace',
-            type: 'daily-reminder'
-          },
-          sound: 'default',
-          badge: 1,
-          ...(Platform.OS === 'android' && {
-            channelId: 'daily-reminders',
-          }),
-        },
-        trigger: {
-          hour: 8,
-          minute: 0,
-          repeats: true,
-        },
-      });
-
-      console.log('Daily notification scheduled for 8:00 AM');
-    } catch (error) {
-      console.error('Error scheduling daily notification:', error);
-    }
-  }
-
-  // Cancel the daily notification
-  static async cancelDailyNotification(): Promise<void> {
-    try {
-      if (!isNotificationsAvailable || !Notifications) {
-        console.log('⚠️ Notifications not available, skipping cancel daily notification');
-        return;
-      }
-
-      await Notifications.cancelScheduledNotificationAsync(DAILY_NOTIFICATION_IDENTIFIER);
-      console.log('Daily notification cancelled');
-    } catch (error) {
-      console.error('Error cancelling daily notification:', error);
-    }
-  }
-
-  // Check if daily notifications are scheduled
-  static async isDailyNotificationScheduled(): Promise<boolean> {
-    try {
-      if (!isNotificationsAvailable || !Notifications) {
-        console.log('⚠️ Notifications not available, returning false for scheduled check');
-        return false;
-      }
-
-      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-      return scheduledNotifications.some(
-        notification => notification.identifier === DAILY_NOTIFICATION_IDENTIFIER
-      );
-    } catch (error) {
-      console.error('Error checking scheduled notifications:', error);
-      return false;
-    }
-  }
 
   // Handle notification response (when user taps notification)
   static addNotificationResponseListener(callback: (response: any) => void) {
@@ -258,47 +232,110 @@ export class NotificationService {
     return Notifications.addNotificationResponseReceivedListener(callback);
   }
 
-  // Schedule activity start notification
-  static async scheduleActivityNotification(activityName: string, startTime: Date, activityId: string): Promise<void> {
+  // Simplified notification scheduling - just pass title, body, seconds, sparkId, and optional icon
+  static async scheduleNotification(
+    title: string,
+    body: string,
+    seconds: number,
+    sparkId: string,
+    identifier?: string,
+    icon?: string
+  ): Promise<string | null> {
     try {
       const hasPermissions = await this.requestPermissions();
       if (!hasPermissions) {
         console.log('Notification permissions not granted');
+        return null;
+      }
+
+      // Validate seconds is positive
+      if (seconds <= 0) {
+        console.log(`⏭️ Skipping notification - seconds must be positive (got ${seconds})`);
+        return null;
+      }
+
+      // Use the correct trigger format with type field
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: seconds,
+        channelId: Platform.OS === 'android' ? 'default' : undefined,
+      };
+
+      // Use spark icon if provided, otherwise default to ✨
+      const notificationTitle = icon 
+        ? `${icon} ${title}`
+        : (title.startsWith('✨') ? title : `✨ ${title}`);
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        identifier: identifier || `spark-${sparkId}-${Date.now()}`,
+        content: {
+          title: notificationTitle,
+          body,
+          data: {
+            type: 'spark-notification',
+            sparkId,
+          },
+          sound: 'default',
+          badge: 1,
+          ...(Platform.OS === 'android' && {
+            channelId: 'default',
+          }),
+        },
+        trigger: trigger as any,
+      });
+
+      return notificationId;
+    } catch (error) {
+      console.error('Error scheduling notification:', error);
+      return null;
+    }
+  }
+
+  // Schedule activity start notification (backwards compatible wrapper)
+  static async scheduleActivityNotification(
+    activityName: string, 
+    startTime: Date, 
+    activityId: string, 
+    sparkName?: string, 
+    sparkId?: string,
+    icon?: string
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const futureDate = new Date(startTime);
+      
+      // Validate that the date is in the future
+      if (futureDate.getTime() <= now.getTime()) {
+        console.log(`⏭️ Skipping notification for "${activityName}" - start time is in the past (${futureDate.toLocaleString()})`);
         return;
       }
 
-      // Calculate seconds until the activity starts
-      const now = new Date();
-      const secondsUntilStart = Math.floor((startTime.getTime() - now.getTime()) / 1000);
+      // Calculate seconds until start
+      const secondsUntilStart = Math.floor((futureDate.getTime() - now.getTime()) / 1000);
 
-      // Only schedule if the activity is in the future
-      if (secondsUntilStart > 0) {
-        await Notifications.scheduleNotificationAsync({
-          identifier: `activity-${activityId}`,
-          content: {
-            title: '⛳ Tee Time Timer',
-            body: `Time to start: ${activityName}`,
-            data: { 
-              type: 'activity-start',
-              activityId,
-              activityName,
-              taskName: BACKGROUND_NOTIFICATION_TASK
-            },
-            sound: 'default',
-            badge: 1,
-            ...(Platform.OS === 'android' && {
-              channelId: 'default',
-            }),
-          },
-          trigger: {
-            seconds: secondsUntilStart,
-          },
-        });
+      // Use the simplified scheduling method
+      const title = sparkName || 'Activity Reminder';
+      const body = `Time to start: ${activityName}`;
+      
+      const notificationId = await this.scheduleNotification(
+        title,
+        body,
+        secondsUntilStart,
+        sparkId || activityId,
+        `activity-${activityId}`,
+        icon
+      );
 
-        console.log(`Activity notification scheduled for ${activityName} in ${secondsUntilStart} seconds`);
+      if (notificationId) {
+        console.log(`✅ Activity notification scheduled for "${activityName}" (ID: ${notificationId})`);
+      } else {
+        console.warn(`⚠️ Failed to schedule notification for "${activityName}"`);
       }
+      console.log(`   Scheduled time: ${futureDate.toLocaleString()}`);
+      console.log(`   Will fire in: ${Math.floor(secondsUntilStart / 60)} minutes (${secondsUntilStart} seconds)`);
+      console.log(`   Notification ID: ${notificationId}`);
     } catch (error) {
-      console.error('Error scheduling activity notification:', error);
+      console.error(`❌ Error scheduling activity notification for "${activityName}":`, error);
     }
   }
 
@@ -307,7 +344,7 @@ export class NotificationService {
     try {
       const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
       const activityNotifications = scheduledNotifications.filter(
-        notification => notification.content.data?.type === 'activity-start'
+        (notification: any) => notification.content.data?.type === 'activity-start'
       );
       
       for (const notification of activityNotifications) {
@@ -365,7 +402,7 @@ export class NotificationService {
       console.log('Notification permissions granted');
 
       // Check if we're running in Expo Go (which has limitations with scheduled notifications)
-      const isExpoGo = __DEV__ && !global.nativeCallSyncHook;
+      const isExpoGo = __DEV__ && !(global as any).nativeCallSyncHook;
       
       if (isExpoGo) {
         console.log('⚠️  EXPO GO LIMITATION DETECTED');

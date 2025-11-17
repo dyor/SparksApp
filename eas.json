@@ -10,12 +10,10 @@
       "distribution": "internal",
       "ios": {
         "resourceClass": "m-medium",
-        "bundleIdentifier": "com.mattdyor.sparks.dev",
         "simulator": true
       },
       "android": {
-        "resourceClass": "medium",
-        "package": "com.mattdyor.sparks.dev"
+        "resourceClass": "medium"
       },
       "env": {
         "EXPO_PUBLIC_BUILD_TYPE": "development"

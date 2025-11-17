@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Easing, View, TouchableOpacity, StyleSheet } from 'react-native';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, useNavigation, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,6 +17,9 @@ import { HapticFeedback } from '../utils/haptics';
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const MySparksStack = createStackNavigator<MySparkStackParamList>();
 const MarketplaceStack = createStackNavigator<MarketplaceStackParamList>();
+
+// Create navigation ref for programmatic navigation (e.g., from notifications)
+export const navigationRef = createNavigationContainerRef<RootTabParamList>();
 
 // Use standard React Navigation transitions
 const sparkTransition = {
@@ -262,7 +265,7 @@ export const AppNavigator: React.FC = () => {
   const [tabBarVisible, setTabBarVisible] = React.useState(true);
   
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Tab.Navigator
         initialRouteName="MySparks"
         screenOptions={{

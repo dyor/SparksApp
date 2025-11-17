@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal, ActivityIndicator } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { ExchangeRateService } from '../utils/exchangeRate';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -63,6 +64,32 @@ const QuickConvertSettings: React.FC<{
   const [selectedCountry, setSelectedCountry] = useState(data.selectedCountry || 'MXN');
   const [usdDenominations, setUsdDenominations] = useState([...(data.usdDenominations || DEFAULT_USD_DENOMINATIONS)]);
   const [newDenomination, setNewDenomination] = useState('');
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [cachedRates, setCachedRates] = useState<Record<string, number>>({});
+  const [initialCountry] = useState(data.selectedCountry || 'MXN'); // Track initial country to avoid overwriting on mount
+
+  // Load cached rates on mount
+  useEffect(() => {
+    const loadCachedRates = async () => {
+      try {
+        const result = await ExchangeRateService.fetchAllRates();
+        if (result.success && result.rates) {
+          setCachedRates(result.rates);
+        }
+      } catch (error) {
+        console.error('Error loading cached rates:', error);
+      }
+    };
+    loadCachedRates();
+  }, []);
+
+  // Update exchange rate input when country is selected (but not on initial mount)
+  useEffect(() => {
+    // Only update if country changed from initial value and cached rate is available
+    if (selectedCountry !== initialCountry && cachedRates[selectedCountry]) {
+      setExchangeRate(cachedRates[selectedCountry].toFixed(4));
+    }
+  }, [selectedCountry, cachedRates, initialCountry]);
 
   const handleSave = () => {
     const rate = parseFloat(exchangeRate);
@@ -112,6 +139,33 @@ const QuickConvertSettings: React.FC<{
     setUsdDenominations(usdDenominations.filter(d => d !== value));
   };
 
+  const handleFetchExchangeRate = async () => {
+    setIsFetchingRate(true);
+    const result = await ExchangeRateService.fetchAllRates();
+    setIsFetchingRate(false);
+
+    if (result.success && result.rates) {
+      setCachedRates(result.rates);
+      const rate = result.rates[selectedCountry];
+      if (rate) {
+        setExchangeRate(rate.toFixed(4));
+        HapticFeedback.success();
+        Alert.alert(
+          'Exchange Rate Updated',
+          `Current rate for ${selectedCountry}: ${rate.toFixed(4)}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } else {
+      HapticFeedback.error();
+      Alert.alert(
+        'Failed to Fetch Rate',
+        result.error || 'Could not fetch exchange rate. Please enter manually.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   const selectedCountryInfo = COUNTRIES.find(c => c.code === selectedCountry) || COUNTRIES[0];
 
   return (
@@ -124,39 +178,66 @@ const QuickConvertSettings: React.FC<{
           sparkId="quick-convert"
         />
 
-        <SettingsSection title="Exchange Rate">
-          <SettingsInput
-            label="Exchange Rate"
-            value={exchangeRate}
-            onChangeText={setExchangeRate}
-            placeholder="18.40"
-            keyboardType="numeric"
-            description="Enter the exchange rate (e.g., 18.40 means 1 USD = 18.40 foreign currency)"
-          />
-        </SettingsSection>
-
         <SettingsSection title="Currency">
           <View style={styles.countrySelector}>
             <Text style={[styles.countryLabel, { color: colors.text }]}>Country/Currency</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.countryScroll}>
-              {COUNTRIES.map((country) => (
-                <TouchableOpacity
-                  key={country.code}
-                  style={[
-                    styles.countryOption,
-                    { borderColor: colors.border },
-                    selectedCountry === country.code && { borderColor: colors.primary, backgroundColor: colors.primary + '20' }
-                  ]}
-                  onPress={() => setSelectedCountry(country.code)}
-                >
-                  <Text style={styles.countryFlag}>{country.flag}</Text>
-                  <Text style={[styles.countryCode, { color: colors.text }]}>{country.code}</Text>
-                </TouchableOpacity>
-              ))}
+              {COUNTRIES.map((country) => {
+                const cachedRate = cachedRates[country.code];
+                return (
+                  <TouchableOpacity
+                    key={country.code}
+                    style={[
+                      styles.countryOption,
+                      { borderColor: colors.border },
+                      selectedCountry === country.code && { borderColor: colors.primary, backgroundColor: colors.primary + '20' }
+                    ]}
+                    onPress={() => {
+                      setSelectedCountry(country.code);
+                      // Update exchange rate immediately when country is selected
+                      if (cachedRates[country.code]) {
+                        setExchangeRate(cachedRates[country.code].toFixed(4));
+                      }
+                    }}
+                  >
+                    <Text style={styles.countryFlag}>{country.flag}</Text>
+                    <Text style={[styles.countryCode, { color: colors.text }]}>{country.code}</Text>
+                    {cachedRate && (
+                      <Text style={[styles.countryRate, { color: colors.textSecondary }]}>
+                        {cachedRate.toFixed(2)}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
             <Text style={[styles.selectedCurrency, { color: colors.textSecondary }]}>
               Selected: {selectedCountryInfo.flag} {selectedCountryInfo.name} ({selectedCountryInfo.symbol})
             </Text>
+          </View>
+        </SettingsSection>
+
+        <SettingsSection title="Exchange Rate">
+          <View style={styles.exchangeRateContainer}>
+            <SettingsInput
+              label="Exchange Rate"
+              value={exchangeRate}
+              onChangeText={setExchangeRate}
+              placeholder="18.40"
+              keyboardType="numeric"
+              description="Enter the exchange rate (e.g., 18.40 means 1 USD = 18.40 foreign currency)"
+            />
+            <TouchableOpacity
+              style={[styles.fetchRateButton, { backgroundColor: colors.primary }]}
+              onPress={handleFetchExchangeRate}
+              disabled={isFetchingRate}
+            >
+              {isFetchingRate ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.fetchRateButtonText}>🔄 Fetch Current Rate</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </SettingsSection>
 
@@ -214,6 +295,90 @@ const ExchangeRateModal: React.FC<{
   const { colors } = useTheme();
   const [exchangeRate, setExchangeRate] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('MXN');
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [hasAutoFetched, setHasAutoFetched] = useState(false);
+  const [cachedRates, setCachedRates] = useState<Record<string, number>>({});
+
+  // Load cached rates on mount
+  useEffect(() => {
+    const loadCachedRates = async () => {
+      try {
+        const result = await ExchangeRateService.fetchAllRates();
+        if (result.success && result.rates) {
+          setCachedRates(result.rates);
+        }
+      } catch (error) {
+        console.error('Error loading cached rates:', error);
+      }
+    };
+    if (visible) {
+      loadCachedRates();
+    }
+  }, [visible]);
+
+  // Update exchange rate input when country is selected and cached rate is available
+  useEffect(() => {
+    if (visible && cachedRates[selectedCountry] && !hasAutoFetched) {
+      setExchangeRate(cachedRates[selectedCountry].toFixed(4));
+    }
+  }, [selectedCountry, cachedRates, visible, hasAutoFetched]);
+
+  const handleAutoFetch = async () => {
+    setIsFetchingRate(true);
+    const result = await ExchangeRateService.fetchAllRates();
+    setIsFetchingRate(false);
+    setHasAutoFetched(true);
+
+    if (result.success && result.rates) {
+      setCachedRates(result.rates);
+      const rate = result.rates[selectedCountry];
+      if (rate) {
+        setExchangeRate(rate.toFixed(4));
+        HapticFeedback.light();
+      }
+    } else {
+      // Silently fail - user can enter manually
+      console.log('Auto-fetch failed:', result.error);
+    }
+  };
+
+  // Auto-fetch exchange rate when currency changes
+  useEffect(() => {
+    if (visible && selectedCountry && !hasAutoFetched) {
+      handleAutoFetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, selectedCountry]);
+
+  // Reset auto-fetch flag when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setHasAutoFetched(false);
+      setExchangeRate('');
+    }
+  }, [visible]);
+
+  const handleManualFetch = async () => {
+    setIsFetchingRate(true);
+    const result = await ExchangeRateService.fetchAllRates();
+    setIsFetchingRate(false);
+
+    if (result.success && result.rates) {
+      setCachedRates(result.rates);
+      const rate = result.rates[selectedCountry];
+      if (rate) {
+        setExchangeRate(rate.toFixed(4));
+        HapticFeedback.success();
+      }
+    } else {
+      HapticFeedback.error();
+      Alert.alert(
+        'Failed to Fetch Rate',
+        result.error || 'Could not fetch exchange rate. Please enter manually.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   const handleSubmit = () => {
     const rate = parseFloat(exchangeRate);
@@ -237,15 +402,24 @@ const ExchangeRateModal: React.FC<{
             Enter the exchange rate for {selectedCountryInfo.flag} {selectedCountryInfo.name}
           </Text>
           
-          <TextInput
-            style={[styles.exchangeRateInput, { borderColor: colors.border, color: colors.text }]}
-            value={exchangeRate}
-            onChangeText={setExchangeRate}
-            placeholder="18.40"
-            keyboardType="numeric"
-            placeholderTextColor={colors.textSecondary}
-            autoFocus
-          />
+          <View style={styles.modalExchangeRateContainer}>
+            <TextInput
+              style={[styles.exchangeRateInput, { borderColor: colors.border, color: colors.text }]}
+              value={exchangeRate}
+              onChangeText={setExchangeRate}
+              placeholder="18.40"
+              keyboardType="numeric"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus={!isFetchingRate}
+              editable={!isFetchingRate}
+            />
+            {isFetchingRate && (
+              <View style={styles.fetchingIndicator}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.fetchingText, { color: colors.textSecondary }]}>Fetching...</Text>
+              </View>
+            )}
+          </View>
           
           <Text style={[styles.rateDescription, { color: colors.textSecondary }]}>
             This means 1 USD = {exchangeRate || 'X'} {selectedCountryInfo.code}
@@ -254,22 +428,49 @@ const ExchangeRateModal: React.FC<{
           <View style={styles.countrySelector}>
             <Text style={[styles.countryLabel, { color: colors.text }]}>Select Currency</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.countryScroll}>
-              {COUNTRIES.map((country) => (
-                <TouchableOpacity
-                  key={country.code}
-                  style={[
-                    styles.countryOption,
-                    { borderColor: colors.border },
-                    selectedCountry === country.code && { borderColor: colors.primary, backgroundColor: colors.primary + '20' }
-                  ]}
-                  onPress={() => setSelectedCountry(country.code)}
-                >
-                  <Text style={styles.countryFlag}>{country.flag}</Text>
-                  <Text style={[styles.countryCode, { color: colors.text }]}>{country.code}</Text>
-                </TouchableOpacity>
-              ))}
+              {COUNTRIES.map((country) => {
+                const cachedRate = cachedRates[country.code];
+                return (
+                  <TouchableOpacity
+                    key={country.code}
+                    style={[
+                      styles.countryOption,
+                      { borderColor: colors.border },
+                      selectedCountry === country.code && { borderColor: colors.primary, backgroundColor: colors.primary + '20' }
+                    ]}
+                    onPress={() => {
+                      setSelectedCountry(country.code);
+                      setHasAutoFetched(false); // Reset to auto-fetch for new currency
+                      // Update exchange rate immediately when country is selected
+                      if (cachedRates[country.code]) {
+                        setExchangeRate(cachedRates[country.code].toFixed(4));
+                      }
+                    }}
+                  >
+                    <Text style={styles.countryFlag}>{country.flag}</Text>
+                    <Text style={[styles.countryCode, { color: colors.text }]}>{country.code}</Text>
+                    {cachedRate && (
+                      <Text style={[styles.countryRate, { color: colors.textSecondary }]}>
+                        {cachedRate.toFixed(2)}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
+
+          <TouchableOpacity
+            style={[styles.fetchRateButtonModal, { backgroundColor: colors.primary }]}
+            onPress={handleManualFetch}
+            disabled={isFetchingRate}
+          >
+            {isFetchingRate ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.fetchRateButtonText}>🔄 Fetch Current Rate</Text>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.setupButton, { backgroundColor: colors.primary }]}
@@ -622,6 +823,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  countryRate: {
+    fontSize: 10,
+    marginTop: 2,
+  },
   selectedCurrency: {
     fontSize: 14,
     textAlign: 'center',
@@ -685,6 +890,44 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  exchangeRateContainer: {
+    marginBottom: 10,
+  },
+  fetchRateButton: {
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 44,
+  },
+  fetchRateButtonModal: {
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 44,
+  },
+  fetchRateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalExchangeRateContainer: {
+    position: 'relative',
+  },
+  fetchingIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fetchingText: {
+    fontSize: 12,
   },
 });
 

@@ -277,7 +277,7 @@ export class FeedbackNotificationService {
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '📬 New Response!',
+          title: '✨ New Response!',
           body: `You have a new response to your ${sparkName} feedback`,
           data: { feedbackId, type: 'feedback_response' },
           sound: true,

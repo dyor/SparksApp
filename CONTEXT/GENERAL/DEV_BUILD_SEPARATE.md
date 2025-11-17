@@ -10,23 +10,33 @@ Configure your development build to use a different bundle identifier so both ap
 
 ## Configuration
 
-### Option 1: Using EAS Build Profiles (Recommended)
+### Option 1: Using app.config.js with Environment Variables (Recommended)
 
-Your `eas.json` is already configured with a development profile that uses a different bundle identifier:
+EAS doesn't allow `bundleIdentifier` and `package` in build profiles. Instead, use `app.config.js` to dynamically set these based on environment variables.
 
-```json
-{
-  "build": {
-    "development": {
-      "ios": {
-        "bundleIdentifier": "com.mattdyor.sparks.dev"
-      },
-      "android": {
-        "package": "com.mattdyor.sparks.dev"
-      }
-    }
-  }
-}
+**Convert app.json to app.config.js:**
+
+1. Rename `app.json` to `app.config.js`
+2. Update it to read environment variables:
+
+```javascript
+const IS_DEV = process.env.EXPO_PUBLIC_BUILD_TYPE === 'development';
+
+module.exports = {
+  expo: {
+    name: IS_DEV ? 'Sparks Dev' : 'Sparks',
+    slug: 'sparks-app',
+    // ... all other config from app.json ...
+    ios: {
+      bundleIdentifier: IS_DEV ? 'com.mattdyor.sparks.dev' : 'com.mattdyor.sparks',
+      // ... rest of iOS config ...
+    },
+    android: {
+      package: IS_DEV ? 'com.mattdyor.sparks.dev' : 'com.mattdyor.sparks',
+      // ... rest of Android config ...
+    },
+  },
+};
 ```
 
 **Build development version:**

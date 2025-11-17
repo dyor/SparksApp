@@ -55,13 +55,6 @@ function AppContent() {
       // Update app icon badge with aggregated unread counts
       await FeedbackNotificationService.updateAppIconBadge();
       
-      // If daily notifications are enabled, ensure they're scheduled
-      if (preferences.dailyNotificationsEnabled) {
-        const isScheduled = await NotificationService.isDailyNotificationScheduled();
-        if (!isScheduled) {
-          await NotificationService.scheduleDailyNotification();
-        }
-      }
     };
 
     initializeNotifications();
@@ -69,10 +62,32 @@ function AppContent() {
     // Listen for notification responses (when user taps notification)
     const subscription = NotificationService.addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
-      if (data?.type === 'daily-reminder') {
-        // Could navigate to marketplace here if needed
-        console.log('Daily reminder notification tapped');
-      }
+      
+      // Import navigation ref dynamically to avoid circular dependencies
+      import('./src/navigation/AppNavigator').then(({ navigationRef }) => {
+        if (navigationRef.isReady()) {
+          if (data?.type === 'spark-notification' && data?.sparkId) {
+            // Navigate to the specific spark
+            // First navigate to MySparks stack, then to the Spark screen
+            navigationRef.navigate('MySparks', {
+              screen: 'Spark',
+              params: { sparkId: data.sparkId },
+            });
+            console.log(`✅ Navigated to spark ${data.sparkId} from notification`);
+          } else if (data?.type === 'activity-start' && data?.sparkId) {
+            // Legacy activity notifications - navigate to spark
+            navigationRef.navigate('MySparks', {
+              screen: 'Spark',
+              params: { sparkId: data.sparkId },
+            });
+            console.log(`✅ Navigated to spark ${data.sparkId} from activity notification`);
+          }
+        } else {
+          console.log('⚠️ Navigation not ready yet, cannot navigate');
+        }
+      }).catch((error) => {
+        console.error('Error navigating from notification:', error);
+      });
     });
 
     // Start listening for new feedback responses in real-time
@@ -111,7 +126,7 @@ function AppContent() {
       clearTimeout(listenerTimeout);
       clearInterval(badgeUpdateInterval);
     };
-  }, [preferences.dailyNotificationsEnabled]);
+  }, []);
   
   return (
     <>
