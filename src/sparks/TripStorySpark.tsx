@@ -34,6 +34,7 @@ import {
   SettingsScrollView,
   SettingsHeader,
   SettingsFeedbackSection,
+  SettingsButton,
 } from '../components/SettingsComponents';
 
 const { width } = Dimensions.get('window');
@@ -94,7 +95,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 }) => {
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
-  
+
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
   const [showCreateTrip, setShowCreateTrip] = useState(false);
@@ -119,7 +120,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [customPickerActivity, setCustomPickerActivity] = useState<Activity | undefined>(undefined);
   const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null); // Track which date/activity is loading
   const borderAnimation = useRef(new Animated.Value(0)).current;
-  
+
   // Animate border color when loading
   useEffect(() => {
     if (loadingPhotosByDate) {
@@ -175,18 +176,18 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [photoLat, setPhotoLat] = useState('');
   const [photoLng, setPhotoLng] = useState('');
   const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
-  
+
   // Active state tracking (only one can be active at a time)
   const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
   const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
-  
+
   const scrollY = useRef(new Animated.Value(0)).current;
   const dayPositions = useRef<Map<string, number>>(new Map());
   const activityPositions = useRef<Map<string, number>>(new Map());
   const scrollViewRef = useRef<any>(null);
   const currentScrollPosition = useRef<number>(0);
-  
+
   // Refs for horizontal image scroll views (one per row)
   const dayPhotoScrollRefs = useRef<Map<string, any>>(new Map());
   const activityPhotoScrollRefs = useRef<Map<string, any>>(new Map());
@@ -198,7 +199,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   // Track if we're restoring from saved state (quick switch) vs user interaction
   const isRestoringFromState = useRef(false);
-  
+
   // Restore scroll position ONLY when trip detail view opens from saved state (quick switch)
   // NOT when user clicks + button or other interactions
   useEffect(() => {
@@ -208,7 +209,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         setTimeout(() => {
           scrollToActivity(activeActivityId);
         }, 300);
-      } 
+      }
       else if (activeDayDate && activeTripId === currentTrip.id) {
         setTimeout(() => {
           scrollToDay(activeDayDate);
@@ -241,7 +242,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         // Return original URI as-is - it should still work for display
         return photoUri;
       }
-      
+
       // Check if source file exists (for file:// URIs)
       if (photoUri.startsWith('file://')) {
         try {
@@ -256,11 +257,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           console.warn('⚠️ Could not check file existence, proceeding with save attempt:', infoError);
         }
       }
-      
+
       // Create trips directory if it doesn't exist
       const tripsDir = `${documentDir}trips/`;
       const tripDir = `${tripsDir}${tripId}/`;
-      
+
       // Ensure directories exist
       const tripsDirInfo = await FileSystem.getInfoAsync(tripsDir);
       if (!tripsDirInfo.exists) {
@@ -270,12 +271,12 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       if (!tripDirInfo.exists) {
         await FileSystem.makeDirectoryAsync(tripDir, { intermediates: true });
       }
-      
+
       // Copy image to permanent location
       const permanentUri = `${tripDir}${photoId}.jpg`;
-      
+
       console.log('📸 Attempting to save photo:', { photoUri, permanentUri });
-      
+
       // Try different methods based on URI type
       if (photoUri.startsWith('ph://') || photoUri.startsWith('assets-library://')) {
         // iOS photo library URI - need to use MediaLibrary to get actual file
@@ -284,7 +285,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         // Return original URI as fallback instead of throwing
         return photoUri;
       }
-      
+
       if (photoUri.startsWith('content://')) {
         // Android content URI - use downloadAsync
         try {
@@ -300,7 +301,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           // Fall through to try copyAsync
         }
       }
-      
+
       // Try copyAsync (works for file:// and most other URIs)
       try {
         await FileSystem.copyAsync({
@@ -316,7 +317,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           console.warn('⚠️ Source file does not exist, using original URI as fallback');
           return photoUri;
         }
-        
+
         console.warn('⚠️ copyAsync failed, trying base64 method:', copyError);
         // Try reading as base64 and writing
         try {
@@ -360,7 +361,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         console.warn('⚠️ Cannot migrate photo - document directory not available');
         return photo.uri; // Can't migrate without document directory
       }
-      
+
       // Check if photo URI is already in permanent location
       if (photo.uri && photo.uri.startsWith(documentDir)) {
         // Verify the file still exists (in case app was reinstalled or directory changed)
@@ -373,7 +374,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           // File is missing, will try to re-migrate below
         }
       }
-      
+
       // Check if permanent file already exists
       const permanentUri = `${documentDir}trips/${tripId}/${photo.id}.jpg`;
       const fileInfo = await FileSystem.getInfoAsync(permanentUri);
@@ -381,14 +382,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         console.log('✅ Photo already exists at permanent location:', permanentUri);
         return permanentUri;
       }
-      
+
       // If original URI is a file:// or content:// URI, try to migrate it
       if (photo.uri && (photo.uri.startsWith('file://') || photo.uri.startsWith('content://') || photo.uri.startsWith('ph://'))) {
         console.log('🔄 Migrating photo:', photo.uri, 'to', permanentUri);
         // Try to copy from original URI using the same robust save method
         return await savePhotoPermanently(photo.uri, tripId, photo.id);
       }
-      
+
       // If we can't migrate, return original URI (might be a data URI or external URL)
       console.warn('⚠️ Cannot migrate photo - URI format not supported:', photo.uri);
       return photo.uri;
@@ -419,7 +420,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           return { ...trip, photos: migratedPhotos };
         })
       );
-      
+
       // Save migrated trips (preserve existing data) - always save to ensure URIs are updated
       const currentData = await getSparkData('trip-story');
       // Check if any URIs changed
@@ -428,7 +429,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           return photo.uri !== migratedTrips[tripIndex].photos[photoIndex].uri;
         });
       });
-      
+
       if (urisChanged) {
         await setSparkData('trip-story', {
           ...currentData,
@@ -436,7 +437,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         });
         console.log('✅ Photos migrated successfully');
       }
-      
+
       return migratedTrips;
     } catch (error) {
       console.error('❌ Error migrating photos:', error);
@@ -451,14 +452,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         // Migrate photos to permanent storage
         const migratedTrips = await migrateAllPhotos(data.trips);
         setTrips(migratedTrips);
-        
+
         // Restore active trip if we have an activeTripId
         if (data?.activeTripId) {
           const activeTrip = migratedTrips.find(trip => trip.id === data.activeTripId);
           if (activeTrip) {
             setCurrentTrip(activeTrip);
             setShowTripDetail(true);
-            
+
             // Restore active state
             if (data?.activeDayDate !== undefined) {
               setActiveDayDate(data.activeDayDate);
@@ -467,7 +468,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               setActiveActivityId(data.activeActivityId);
             }
             setActiveTripId(data.activeTripId);
-            
+
             // Mark that we're restoring from state so the useEffect will scroll
             isRestoringFromState.current = true;
             // Scroll to the active position after layout
@@ -484,7 +485,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           }
         }
       }
-      
+
       // Load active state even if no active trip (for when trip detail is already open)
       if (data?.activeDayDate !== undefined) {
         setActiveDayDate(data.activeDayDate);
@@ -502,7 +503,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const saveTrips = async (updatedTrips: Trip[]) => {
     try {
-      await setSparkData('trip-story', { 
+      await setSparkData('trip-story', {
         trips: updatedTrips,
         activeDayDate: activeDayDate,
         activeActivityId: activeActivityId,
@@ -570,7 +571,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
 
     const tripId = Date.now().toString();
-    
+
     // Parse activities from text input if provided
     let parsedActivities: Activity[] = [];
     if (activitiesListText.trim()) {
@@ -602,14 +603,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
     const updatedTrips = [...trips, newTrip];
     await saveTrips(updatedTrips);
-    
+
     // Reset form
     setNewTripTitle('');
     setNewTripStartDate('');
     setNewTripEndDate('');
     setActivitiesListText('');
     setShowCreateTrip(false);
-    
+
     HapticFeedback.success();
     if (parsedActivities.length > 0) {
       Alert.alert('Success', `Trip created with ${parsedActivities.length} activities.`);
@@ -632,8 +633,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       createdAt: new Date().toISOString(),
     };
 
-    const updatedTrips = trips.map(trip => 
-      trip.id === currentTrip.id 
+    const updatedTrips = trips.map(trip =>
+      trip.id === currentTrip.id
         ? { ...trip, activities: [...trip.activities, newActivity], updatedAt: new Date().toISOString() }
         : trip
     );
@@ -641,13 +642,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     await saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
-    
+
     // Reset form
     setNewActivityName('');
     setNewActivityTime('');
     setSelectedDate('');
     setShowAddActivity(false);
-    
+
     HapticFeedback.success();
   };
 
@@ -657,7 +658,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Camera Permission Required', 
+          'Camera Permission Required',
           'Please allow camera access in your device settings to take photos.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -694,7 +695,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       if (result.assets[0]) {
         const asset = result.assets[0];
-        
+
         // Get location
         let location = null;
         try {
@@ -726,11 +727,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         // Create timestamp at noon UTC to ensure consistent date extraction regardless of timezone
         const photoDate = new Date(dateToUse + 'T12:00:00Z').toISOString();
         console.log('📸 capturePhoto - date parameter:', date, 'dateToUse:', dateToUse, 'photoDate (timestamp):', photoDate);
-        
+
         // Save photo permanently
         const photoId = Date.now().toString();
         const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
-        
+
         const newPhoto: TripPhoto = {
           id: photoId,
           tripId: currentTrip!.id,
@@ -742,20 +743,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           createdAt: new Date().toISOString(),
         };
 
-        const updatedTrips = trips.map(trip => 
-          trip.id === currentTrip!.id 
-            ? { 
-                ...trip, 
-                photos: [...trip.photos, newPhoto], 
-                updatedAt: new Date().toISOString() 
-              }
+        const updatedTrips = trips.map(trip =>
+          trip.id === currentTrip!.id
+            ? {
+              ...trip,
+              photos: [...trip.photos, newPhoto],
+              updatedAt: new Date().toISOString()
+            }
             : trip
         );
 
         await saveTrips(updatedTrips);
         const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
         setCurrentTrip(updatedTrip);
-        
+
         setShowPhotoCapture(false);
         setSelectedActivity(null);
         setSelectedDate('');
@@ -811,7 +812,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const addFromGallery = async (activity?: Activity, date?: string, allowMultiple: boolean = false) => {
     console.log('📷 addFromGallery called with activity:', activity?.id, activity?.name, 'date:', date, 'allowMultiple:', allowMultiple);
-    
+
     // Only use custom picker for "Add Many" (multiple selection) with date filtering
     // For "Add 1", use regular picker which allows cropping
     const dateToUse = date || activity?.startDate;
@@ -819,11 +820,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       // Create a unique key for this loading operation
       const loadingKey = dateToUse + (activity?.id || '');
       setLoadingPhotosByDate(loadingKey);
-      
+
       try {
         // Load photos for the target date
         const photos = await loadPhotosByDate(dateToUse);
-        
+
         if (photos.length === 0) {
           setLoadingPhotosByDate(null);
           Alert.alert(
@@ -831,8 +832,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             `No photos found for ${dateToUse}. Would you like to browse all photos instead?`,
             [
               { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Browse All', 
+              {
+                text: 'Browse All',
                 onPress: () => addFromGallery(activity, undefined, allowMultiple) // Fallback to regular picker
               }
             ]
@@ -918,7 +919,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       // Create timestamp at noon UTC to ensure consistent date extraction regardless of timezone
       const photoDate = new Date(dateToUse + 'T12:00:00Z').toISOString();
       console.log('📷 addFromGallery - date parameter:', date, 'dateToUse:', dateToUse, 'photoDate (timestamp):', photoDate);
-      
+
       // Get location once (will be same for all photos in bulk add)
       let location = null;
       try {
@@ -938,11 +939,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       const newPhotos: TripPhoto[] = [];
       for (let i = 0; i < assetsToProcess.length; i++) {
         const asset = assetsToProcess[i];
-        
+
         // Save photo permanently with unique ID
         const photoId = `${Date.now()}-${i}`;
         const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
-        
+
         const newPhoto: TripPhoto = {
           id: photoId,
           tripId: currentTrip!.id,
@@ -953,30 +954,30 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           caption: '',
           createdAt: new Date().toISOString(),
         };
-        
+
         newPhotos.push(newPhoto);
       }
 
       // Add all photos at once
-      const updatedTrips = trips.map(trip => 
-        trip.id === currentTrip!.id 
-          ? { 
-              ...trip, 
-              photos: [...trip.photos, ...newPhotos], 
-              updatedAt: new Date().toISOString() 
-            }
+      const updatedTrips = trips.map(trip =>
+        trip.id === currentTrip!.id
+          ? {
+            ...trip,
+            photos: [...trip.photos, ...newPhotos],
+            updatedAt: new Date().toISOString()
+          }
           : trip
       );
-      
+
       await saveTrips(updatedTrips);
       const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
       setCurrentTrip(updatedTrip);
-      
+
       setShowPhotoCapture(false);
       setSelectedActivity(null);
       setSelectedDate('');
       HapticFeedback.success();
-      
+
       if (newPhotos.length > 1) {
         Alert.alert('Success', `Added ${newPhotos.length} photos to ${activity?.name || 'the activity'}.`);
       }
@@ -996,7 +997,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     if (!customPickerDate || !currentTrip) return;
 
     // Get selected assets
-    const selectedAssets = customPickerPhotos.filter(photo => 
+    const selectedAssets = customPickerPhotos.filter(photo =>
       selectedPickerPhotos.has(photo.id)
     );
 
@@ -1019,14 +1020,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     const newPhotos: TripPhoto[] = [];
     for (let i = 0; i < selectedAssets.length; i++) {
       const asset = selectedAssets[i];
-      
+
       try {
         // Get the full URI for the asset - request localUri which is the actual file path
         const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-        
+
         // Use localUri if available (this is the actual file path)
         let photoUri = assetInfo.localUri;
-        
+
         // If localUri is not available, we need to handle it differently
         if (!photoUri) {
           // Try to get the URI from the asset directly
@@ -1041,13 +1042,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             photoUri = asset.uri;
           }
         }
-        
+
         // Ensure we have a valid URI
         if (!photoUri) {
           console.error('❌ No valid URI found for asset:', asset.id);
           continue;
         }
-        
+
         // If we still have a ph:// URI, we need to handle it specially
         if (photoUri.startsWith('ph://')) {
           console.warn('⚠️ Received ph:// URI, attempting to get localUri with download option');
@@ -1056,20 +1057,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             shouldDownloadFromNetwork: true,
           });
           photoUri = assetInfoWithDownload.localUri || assetInfoWithDownload.uri;
-          
+
           if (!photoUri || photoUri.startsWith('ph://')) {
             console.error('❌ Could not get valid file URI for asset:', asset.id);
             continue;
           }
         }
-        
+
         // Save photo permanently with unique ID
         const photoId = `${Date.now()}-${i}`;
         const permanentUri = await savePhotoPermanently(photoUri, currentTrip.id, photoId);
-      
+
         // Create timestamp at noon UTC for the target date
         const photoDate = new Date(customPickerDate + 'T12:00:00Z').toISOString();
-        
+
         const newPhoto: TripPhoto = {
           id: photoId,
           tripId: currentTrip.id,
@@ -1080,7 +1081,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           caption: '',
           createdAt: new Date().toISOString(),
         };
-        
+
         newPhotos.push(newPhoto);
       } catch (error) {
         console.error(`❌ Error processing asset ${asset.id}:`, error);
@@ -1089,20 +1090,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
 
     // Add all photos at once
-    const updatedTrips = trips.map(trip => 
-      trip.id === currentTrip.id 
-        ? { 
-            ...trip, 
-            photos: [...trip.photos, ...newPhotos], 
-            updatedAt: new Date().toISOString() 
-          }
+    const updatedTrips = trips.map(trip =>
+      trip.id === currentTrip.id
+        ? {
+          ...trip,
+          photos: [...trip.photos, ...newPhotos],
+          updatedAt: new Date().toISOString()
+        }
         : trip
     );
-    
+
     await saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
-    
+
     // Close picker and reset state
     setShowCustomPhotoPicker(false);
     setSelectedPickerPhotos(new Set());
@@ -1112,7 +1113,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setSelectedActivity(null);
     setSelectedDate('');
     HapticFeedback.success();
-    
+
     if (newPhotos.length > 1) {
       Alert.alert('Success', `Added ${newPhotos.length} photos to ${customPickerActivity?.name || 'the activity'}.`);
     }
@@ -1141,11 +1142,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         latitude: parseFloat(photoLat),
         longitude: parseFloat(photoLng),
       };
-      
+
       if (photoLocation) {
         loc.address = photoLocation;
       }
-      
+
       location = loc;
     }
 
@@ -1157,13 +1158,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       location,
     };
 
-    const updatedTrips = trips.map(trip => 
-      trip.id === currentTrip.id 
-        ? { 
-            ...trip, 
-            photos: trip.photos.map(p => p.id === selectedPhoto.id ? updatedPhoto : p),
-            updatedAt: new Date().toISOString() 
-          }
+    const updatedTrips = trips.map(trip =>
+      trip.id === currentTrip.id
+        ? {
+          ...trip,
+          photos: trip.photos.map(p => p.id === selectedPhoto.id ? updatedPhoto : p),
+          updatedAt: new Date().toISOString()
+        }
         : trip
     );
 
@@ -1171,8 +1172,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
     setShowPhotoDetail(false);
     setSelectedPhoto(null);
-    
-    
+
+
     HapticFeedback.success();
   };
 
@@ -1184,17 +1185,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       'Are you sure you want to delete this photo? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const updatedTrips = trips.map(trip => 
-              trip.id === currentTrip.id 
-                ? { 
-                    ...trip, 
-                    photos: trip.photos.filter(p => p.id !== selectedPhoto.id),
-                    updatedAt: new Date().toISOString() 
-                  }
+            const updatedTrips = trips.map(trip =>
+              trip.id === currentTrip.id
+                ? {
+                  ...trip,
+                  photos: trip.photos.filter(p => p.id !== selectedPhoto.id),
+                  updatedAt: new Date().toISOString()
+                }
                 : trip
             );
 
@@ -1202,8 +1203,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
             setShowPhotoDetail(false);
             setSelectedPhoto(null);
-            
-            
+
+
             HapticFeedback.success();
           }
         }
@@ -1231,13 +1232,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       const loc: { address?: string; latitude?: number; longitude?: number } = {
         address: editActivityLocation || undefined,
       };
-      
+
       // Add coordinates if provided
       if (editActivityLat && editActivityLng) {
         loc.latitude = parseFloat(editActivityLat);
         loc.longitude = parseFloat(editActivityLng);
       }
-      
+
       location = loc;
     }
 
@@ -1248,13 +1249,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       location,
     };
 
-    const updatedTrips = trips.map(trip => 
-      trip.id === currentTrip.id 
-        ? { 
-            ...trip, 
-            activities: trip.activities.map(a => a.id === editingActivity.id ? updatedActivity : a),
-            updatedAt: new Date().toISOString() 
-          }
+    const updatedTrips = trips.map(trip =>
+      trip.id === currentTrip.id
+        ? {
+          ...trip,
+          activities: trip.activities.map(a => a.id === editingActivity.id ? updatedActivity : a),
+          updatedAt: new Date().toISOString()
+        }
         : trip
     );
 
@@ -1273,18 +1274,18 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       'Are you sure you want to delete this activity? This will also delete all associated photos. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const updatedTrips = trips.map(trip => 
-              trip.id === currentTrip.id 
-                ? { 
-                    ...trip, 
-                    activities: trip.activities.filter(a => a.id !== editingActivity.id),
-                    photos: trip.photos.filter(p => p.activityId !== editingActivity.id),
-                    updatedAt: new Date().toISOString() 
-                  }
+            const updatedTrips = trips.map(trip =>
+              trip.id === currentTrip.id
+                ? {
+                  ...trip,
+                  activities: trip.activities.filter(a => a.id !== editingActivity.id),
+                  photos: trip.photos.filter(p => p.activityId !== editingActivity.id),
+                  updatedAt: new Date().toISOString()
+                }
                 : trip
             );
 
@@ -1311,9 +1312,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           }
         }
       );
-      
+
       const data = await response.json();
-      
+
       if (data && data.length > 0 && data[0].lat && data[0].lon) {
         setEditActivityGeoStatus('success');
         return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
@@ -1380,8 +1381,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       'Are you sure you want to delete this trip? This will also delete all activities and photos. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             const updatedTrips = trips.filter(trip => trip.id !== currentTrip.id);
@@ -1444,21 +1445,21 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             console.log(`✅ Photo ${photoIndex + 1}/${totalPhotos}: Already data URI`);
             return photoUri;
           }
-          
+
           // Resize and compress image first to reduce memory usage
           console.log(`🔄 Photo ${photoIndex + 1}/${totalPhotos}: Resizing and compressing...`);
           const resizedUri = await resizeImageForPDF(photoUri);
-          
+
           // Try to read the resized file - if it fails, the file doesn't exist or isn't accessible
           try {
             console.log(`🔄 Photo ${photoIndex + 1}/${totalPhotos}: Converting to base64...`);
             const base64 = await FileSystem.readAsStringAsync(resizedUri, {
               encoding: 'base64' as any,
             });
-            
+
             const dataUriSize = base64.length;
             console.log(`✅ Photo ${photoIndex + 1}/${totalPhotos}: Converted (${(dataUriSize / 1024).toFixed(1)}KB base64)`);
-            
+
             // Return as data URI
             return `data:image/jpeg;base64,${base64}`;
           } catch (readError) {
@@ -1478,7 +1479,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       let processedCount = 0;
       let successCount = 0;
       let errorCount = 0;
-      
+
       for (const photo of currentTrip.photos) {
         if (photo.uri) {
           const dataUri = await photoToDataUri(photo.uri, processedCount, totalPhotos);
@@ -1490,19 +1491,19 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           }
         }
         processedCount++;
-        
+
         // Log progress every 10 photos
         if (processedCount % 10 === 0 || processedCount === totalPhotos) {
           console.log(`📊 Progress: ${processedCount}/${totalPhotos} photos processed (${successCount} success, ${errorCount} errors)`);
         }
       }
-      
+
       console.log(`✅ Photo conversion complete: ${successCount} successful, ${errorCount} errors`);
-      
+
       // Calculate total HTML size estimate
       const estimatedHtmlSize = Array.from(photoDataUriMap.values()).reduce((sum, uri) => sum + uri.length, 0);
       console.log(`📏 Estimated HTML size: ${(estimatedHtmlSize / 1024 / 1024).toFixed(2)}MB (after compression)`);
-      
+
       if (estimatedHtmlSize > 20 * 1024 * 1024) { // 20MB (reduced from 50MB since we're compressing)
         console.warn('⚠️ WARNING: HTML size is very large, may cause memory issues');
       } else {
@@ -1596,15 +1597,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             <div class="dates">${formatDate(currentTrip.startDate || '')} - ${formatDate(currentTrip.endDate || '')}</div>
           </div>
           ${tripDates.map((date, index) => {
-            const dayActivities = currentTrip.activities
-              .filter(activity => activity.startDate === date)
-              .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
-            const dayPhotos = currentTrip.photos.filter(photo => {
-              const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
-              return photoDate === date;
-            });
-            
-            return `
+        const dayActivities = currentTrip.activities
+          .filter(activity => activity.startDate === date)
+          .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+        const dayPhotos = currentTrip.photos.filter(photo => {
+          const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
+          return photoDate === date;
+        });
+
+        return `
               <div class="day">
                 <div class="day-title">${formatDateWithDayNumber(date, index + 1, tripDates.length)}</div>
                 ${dayActivities.map(activity => `
@@ -1613,9 +1614,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                     <div class="activity-time">${activity.time || 'No time specified'}</div>
                     <div class="photos">
                       ${dayPhotos.filter(photo => photo.activityId === activity.id).map(photo => {
-                        const dataUri = photoDataUriMap.get(photo.id) || '';
-                        return dataUri ? `<img src="${dataUri}" class="photo" alt="Trip photo" />` : '';
-                      }).join('')}
+          const dataUri = photoDataUriMap.get(photo.id) || '';
+          return dataUri ? `<img src="${dataUri}" class="photo" alt="Trip photo" />` : '';
+        }).join('')}
                     </div>
                   </div>
                 `).join('')}
@@ -1624,15 +1625,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                     <div class="activity-name">Day Photos</div>
                     <div class="photos">
                       ${dayPhotos.filter(photo => !photo.activityId).map(photo => {
-                        const dataUri = photoDataUriMap.get(photo.id) || '';
-                        return dataUri ? `<img src="${dataUri}" class="photo" alt="Trip photo" />` : '';
-                      }).join('')}
+          const dataUri = photoDataUriMap.get(photo.id) || '';
+          return dataUri ? `<img src="${dataUri}" class="photo" alt="Trip photo" />` : '';
+        }).join('')}
                     </div>
                   </div>
                 ` : ''}
               </div>
             `;
-          }).join('')}
+      }).join('')}
         </body>
         </html>
       `;
@@ -1640,13 +1641,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       // Generate PDF using expo-print
       console.log('🔄 Generating PDF from HTML...');
       console.log(`📏 HTML length: ${(html.length / 1024 / 1024).toFixed(2)}MB`);
-      
+
       try {
         const startTime = Date.now();
         const { uri } = await Print.printToFileAsync({ html });
         const generationTime = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`✅ PDF generated at: ${uri} (took ${generationTime}s)`);
-        
+
         // Rename PDF to trip name
         const sanitizedTripName = currentTrip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         const documentDir = (FileSystem as any).documentDirectory;
@@ -1656,7 +1657,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           try {
             await FileSystem.moveAsync({ from: uri, to: newUri });
             console.log('✅ PDF renamed to:', newUri);
-            
+
             // Check if sharing is available
             const isAvailable = await Sharing.isAvailableAsync();
             if (!isAvailable) {
@@ -1667,7 +1668,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               );
               return;
             }
-            
+
             // Share the renamed PDF
             const result = await Sharing.shareAsync(newUri, {
               mimeType: 'application/pdf',
@@ -1682,7 +1683,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             // Fall through to use original URI
           }
         }
-        
+
         // Check if sharing is available
         const isAvailable = await Sharing.isAvailableAsync();
         if (!isAvailable) {
@@ -1693,14 +1694,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           );
           return;
         }
-        
+
         // Share the PDF with original name
         const result = await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
           dialogTitle: `Share ${currentTrip.title} Trip Story`,
           UTI: 'com.adobe.pdf',
         });
-        
+
       } catch (printError) {
         console.error('❌ Print/Share error:', printError);
         console.error('❌ Error details:', {
@@ -1742,17 +1743,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 📅 ${formatDate(currentTrip.startDate || '')} - ${formatDate(currentTrip.endDate || '')}
 
 ${tripDates.map((date, index) => {
-  const dayActivities = currentTrip.activities
-    .filter(activity => activity.startDate === date)
-    .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
-  const dayPhotos = currentTrip.photos.filter(photo => {
-    const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
-    return photoDate === date;
-  });
-  
-  return `${formatDateWithDayNumber(date, index + 1, tripDates.length)}
+        const dayActivities = currentTrip.activities
+          .filter(activity => activity.startDate === date)
+          .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+        const dayPhotos = currentTrip.photos.filter(photo => {
+          const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
+          return photoDate === date;
+        });
+
+        return `${formatDateWithDayNumber(date, index + 1, tripDates.length)}
 ${dayActivities.map(activity => `• ${activity.name} at ${activity.time}`).join('\n')}`;
-}).join('\n\n')}
+      }).join('\n\n')}
 
 Created with TripStory ✈️
       `;
@@ -1777,10 +1778,10 @@ Created with TripStory ✈️
         return dateString; // Return original if parsing fails
       }
       const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const monthDayYear = date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      const monthDayYear = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       });
       return `${dayOfWeek} ${monthDayYear}`;
     } catch (error) {
@@ -1795,10 +1796,10 @@ Created with TripStory ✈️
         return `${dateString} (Day ${dayNumber}/${totalDays})`;
       }
       const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const monthDayYear = date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      const monthDayYear = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       });
       return `${dayOfWeek} ${monthDayYear} (Day ${dayNumber}/${totalDays})`;
     } catch (error) {
@@ -1808,21 +1809,21 @@ Created with TripStory ✈️
 
   const getTripDates = () => {
     if (!currentTrip || !currentTrip.startDate || !currentTrip.endDate) return [];
-    
+
     try {
       const startDate = new Date(currentTrip.startDate + 'T00:00:00');
       const endDate = new Date(currentTrip.endDate + 'T00:00:00');
-      
+
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         console.warn('⚠️ Invalid trip dates:', { startDate: currentTrip.startDate, endDate: currentTrip.endDate });
         return [];
       }
-      
+
       const dates = [];
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         dates.push(d.toISOString().split('T')[0]);
       }
-      
+
       return dates;
     } catch (error) {
       console.error('❌ Error in getTripDates:', error, currentTrip);
@@ -1836,20 +1837,20 @@ Created with TripStory ✈️
         console.warn('⚠️ Invalid trip data in getTripStatus:', trip);
         return 'active'; // Default to active if data is invalid
       }
-      
+
       const now = new Date();
       // Get today's date at start of day for comparison
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const startDate = new Date(trip.startDate + 'T00:00:00');
       // Set end date to end of day (23:59:59.999) so trip is active on the end date itself
       const endDate = new Date(trip.endDate + 'T23:59:59.999');
-      
+
       // Validate dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         console.warn('⚠️ Invalid date in getTripStatus:', { startDate: trip.startDate, endDate: trip.endDate });
         return 'active';
       }
-      
+
       if (today < startDate) return 'planned';
       if (today > endDate) return 'completed';
       return 'active';
@@ -1883,9 +1884,9 @@ Created with TripStory ✈️
         console.warn('⚠️ trips is not a valid array:', trips);
         return [];
       }
-      
+
       const now = new Date();
-      
+
       // Filter and sort trips by status
       const plannedTrips = trips.filter(trip => {
         if (!trip || !trip.startDate) return false;
@@ -1897,48 +1898,48 @@ Created with TripStory ✈️
           return false;
         }
       }).sort((a, b) => {
-      const dateA = new Date(a.startDate + 'T00:00:00');
-      const dateB = new Date(b.startDate + 'T00:00:00');
-      return dateA.getTime() - dateB.getTime(); // Next planned to furthest
-    });
+        const dateA = new Date(a.startDate + 'T00:00:00');
+        const dateB = new Date(b.startDate + 'T00:00:00');
+        return dateA.getTime() - dateB.getTime(); // Next planned to furthest
+      });
 
-    const activeTrips = trips.filter(trip => {
-      if (!trip || !trip.startDate || !trip.endDate) return false;
-      try {
-        const startDate = new Date(trip.startDate + 'T00:00:00');
-        // Set end date to end of day so trip is active on the end date itself
-        const endDate = new Date(trip.endDate + 'T23:59:59.999');
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return false;
-        return startDate <= now && endDate >= now; // Active (includes end date)
-      } catch (error) {
-        console.warn('⚠️ Error filtering active trip:', error, trip);
-        return false;
-      }
-    }).sort((a, b) => {
-      const dateA = new Date(a.startDate + 'T00:00:00');
-      const dateB = new Date(b.startDate + 'T00:00:00');
-      return dateA.getTime() - dateB.getTime(); // Earliest to latest
-    });
+      const activeTrips = trips.filter(trip => {
+        if (!trip || !trip.startDate || !trip.endDate) return false;
+        try {
+          const startDate = new Date(trip.startDate + 'T00:00:00');
+          // Set end date to end of day so trip is active on the end date itself
+          const endDate = new Date(trip.endDate + 'T23:59:59.999');
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return false;
+          return startDate <= now && endDate >= now; // Active (includes end date)
+        } catch (error) {
+          console.warn('⚠️ Error filtering active trip:', error, trip);
+          return false;
+        }
+      }).sort((a, b) => {
+        const dateA = new Date(a.startDate + 'T00:00:00');
+        const dateB = new Date(b.startDate + 'T00:00:00');
+        return dateA.getTime() - dateB.getTime(); // Earliest to latest
+      });
 
-    const completedTrips = trips.filter(trip => {
-      if (!trip || !trip.endDate) return false;
-      try {
-        // Set end date to end of day - trip is only completed after the end date has passed
-        const endDate = new Date(trip.endDate + 'T23:59:59.999');
-        if (isNaN(endDate.getTime())) return false;
-        return endDate < now; // Completed (only after end date has fully passed)
-      } catch (error) {
-        console.warn('⚠️ Error filtering completed trip:', error, trip);
-        return false;
-      }
-    }).sort((a, b) => {
-      const dateA = new Date(a.endDate + 'T00:00:00');
-      const dateB = new Date(b.endDate + 'T00:00:00');
-      return dateB.getTime() - dateA.getTime(); // Most recent to oldest
-    });
+      const completedTrips = trips.filter(trip => {
+        if (!trip || !trip.endDate) return false;
+        try {
+          // Set end date to end of day - trip is only completed after the end date has passed
+          const endDate = new Date(trip.endDate + 'T23:59:59.999');
+          if (isNaN(endDate.getTime())) return false;
+          return endDate < now; // Completed (only after end date has fully passed)
+        } catch (error) {
+          console.warn('⚠️ Error filtering completed trip:', error, trip);
+          return false;
+        }
+      }).sort((a, b) => {
+        const dateA = new Date(a.endDate + 'T00:00:00');
+        const dateB = new Date(b.endDate + 'T00:00:00');
+        return dateB.getTime() - dateA.getTime(); // Most recent to oldest
+      });
 
-    // Order: Active trips first, then pending (planned) trips, then completed trips
-    return [...activeTrips, ...plannedTrips, ...completedTrips];
+      // Order: Active trips first, then pending (planned) trips, then completed trips
+      return [...activeTrips, ...plannedTrips, ...completedTrips];
     } catch (error) {
       console.error('❌ Error in getSortedTrips:', error);
       return trips || []; // Return original array or empty array on error
@@ -1982,8 +1983,8 @@ Created with TripStory ✈️
 
   const renderCreateTripModal = () => (
     <Modal visible={showCreateTrip} animationType="slide" presentationStyle="pageSheet">
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
@@ -1994,88 +1995,89 @@ Created with TripStory ✈️
               <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
-          
-          <ScrollView 
+
+          <ScrollView
             style={styles.modalContent}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 20 }}
           >
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Trip Title *</Text>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-              value={newTripTitle}
-              onChangeText={setNewTripTitle}
-              placeholder="Enter trip title"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-
-          <View style={styles.inputRow}>
-            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Start Date *</Text>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Trip Title *</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                value={newTripStartDate}
-                onChangeText={setNewTripStartDate}
-                placeholder="YYYY-MM-DD"
+                value={newTripTitle}
+                onChangeText={setNewTripTitle}
+                placeholder="Enter trip title"
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
-            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>End Date *</Text>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                value={newTripEndDate}
-                onChangeText={setNewTripEndDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </View>
 
-          {/* Manage Activities Section */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 8 }]}>
-              Add Activities (Optional):
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  minHeight: 150,
-                  textAlignVertical: 'top',
-                  paddingTop: 12,
-                }
-              ]}
-              value={activitiesListText}
-              onChangeText={setActivitiesListText}
-              placeholder="Activity Name, 2025-11-08, 23:00-23:30"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={8}
-            />
-            <Text style={[styles.inputLabel, { color: colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
-              Format: Activity Name, YYYY-MM-DD, HH:MM{'\n'}
-              Example:{'\n'}
-              Breakfast, 2025-11-08, 08:00{'\n'}
-              Museum Visit, 2025-11-08, 14:00{'\n'}
-              Dinner, 2025-11-08, 19:00-20:30
-            </Text>
-          </View>
+            <View style={styles.inputRow}>
+              <View style={[styles.inputGroup, styles.inputGroupHalf]}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Start Date *</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={newTripStartDate}
+                  onChangeText={setNewTripStartDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+              <View style={[styles.inputGroup, styles.inputGroupHalf]}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>End Date *</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={newTripEndDate}
+                  onChangeText={setNewTripEndDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            {/* Manage Activities Section */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 8 }]}>
+                Add Activities (Optional):
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surface,
+                    color: colors.text,
+                    borderColor: colors.border,
+                    minHeight: 150,
+                    textAlignVertical: 'top',
+                    paddingTop: 12,
+                  }
+                ]}
+                value={activitiesListText}
+                onChangeText={setActivitiesListText}
+                placeholder="Activity Name, 2025-11-08, 23:00-23:30"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={8}
+              />
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
+                Format: Activity Name, YYYY-MM-DD, HH:MM{'\n'}
+                Example:{'\n'}
+                Breakfast, 2025-11-08, 08:00{'\n'}
+                Museum Visit, 2025-11-08, 14:00{'\n'}
+                Dinner, 2025-11-08, 19:00-20:30
+              </Text>
+            </View>
 
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary }]}
-              onPress={createTrip}
-            >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Create Trip</Text>
-            </TouchableOpacity>
+            <View style={{ width: '100%', paddingHorizontal: 20, paddingVertical: 20 }}>
+              <SettingsButton
+                title="Create Trip"
+                variant="primary"
+                onPress={createTrip}
+              />
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -2089,7 +2091,7 @@ Created with TripStory ✈️
       if (tripDates.length > 0 && !selectedDate) {
         setSelectedDate(tripDates[0]);
       }
-      
+
       // Scroll to selected date
       if (dateScrollViewRef.current && selectedDate) {
         const dateIndex = tripDates.indexOf(selectedDate);
@@ -2108,47 +2110,47 @@ Created with TripStory ✈️
 
   const renderAddActivityModal = () => (
     <Modal visible={showAddActivityModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Add Activity</Text>
-            <TouchableOpacity onPress={() => {
-              setShowAddActivityModal(false);
-              setNewActivityName('');
-              setNewActivityTime('');
-              setSelectedDate('');
-            }}>
-              <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Activity Name *</Text>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                value={newActivityName}
-                onChangeText={setNewActivityName}
-                placeholder="Enter activity name"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Activity</Text>
+          <TouchableOpacity onPress={() => {
+            setShowAddActivityModal(false);
+            setNewActivityName('');
+            setNewActivityTime('');
+            setSelectedDate('');
+          }}>
+            <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Date *</Text>
-              <ScrollView 
-                ref={dateScrollViewRef}
-                horizontal 
-                showsHorizontalScrollIndicator={false} 
-                style={styles.dateScrollView}
-              >
-                {currentTrip ? getTripDates().map(date => (
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Activity Name *</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={newActivityName}
+              onChangeText={setNewActivityName}
+              placeholder="Enter activity name"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Date *</Text>
+            <ScrollView
+              ref={dateScrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.dateScrollView}
+            >
+              {currentTrip ? getTripDates().map(date => (
                 <TouchableOpacity
                   key={date}
                   style={[
                     styles.dateOption,
-                    { 
+                    {
                       backgroundColor: selectedDate === date ? colors.primary : colors.surface,
-                      borderColor: colors.border 
+                      borderColor: colors.border
                     }
                   ]}
                   onPress={() => setSelectedDate(date)}
@@ -2160,22 +2162,22 @@ Created with TripStory ✈️
                     {formatDate(date)}
                   </Text>
                 </TouchableOpacity>
-                )) : null}
-              </ScrollView>
-            </View>
+              )) : null}
+            </ScrollView>
+          </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Time</Text>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                value={newActivityTime}
-                onChangeText={setNewActivityTime}
-                placeholder="HH:MM (e.g., 14:30)"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Time</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={newActivityTime}
+              onChangeText={setNewActivityTime}
+              placeholder="HH:MM (e.g., 14:30)"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
 
-          </ScrollView>
+        </ScrollView>
 
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -2202,21 +2204,21 @@ Created with TripStory ✈️
             </TouchableOpacity>
           </View>
         </View>
-        </View>
-      </Modal>
-    );
+      </View>
+    </Modal>
+  );
 
   const parseActivitiesList = (text: string, tripId: string): Activity[] => {
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     const activities: Activity[] = [];
-    
+
     lines.forEach((line, index) => {
       const parts = line.split(',').map(p => p.trim());
       if (parts.length >= 2) {
         const name = parts[0];
         const date = parts[1];
         const time = parts[2] || '12:00';
-        
+
         // Validate date format (YYYY-MM-DD)
         if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           activities.push({
@@ -2231,32 +2233,32 @@ Created with TripStory ✈️
         }
       }
     });
-    
+
     return activities;
   };
 
   const saveActivitiesFromList = async () => {
     if (!currentTrip) return;
-    
+
     const newActivities = parseActivitiesList(activitiesListText, currentTrip.id);
-    
+
     if (newActivities.length === 0) {
       Alert.alert('Error', 'No valid activities found. Please check the format.');
       return;
     }
-    
-    const updatedTrips = trips.map(trip => 
-      trip.id === currentTrip.id 
+
+    const updatedTrips = trips.map(trip =>
+      trip.id === currentTrip.id
         ? { ...trip, activities: newActivities, updatedAt: new Date().toISOString() }
         : trip
     );
-    
+
     await saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
     setShowManageActivities(false);
     setActivitiesListText('');
-    
+
     HapticFeedback.success();
     Alert.alert('Success', `Saved ${newActivities.length} activities.`);
   };
@@ -2273,7 +2275,7 @@ Created with TripStory ✈️
             <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        
+
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
             <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 8 }]}>
@@ -2329,22 +2331,22 @@ Created with TripStory ✈️
             <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.modalContent}>
           <Text style={[styles.inputLabel, { color: colors.text }]}>Select Activity (Optional)</Text>
           <ScrollView style={styles.activityList}>
             <TouchableOpacity
               style={[
-                styles.activityOption, 
-                { 
-                  backgroundColor: selectedActivity === null ? colors.primary : colors.surface, 
-                  borderColor: colors.border 
+                styles.activityOption,
+                {
+                  backgroundColor: selectedActivity === null ? colors.primary : colors.surface,
+                  borderColor: colors.border
                 }
               ]}
               onPress={() => setSelectedActivity(null)}
             >
               <Text style={[
-                styles.activityOptionText, 
+                styles.activityOptionText,
                 { color: selectedActivity === null ? colors.background : colors.text }
               ]}>No Activity</Text>
             </TouchableOpacity>
@@ -2352,16 +2354,16 @@ Created with TripStory ✈️
               <TouchableOpacity
                 key={activity.id}
                 style={[
-                  styles.activityOption, 
-                  { 
-                    backgroundColor: selectedActivity?.id === activity.id ? colors.primary : colors.surface, 
-                    borderColor: colors.border 
+                  styles.activityOption,
+                  {
+                    backgroundColor: selectedActivity?.id === activity.id ? colors.primary : colors.surface,
+                    borderColor: colors.border
                   }
                 ]}
                 onPress={() => setSelectedActivity(activity)}
               >
                 <Text style={[
-                  styles.activityOptionText, 
+                  styles.activityOptionText,
                   { color: selectedActivity?.id === activity.id ? colors.background : colors.text }
                 ]}>{activity.name}</Text>
               </TouchableOpacity>
@@ -2404,7 +2406,7 @@ Created with TripStory ✈️
               <Text style={[styles.modalClose, { color: colors.primary }]}>Done</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             {/* Photo Preview */}
             <View style={styles.photoPreviewContainer}>
@@ -2454,7 +2456,7 @@ Created with TripStory ✈️
                       Alert.alert('Missing Location', 'Please enter a location address first.');
                       return;
                     }
-                    
+
                     setPhotoGeoStatus('geocoding');
                     const coords = await geocodeLocation(photoLocation);
                     if (coords) {
@@ -2501,7 +2503,7 @@ Created with TripStory ✈️
             {/* View in Maps Link */}
             {(selectedPhoto.location || (photoLat && photoLng)) && (
               <View style={styles.inputGroup}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.locationContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => {
                     const lat = selectedPhoto.location?.latitude || parseFloat(photoLat);
@@ -2527,7 +2529,7 @@ Created with TripStory ✈️
             {!showActivitySelector ? (
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.text }]}>Currently Associated With</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.currentActivityContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => setShowActivitySelector(true)}
                   activeOpacity={0.7}
@@ -2557,9 +2559,9 @@ Created with TripStory ✈️
                   <TouchableOpacity
                     style={[
                       styles.activityOption,
-                      { 
+                      {
                         backgroundColor: photoActivityId === null ? colors.primary : colors.surface,
-                        borderColor: colors.border 
+                        borderColor: colors.border
                       }
                     ]}
                     onPress={() => {
@@ -2579,9 +2581,9 @@ Created with TripStory ✈️
                       key={activity.id}
                       style={[
                         styles.activityOption,
-                        { 
+                        {
                           backgroundColor: photoActivityId === activity.id ? colors.primary : colors.surface,
-                          borderColor: colors.border 
+                          borderColor: colors.border
                         }
                       ]}
                       onPress={() => {
@@ -2637,14 +2639,14 @@ Created with TripStory ✈️
               <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             <TouchableOpacity
               style={[
                 styles.activityOption,
-                { 
+                {
                   backgroundColor: photoActivityId === null ? colors.primary : colors.surface,
-                  borderColor: colors.border 
+                  borderColor: colors.border
                 }
               ]}
               onPress={() => selectActivityForPhoto(null)}
@@ -2661,9 +2663,9 @@ Created with TripStory ✈️
                 key={activity.id}
                 style={[
                   styles.activityOption,
-                  { 
+                  {
                     backgroundColor: photoActivityId === activity.id ? colors.primary : colors.surface,
-                    borderColor: colors.border 
+                    borderColor: colors.border
                   }
                 ]}
                 onPress={() => selectActivityForPhoto(activity.id)}
@@ -2697,7 +2699,7 @@ Created with TripStory ✈️
             <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        
+
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>Activity Name *</Text>
@@ -2738,7 +2740,7 @@ Created with TripStory ✈️
                     Alert.alert('Missing Location', 'Please enter a location address first.');
                     return;
                   }
-                  
+
                   const coords = await geocodeLocation(editActivityLocation);
                   if (coords) {
                     setEditActivityLat(coords.lat.toString());
@@ -2750,7 +2752,7 @@ Created with TripStory ✈️
                 }}
               >
                 <Text style={[styles.geocodeButtonText, { color: colors.background }]}>
-                  {editActivityGeoStatus === 'geocoding' ? '...' : '📍'}
+                  {editActivityGeoStatus === 'geocoding' ? '...' : 'Locate'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2808,7 +2810,7 @@ Created with TripStory ✈️
             <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        
+
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>Trip Title *</Text>
@@ -2845,27 +2847,29 @@ Created with TripStory ✈️
         </ScrollView>
 
         <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: colors.primary }]}
-            onPress={updateTrip}
-          >
-            <Text style={[styles.createButtonText, { color: colors.background }]}>Update Trip</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: colors.primary, marginTop: 8 }]}
-            onPress={() => {
-              setShowEditTrip(false);
-              setShowAddActivityModal(true);
-            }}
-          >
-            <Text style={[styles.createButtonText, { color: colors.background }]}>Add Activity</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.deleteButton, { backgroundColor: '#FF3B30', marginTop: 8 }]}
-            onPress={deleteTrip}
-          >
-            <Text style={[styles.deleteButtonText, { color: 'white' }]}>🗑️ Delete Trip</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingHorizontal: 4 }]}
+              onPress={updateTrip}
+            >
+              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Update Trip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingHorizontal: 4 }]}
+              onPress={() => {
+                setShowEditTrip(false);
+                setShowAddActivityModal(true);
+              }}
+            >
+              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Add Activity</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteButton, { backgroundColor: '#FF3B30', flex: 1, paddingHorizontal: 4, marginBottom: 0 }]}
+              onPress={deleteTrip}
+            >
+              <Text style={[styles.deleteButtonText, { color: 'white', fontSize: 14 }]} numberOfLines={1}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -2891,9 +2895,9 @@ Created with TripStory ✈️
     };
 
     return (
-      <Modal 
-        visible={showCustomPhotoPicker} 
-        animationType="slide" 
+      <Modal
+        visible={showCustomPhotoPicker}
+        animationType="slide"
         presentationStyle="pageSheet"
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
@@ -2921,8 +2925,8 @@ Created with TripStory ✈️
                       key={asset.id}
                       style={[
                         styles.photoGridItem,
-                        { 
-                          width: photoSize, 
+                        {
+                          width: photoSize,
                           height: photoSize,
                           borderWidth: isSelected ? 3 : 1,
                           borderColor: isSelected ? colors.primary : colors.border,
@@ -2970,7 +2974,7 @@ Created with TripStory ✈️
             <TouchableOpacity
               style={[
                 styles.modalFooterButton,
-                { 
+                {
                   backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
                   opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
                   flex: 1,
@@ -2987,7 +2991,7 @@ Created with TripStory ✈️
             <TouchableOpacity
               style={[
                 styles.modalFooterButton,
-                { 
+                {
                   backgroundColor: colors.border,
                   flex: 1,
                   marginLeft: 8,
@@ -3061,14 +3065,14 @@ Created with TripStory ✈️
 
     // Filter activities by selected day if a day is selected
     if (selectedMapDay) {
-      activitiesWithExplicitLocations = activitiesWithExplicitLocations.filter(a => 
+      activitiesWithExplicitLocations = activitiesWithExplicitLocations.filter(a =>
         a.activity.startDate === selectedMapDay
       );
     }
 
     // Get total markers count (before filtering) for dropdown display
     const allPhotosWithLocations = currentTrip.photos.filter(photo => photo.location?.latitude && photo.location?.longitude);
-    const allActivitiesWithLocations = currentTrip.activities.filter(activity => 
+    const allActivitiesWithLocations = currentTrip.activities.filter(activity =>
       activity.location?.latitude && activity.location?.longitude
     );
     const totalMarkersCount = allPhotosWithLocations.length + allActivitiesWithLocations.length;
@@ -3098,11 +3102,11 @@ Created with TripStory ✈️
     // Generate OpenStreetMap tile URL
     const generateMapTileUrl = () => {
       if (allMarkers.length === 0) return null;
-      
+
       // Calculate center point from all markers
       const avgLat = allMarkers.reduce((sum, m) => sum + (m.latitude || 0), 0) / allMarkers.length;
       const avgLng = allMarkers.reduce((sum, m) => sum + (m.longitude || 0), 0) / allMarkers.length;
-      
+
       // Calculate bounds to determine appropriate zoom
       const lats = allMarkers.map(m => m.latitude || 0).filter(lat => lat !== 0);
       const lngs = allMarkers.map(m => m.longitude || 0).filter(lng => lng !== 0);
@@ -3110,7 +3114,7 @@ Created with TripStory ✈️
       const latSpan = Math.max(...lats) - Math.min(...lats);
       const lngSpan = Math.max(...lngs) - Math.min(...lngs);
       const maxSpan = Math.max(latSpan, lngSpan);
-      
+
       // Adjust zoom based on span (closer markers = higher zoom)
       let zoom = 13;
       if (maxSpan > 0.1) zoom = 10; // Very spread out
@@ -3118,17 +3122,17 @@ Created with TripStory ✈️
       else if (maxSpan > 0.02) zoom = 12;
       else if (maxSpan > 0.01) zoom = 13;
       else zoom = 14; // Very close together
-      
+
       const tileX = Math.floor((avgLng + 180) / 360 * Math.pow(2, zoom));
       const tileY = Math.floor((1 - Math.log(Math.tan(avgLat * Math.PI / 180) + 1 / Math.cos(avgLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
-      
+
       return `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
     };
 
     // Calculate marker position on the map with better accuracy
     const calculateMarkerPosition = (lat: number, lng: number) => {
       if (allMarkers.length === 0) return { x: 0, y: 0 };
-      
+
       // Calculate center point and bounds
       const lats = allMarkers.map(m => m.latitude || 0).filter(l => l !== 0);
       const lngs = allMarkers.map(m => m.longitude || 0).filter(l => l !== 0);
@@ -3137,21 +3141,21 @@ Created with TripStory ✈️
       const maxLat = Math.max(...lats);
       const minLng = Math.min(...lngs);
       const maxLng = Math.max(...lngs);
-      
+
       const latSpan = maxLat - minLat || 0.01; // Avoid division by zero
       const lngSpan = maxLng - minLng || 0.01;
-      
+
       // Map to screen coordinates (400x300 is our map size, with padding)
       const padding = 20;
       const mapWidth = 400 - (padding * 2);
       const mapHeight = 300 - (padding * 2);
-      
+
       const x = padding + ((lng - minLng) / lngSpan) * mapWidth;
       const y = padding + ((maxLat - lat) / latSpan) * mapHeight; // Inverted for screen coordinates
-      
-      return { 
-        x: Math.max(padding, Math.min(400 - padding, x)), 
-        y: Math.max(padding, Math.min(300 - padding, y)) 
+
+      return {
+        x: Math.max(padding, Math.min(400 - padding, x)),
+        y: Math.max(padding, Math.min(300 - padding, y))
       };
     };
 
@@ -3161,10 +3165,10 @@ Created with TripStory ✈️
         const dateObj = new Date(date + 'T00:00:00');
         if (isNaN(dateObj.getTime())) return date;
         const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-        const dateStr = dateObj.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
+        const dateStr = dateObj.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
         });
         const photoCount = getPhotoCountForDay(date);
         return `${dayName}, ${dateStr} (${dayNumber}/${totalDays}) - ${photoCount} photo${photoCount !== 1 ? 's' : ''}`;
@@ -3186,7 +3190,7 @@ Created with TripStory ✈️
               <Text style={[styles.modalClose, { color: colors.primary }]}>Close</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             {/* Day Filter Dropdown */}
             <View style={[styles.mapDayFilterContainer, { borderColor: colors.border }]}>
@@ -3195,7 +3199,7 @@ Created with TripStory ✈️
                 onPress={() => setShowMapDayDropdown(!showMapDayDropdown)}
               >
                 <Text style={[styles.mapDayFilterText, { color: colors.text }]}>
-                  {selectedMapDay 
+                  {selectedMapDay
                     ? formatDayForDropdown(selectedMapDay, tripDates.indexOf(selectedMapDay) + 1, tripDates.length)
                     : `All Days (${totalMarkersCount} marker${totalMarkersCount !== 1 ? 's' : ''})`}
                 </Text>
@@ -3203,9 +3207,9 @@ Created with TripStory ✈️
                   {showMapDayDropdown ? '▲' : '▼'}
                 </Text>
               </TouchableOpacity>
-              
+
               {showMapDayDropdown && (
-                <ScrollView 
+                <ScrollView
                   style={[styles.mapDayDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   nestedScrollEnabled={true}
                 >
@@ -3254,26 +3258,26 @@ Created with TripStory ✈️
                 <View style={styles.mapImageContainer}>
                   {/* OpenStreetMap Background */}
                   {generateMapTileUrl() && (
-                    <Image 
-                      source={{ uri: generateMapTileUrl()! }} 
+                    <Image
+                      source={{ uri: generateMapTileUrl()! }}
                       style={styles.mapBackground}
                       resizeMode="cover"
                     />
                   )}
-                  
+
                   {/* All Markers: Photos and Activities */}
                   {allMarkers.map((marker, index) => {
                     if (!marker.latitude || !marker.longitude) return null;
                     const markerPosition = calculateMarkerPosition(marker.latitude, marker.longitude);
-                    
+
                     return (
-                      <View 
-                        key={`${marker.type}-${marker.id}`} 
+                      <View
+                        key={`${marker.type}-${marker.id}`}
                         style={[
-                          styles.mapMarker, 
-                          { 
+                          styles.mapMarker,
+                          {
                             left: markerPosition.x - 25, // Center the marker
-                            top: markerPosition.y - 25 
+                            top: markerPosition.y - 25
                           }
                         ]}
                       >
@@ -3285,8 +3289,8 @@ Created with TripStory ✈️
                               handlePhotoPress(marker.photo);
                             }}
                           >
-                            <Image 
-                              source={{ uri: marker.photo.uri }} 
+                            <Image
+                              source={{ uri: marker.photo.uri }}
                               style={styles.markerPhoto}
                             />
                             <View style={styles.markerLabel}>
@@ -3358,13 +3362,13 @@ Created with TripStory ✈️
       scrollViewRef.current.scrollTo({ y: dayY - 40, animated: true }); // Account for sticky headers
     }
   }, []);
-  
+
   // Memoize tripDates to prevent unnecessary recalculations (moved to top level for hooks rules)
   const tripDates = useMemo(() => {
     if (!currentTrip) return [];
     return getTripDates();
   }, [currentTrip]);
-  
+
 
   const handleScroll = (event: any) => {
     if (!currentTrip) return;
@@ -3377,9 +3381,9 @@ Created with TripStory ✈️
     if (activityY !== undefined && scrollViewRef.current) {
       const stickyTitleHeight = 40;
       const scrollToY = Math.max(0, activityY - stickyTitleHeight);
-      scrollViewRef.current.scrollTo({ 
-        y: scrollToY, 
-        animated: true 
+      scrollViewRef.current.scrollTo({
+        y: scrollToY,
+        animated: true
       });
     }
   };
@@ -3387,7 +3391,7 @@ Created with TripStory ✈️
   // Helper functions for horizontal image scrolling
   const scrollImageRow = (ref: any, direction: 'prev' | 'next', imageWidth: number) => {
     if (!ref?.current) return;
-    
+
     ref.current.getScrollResponder()?.getScrollableNode()?.scrollBy({
       x: direction === 'prev' ? -imageWidth : imageWidth,
       animated: true,
@@ -3424,8 +3428,8 @@ Created with TripStory ✈️
       imageRowScrollState.current.set(rowId, { position: 0, canPrev: false, canNext: photos.length > 1 });
       previousPhotoCounts.current.set(rowId, photos.length);
     }
-    
-    const scrollRef = rowId.startsWith('day-') 
+
+    const scrollRef = rowId.startsWith('day-')
       ? dayPhotoScrollRefs.current.get(rowId)
       : activityPhotoScrollRefs.current.get(rowId);
 
@@ -3438,18 +3442,18 @@ Created with TripStory ✈️
       const offsetX = event.nativeEvent.contentOffset.x;
       const contentWidth = event.nativeEvent.contentSize.width;
       const layoutWidth = event.nativeEvent.layoutMeasurement.width;
-      
+
       const newState = {
         position: offsetX,
         canPrev: offsetX > 10,
         canNext: offsetX < contentWidth - layoutWidth - 10,
       };
-      
+
       // Only update state if it actually changed to reduce re-renders
       const currentState = imageRowScrollState.current.get(rowId);
-      if (!currentState || 
-          currentState.canPrev !== newState.canPrev || 
-          currentState.canNext !== newState.canNext) {
+      if (!currentState ||
+        currentState.canPrev !== newState.canPrev ||
+        currentState.canNext !== newState.canNext) {
         setScrollState(newState);
         imageRowScrollState.current.set(rowId, newState);
       } else {
@@ -3485,7 +3489,7 @@ Created with TripStory ✈️
       if (scrollRef?.current) {
         const previousCount = previousPhotoCounts.current.get(rowId) || 0;
         const currentCount = photos.length;
-        
+
         // Only do something if the count actually changed
         if (currentCount !== previousCount) {
           // If a new photo was added (count increased), scroll to center the last photo
@@ -3497,20 +3501,20 @@ Created with TripStory ✈️
                 const imageGap = 8; // marginRight from horizontalImageItem style
                 const lastImageIndex = currentCount - 1;
                 const lastImageStartX = lastImageIndex * (imageWidth + imageGap);
-                
+
                 // Center the image: scroll so the image center aligns with ScrollView center
                 // ScrollView center is at scrollViewWidth / 2
                 // Image center is at lastImageStartX + imageWidth / 2
                 // Scroll position = imageCenter - scrollViewCenter
                 const scrollX = lastImageStartX + (imageWidth / 2) - (scrollViewWidth / 2);
-                
+
                 // Make sure we don't scroll past the beginning or end
                 const totalContentWidth = currentCount * (imageWidth + imageGap);
                 const maxScroll = Math.max(0, totalContentWidth - scrollViewWidth);
                 const finalScrollX = Math.max(0, Math.min(scrollX, maxScroll));
-                
+
                 scrollRef.current.scrollTo({ x: finalScrollX, animated: true });
-                
+
                 // Update scroll state after scrolling
                 setTimeout(() => {
                   const newState = {
@@ -3535,7 +3539,7 @@ Created with TripStory ✈️
             }, 100);
           }
           // If count decreased (photo deleted), don't change scroll position - keep current position
-          
+
           // Update previous count
           previousPhotoCounts.current.set(rowId, currentCount);
         }
@@ -3554,7 +3558,7 @@ Created with TripStory ✈️
             <Text style={[styles.imageNavButtonText, { color: colors.text }]}>‹</Text>
           </TouchableOpacity>
         )}
-        
+
         {/* Horizontal ScrollView */}
         <ScrollView
           ref={scrollRef}
@@ -3616,7 +3620,7 @@ Created with TripStory ✈️
 
   const renderTripDetailView = () => {
     if (!currentTrip) return null;
-    
+
     return (
       // dyor: controls the outer scroll view
       <View style={[styles.tripDetailContainer, { backgroundColor: colors.background }]}>
@@ -3625,7 +3629,7 @@ Created with TripStory ✈️
         <View style={[styles.statusBarBackground, { backgroundColor: colors.surface }]} />
         <View style={[styles.stickyTripTitleContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.tripTitleRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButtonContainer}
               onPress={() => {
                 setShowTripDetail(false);
@@ -3639,7 +3643,7 @@ Created with TripStory ✈️
               <Text style={[styles.backButtonText, { color: colors.primary }]}>←</Text>
             </TouchableOpacity>
             <Text style={[styles.tripDetailTitle, { color: colors.text }]}>{currentTrip.title}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.editButton, { width: 40, alignItems: 'flex-end' }]}
               onPress={() => {
                 openEditTrip();
@@ -3651,7 +3655,7 @@ Created with TripStory ✈️
         </View>
 
 
-        <Animated.ScrollView 
+        <Animated.ScrollView
           ref={scrollViewRef}
           style={styles.tripDetailContent}
           onScroll={Animated.event(
@@ -3685,8 +3689,8 @@ Created with TripStory ✈️
             });
 
             return (
-              <View 
-                key={date} 
+              <View
+                key={date}
                 style={[styles.dayContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onLayout={(event) => {
                   const { y } = event.nativeEvent.layout;
@@ -3701,7 +3705,7 @@ Created with TripStory ✈️
                     style={[styles.plusButton, { backgroundColor: (activeDayDate === date && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
                     onPress={() => activateDay(date)}
                   >
-                    <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{(activeDayDate === date && activeTripId === currentTrip.id) ? '-': '+' }</Text>
+                    <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{(activeDayDate === date && activeTripId === currentTrip.id) ? '-' : '+'}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -3711,7 +3715,7 @@ Created with TripStory ✈️
                     <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
                       Day Photos{dayPhotos.filter(photo => !photo.activityId).length > 0 ? ` (${dayPhotos.filter(photo => !photo.activityId).length})` : ''}
                     </Text>
-                    
+
                     {/* Snap/Add buttons above image row - only show when day is active */}
                     {activeDayDate === date && activeTripId === currentTrip.id && (
                       <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
@@ -3723,7 +3727,7 @@ Created with TripStory ✈️
                             capturePhoto(undefined, date);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
@@ -3737,26 +3741,28 @@ Created with TripStory ✈️
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
-                          const animatedBorderColor = isLoading 
+                          const animatedBorderColor = isLoading
                             ? borderAnimation.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [colors.primary, colors.secondary],
-                              })
+                              inputRange: [0, 1],
+                              outputRange: [colors.primary, colors.secondary],
+                            })
                             : colors.primary;
                           return (
-                            <Animated.View style={{ 
-                              borderColor: animatedBorderColor, 
+                            <Animated.View style={{
+                              flex: 1,
+                              borderColor: animatedBorderColor,
                               borderWidth: isLoading ? 2 : 1,
                               borderRadius: 9999,
                               overflow: 'hidden',
                             }}>
                               <TouchableOpacity
                                 style={[
-                                  styles.addButton, 
-                                  { 
-                                    backgroundColor: '#f5f5f5', 
+                                  styles.addButton,
+                                  {
+                                    backgroundColor: '#f5f5f5',
                                     borderWidth: 0,
                                     opacity: isLoading ? 0.7 : 1,
+                                    flex: 1,
                                   }
                                 ]}
                                 onPress={() => {
@@ -3775,14 +3781,14 @@ Created with TripStory ✈️
                         })()}
                       </View>
                     )}
-                    
+
                     <HorizontalImageRow
                       photos={dayPhotos.filter(photo => !photo.activityId)}
                       rowId={`day-${date}`}
                       imageWidth={screenWidth - 80}
                       imageHeight={screenWidth - 80}
                     />
-                    
+
                     {/* Snap/Add buttons below image row - only show when day is active */}
                     {activeDayDate === date && activeTripId === currentTrip.id && (
                       <View style={styles.activityPhotoButtons}>
@@ -3794,7 +3800,7 @@ Created with TripStory ✈️
                             capturePhoto(undefined, date);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
@@ -3808,26 +3814,28 @@ Created with TripStory ✈️
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
-                          const animatedBorderColor = isLoading 
+                          const animatedBorderColor = isLoading
                             ? borderAnimation.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [colors.primary, colors.secondary],
-                              })
+                              inputRange: [0, 1],
+                              outputRange: [colors.primary, colors.secondary],
+                            })
                             : colors.primary;
                           return (
-                            <Animated.View style={{ 
-                              borderColor: animatedBorderColor, 
+                            <Animated.View style={{
+                              flex: 1,
+                              borderColor: animatedBorderColor,
                               borderWidth: isLoading ? 2 : 1,
-                              borderRadius: 8,
+                              borderRadius: 9999,
                               overflow: 'hidden',
                             }}>
                               <TouchableOpacity
                                 style={[
-                                  styles.addButton, 
-                                  { 
-                                    backgroundColor: '#f5f5f5', 
+                                  styles.addButton,
+                                  {
+                                    backgroundColor: '#f5f5f5',
                                     borderWidth: 0,
                                     opacity: isLoading ? 0.7 : 1,
+                                    flex: 1,
                                   }
                                 ]}
                                 onPress={() => {
@@ -3848,7 +3856,7 @@ Created with TripStory ✈️
                     )}
                   </View>
                 )}
-                
+
                 {/* Snap/Add buttons when no day photos exist yet - only show when day is active */}
                 {dayPhotos.filter(photo => !photo.activityId).length === 0 && activeDayDate === date && activeTripId === currentTrip.id && (
                   <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
@@ -3860,7 +3868,7 @@ Created with TripStory ✈️
                         capturePhoto(undefined, date);
                       }}
                     >
-                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
@@ -3874,24 +3882,25 @@ Created with TripStory ✈️
                     </TouchableOpacity>
                     {(() => {
                       const isLoading = loadingPhotosByDate === (date + '');
-                      const animatedBorderColor = isLoading 
+                      const animatedBorderColor = isLoading
                         ? borderAnimation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [colors.primary, colors.secondary],
-                          })
+                          inputRange: [0, 1],
+                          outputRange: [colors.primary, colors.secondary],
+                        })
                         : colors.primary;
                       return (
-                        <Animated.View style={{ 
-                          borderColor: animatedBorderColor, 
+                        <Animated.View style={{
+                          flex: 1,
+                          borderColor: animatedBorderColor,
                           borderWidth: isLoading ? 2 : 1,
                           borderRadius: 9999,
                           overflow: 'hidden',
                         }}>
                           <TouchableOpacity
                             style={[
-                              styles.addButton, 
-                              { 
-                                backgroundColor: '#f5f5f5', 
+                              styles.addButton,
+                              {
+                                backgroundColor: '#f5f5f5',
                                 borderWidth: 0,
                                 opacity: isLoading ? 0.7 : 1,
                               }
@@ -3921,222 +3930,226 @@ Created with TripStory ✈️
                   // If there are day photos, purple header might scroll away, so show grey date on all activities
                   const hasDayPhotos = dayPhotos.filter(photo => !photo.activityId).length > 0;
                   const showDateAboveActivity = hasDayPhotos || activityIndex > 0;
-                  
+
                   return (
-                  <View 
-                    key={activity.id} 
-                    style={[styles.activityContainer, { borderColor: colors.border }]}
-                    onLayout={(event) => {
-                      const { y } = event.nativeEvent.layout;
-                      activityPositions.current.set(activity.id, y);
-                    }}
-                  >
-                    {showDateAboveActivity && (
-                      <Text style={[styles.activityDateLabel, { color: colors.textSecondary }]}>
-                        {formatDate(date)}
-                      </Text>
-                    )}
-                    <View style={styles.activityHeader}>
-                      <View style={styles.activityTitleContainer}>
-                        <Text style={[styles.activityName, { color: colors.text }]}>
-                          {activity.name}{dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 ? ` (${dayPhotos.filter(photo => photo.activityId === activity.id).length})` : ''}
+                    <View
+                      key={activity.id}
+                      style={[styles.activityContainer, { borderColor: colors.border }]}
+                      onLayout={(event) => {
+                        const { y } = event.nativeEvent.layout;
+                        activityPositions.current.set(activity.id, y);
+                      }}
+                    >
+                      {showDateAboveActivity && (
+                        <Text style={[styles.activityDateLabel, { color: colors.textSecondary }]}>
+                          {formatDate(date)}
                         </Text>
-                        {activeActivityId === activity.id && activeTripId === currentTrip.id && (
-                          <TouchableOpacity 
-                            style={styles.editButton}
-                            onPress={() => openEditActivity(activity)}
+                      )}
+                      <View style={styles.activityHeader}>
+                        <View style={styles.activityTitleContainer}>
+                          <Text style={[styles.activityName, { color: colors.text }]}>
+                            {activity.name}{dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 ? ` (${dayPhotos.filter(photo => photo.activityId === activity.id).length})` : ''}
+                          </Text>
+                          {activeActivityId === activity.id && activeTripId === currentTrip.id && (
+                            <TouchableOpacity
+                              style={styles.editButton}
+                              onPress={() => openEditActivity(activity)}
+                            >
+                              <Text style={styles.editButtonText}>✎</Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity
+                            style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
+                            onPress={() => activateActivity(activity.id)}
                           >
-                            <Text style={styles.editButtonText}>✎</Text>
+                            <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{(activeActivityId === activity.id && activeTripId === currentTrip.id) ? '-' : '+'}</Text>
                           </TouchableOpacity>
+                        </View>
+                        {activity.time && (
+                          <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
                         )}
-                        <TouchableOpacity
-                          style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
-                          onPress={() => activateActivity(activity.id)}
-                        >
-                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>{ (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '-' : '+' }</Text>
-                        </TouchableOpacity>
                       </View>
-                      {activity.time && (
-                        <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
+
+                      {/* Activity photos */}
+                      {dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
+                        <View style={styles.activityPhotos}>
+                          {/* Snap/Add buttons above image row - only show when activity is active */}
+                          {activeActivityId === activity.id && activeTripId === currentTrip.id && (
+                            <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
+                              <TouchableOpacity
+                                style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                                onPress={() => {
+                                  setSelectedActivity(activity);
+                                  setSelectedDate(activity.startDate);
+                                  capturePhoto(activity);
+                                }}
+                              >
+                                <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                                onPress={() => {
+                                  setSelectedActivity(activity);
+                                  setSelectedDate(activity.startDate);
+                                  addFromGallery(activity, undefined, false);
+                                }}
+                              >
+                                <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                              </TouchableOpacity>
+                              {(() => {
+                                const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
+                                const animatedBorderColor = isLoading
+                                  ? borderAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [colors.primary, colors.secondary],
+                                  })
+                                  : colors.primary;
+                                return (
+                                  <Animated.View style={{
+                                    flex: 1,
+                                    borderColor: animatedBorderColor,
+                                    borderWidth: isLoading ? 2 : 1,
+                                    borderRadius: 9999,
+                                    overflow: 'hidden',
+                                  }}>
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.addButton,
+                                        {
+                                          backgroundColor: '#f5f5f5',
+                                          borderWidth: 0,
+                                          opacity: isLoading ? 0.7 : 1,
+                                          flex: 1,
+                                        }
+                                      ]}
+                                      onPress={() => {
+                                        setSelectedActivity(activity);
+                                        setSelectedDate(activity.startDate);
+                                        addFromGallery(activity, undefined, true);
+                                      }}
+                                      disabled={isLoading}
+                                    >
+                                      <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                        {isLoading ? 'Searching...' : 'Add Many'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </Animated.View>
+                                );
+                              })()}
+                            </View>
+                          )}
+
+                          <HorizontalImageRow
+                            photos={dayPhotos.filter(photo => photo.activityId === activity.id)}
+                            rowId={`activity-${activity.id}`}
+                            imageWidth={screenWidth - 80}
+                            imageHeight={screenWidth - 80}
+                          />
+
+                          {/* Snap/Add buttons below image row - only show when activity is active */}
+                          {activeActivityId === activity.id && activeTripId === currentTrip.id && (
+                            <View style={styles.activityPhotoButtons}>
+                              <TouchableOpacity
+                                style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                                onPress={() => {
+                                  setSelectedActivity(activity);
+                                  setSelectedDate(activity.startDate);
+                                  capturePhoto(activity);
+                                }}
+                              >
+                                <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                                onPress={() => {
+                                  setSelectedActivity(activity);
+                                  setSelectedDate(activity.startDate);
+                                  addFromGallery(activity, undefined, false);
+                                }}
+                              >
+                                <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                              </TouchableOpacity>
+                              {(() => {
+                                const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
+                                const animatedBorderColor = isLoading
+                                  ? borderAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [colors.primary, colors.secondary],
+                                  })
+                                  : colors.primary;
+                                return (
+                                  <Animated.View style={{
+                                    flex: 1,
+                                    borderColor: animatedBorderColor,
+                                    borderWidth: isLoading ? 2 : 1,
+                                    borderRadius: 9999,
+                                    overflow: 'hidden',
+                                  }}>
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.addButton,
+                                        {
+                                          backgroundColor: '#f5f5f5',
+                                          borderWidth: 0,
+                                          opacity: isLoading ? 0.7 : 1,
+                                          flex: 1,
+                                        }
+                                      ]}
+                                      onPress={() => {
+                                        setSelectedActivity(activity);
+                                        setSelectedDate(activity.startDate);
+                                        addFromGallery(activity, undefined, true);
+                                      }}
+                                      disabled={isLoading}
+                                    >
+                                      <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                        {isLoading ? 'Searching...' : 'Add Many'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </Animated.View>
+                                );
+                              })()}
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Snap/Add buttons when no activity photos exist yet - only show when activity is active */}
+                      {dayPhotos.filter(photo => photo.activityId === activity.id).length === 0 && activeActivityId === activity.id && activeTripId === currentTrip.id && (
+                        <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
+                          <TouchableOpacity
+                            style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                            onPress={() => {
+                              setSelectedActivity(activity);
+                              setSelectedDate(activity.startDate);
+                              capturePhoto(activity);
+                            }}
+                          >
+                            <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                            onPress={() => {
+                              setSelectedActivity(activity);
+                              setSelectedDate(activity.startDate);
+                              addFromGallery(activity, undefined, false);
+                            }}
+                          >
+                            <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                            onPress={() => {
+                              setSelectedActivity(activity);
+                              setSelectedDate(activity.startDate);
+                              addFromGallery(activity, undefined, true);
+                            }}
+                          >
+                            <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
-                    
-                    {/* Activity photos */}
-                    {dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
-                      <View style={styles.activityPhotos}>
-                        {/* Snap/Add buttons above image row - only show when activity is active */}
-                        {activeActivityId === activity.id && activeTripId === currentTrip.id && (
-                          <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
-                            <TouchableOpacity
-                              style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                capturePhoto(activity);
-                              }}
-                            >
-                              <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                addFromGallery(activity, undefined, false);
-                              }}
-                            >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
-                            </TouchableOpacity>
-                            {(() => {
-                              const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
-                              const animatedBorderColor = isLoading 
-                                ? borderAnimation.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [colors.primary, colors.secondary],
-                                  })
-                                : colors.primary;
-                              return (
-                                <Animated.View style={{ 
-                                  borderColor: animatedBorderColor, 
-                                  borderWidth: isLoading ? 2 : 1,
-                                  borderRadius: 9999,
-                                  overflow: 'hidden',
-                                }}>
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.addButton, 
-                                      { 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderWidth: 0,
-                                        opacity: isLoading ? 0.7 : 1,
-                                      }
-                                    ]}
-                                    onPress={() => {
-                                      setSelectedActivity(activity);
-                                      setSelectedDate(activity.startDate);
-                                      addFromGallery(activity, undefined, true);
-                                    }}
-                                    disabled={isLoading}
-                                  >
-                                    <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                      {isLoading ? 'Searching...' : 'Add Many'}
-                                    </Text>
-                                  </TouchableOpacity>
-                                </Animated.View>
-                              );
-                            })()}
-                          </View>
-                        )}
-                        
-                        <HorizontalImageRow
-                          photos={dayPhotos.filter(photo => photo.activityId === activity.id)}
-                          rowId={`activity-${activity.id}`}
-                          imageWidth={screenWidth - 80}
-                          imageHeight={screenWidth - 80}
-                        />
-                        
-                        {/* Snap/Add buttons below image row - only show when activity is active */}
-                        {activeActivityId === activity.id && activeTripId === currentTrip.id && (
-                          <View style={styles.activityPhotoButtons}>
-                            <TouchableOpacity
-                              style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                capturePhoto(activity);
-                              }}
-                            >
-                              <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                              onPress={() => {
-                                setSelectedActivity(activity);
-                                setSelectedDate(activity.startDate);
-                                addFromGallery(activity, undefined, false);
-                              }}
-                            >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
-                            </TouchableOpacity>
-                            {(() => {
-                              const isLoading = loadingPhotosByDate === (activity.startDate + activity.id);
-                              const animatedBorderColor = isLoading 
-                                ? borderAnimation.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [colors.primary, colors.secondary],
-                                  })
-                                : colors.primary;
-                              return (
-                                <Animated.View style={{ 
-                                  borderColor: animatedBorderColor, 
-                                  borderWidth: isLoading ? 2 : 1,
-                                  borderRadius: 9999,
-                                  overflow: 'hidden',
-                                }}>
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.addButton, 
-                                      { 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderWidth: 0,
-                                        opacity: isLoading ? 0.7 : 1,
-                                      }
-                                    ]}
-                                    onPress={() => {
-                                      setSelectedActivity(activity);
-                                      setSelectedDate(activity.startDate);
-                                      addFromGallery(activity, undefined, true);
-                                    }}
-                                    disabled={isLoading}
-                                  >
-                                    <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                      {isLoading ? 'Searching...' : 'Add Many'}
-                                    </Text>
-                                  </TouchableOpacity>
-                                </Animated.View>
-                              );
-                            })()}
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Snap/Add buttons when no activity photos exist yet - only show when activity is active */}
-                    {dayPhotos.filter(photo => photo.activityId === activity.id).length === 0 && activeActivityId === activity.id && activeTripId === currentTrip.id && (
-                      <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
-                        <TouchableOpacity
-                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedActivity(activity);
-                            setSelectedDate(activity.startDate);
-                            capturePhoto(activity);
-                          }}
-                        >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedActivity(activity);
-                            setSelectedDate(activity.startDate);
-                            addFromGallery(activity, undefined, false);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedActivity(activity);
-                            setSelectedDate(activity.startDate);
-                            addFromGallery(activity, undefined, true);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
                   );
                 })}
               </View>
@@ -4164,7 +4177,7 @@ Created with TripStory ✈️
               Share Story
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.bottomButton, { backgroundColor: colors.secondary }]}
             onPress={() => {
@@ -4201,9 +4214,9 @@ Created with TripStory ✈️
             icon="✈️"
             sparkId="trip-story"
           />
-          
+
           <SettingsFeedbackSection sparkName="TripStory" sparkId="trip-story" />
-          
+
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: colors.primary }]}
             onPress={onCloseSettings}
@@ -4241,12 +4254,12 @@ Created with TripStory ✈️
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.createTripButton, { backgroundColor: colors.primary }]}
-        onPress={() => setShowCreateTrip(true)}
-      >
-        <Text style={[styles.createTripButtonText, { color: colors.background }]}>+ Create New Trip</Text>
-      </TouchableOpacity>
+      <View style={{ padding: 20 }}>
+        <SettingsButton
+          title="+ Create New Trip"
+          onPress={() => setShowCreateTrip(true)}
+        />
+      </View>
 
       {renderCreateTripModal()}
       {renderAddActivityModal()}
@@ -4288,7 +4301,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-    
+
   },
   tripHeaderRight: {
     flexDirection: 'row',
@@ -4335,16 +4348,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  createTripButton: {
-    margin: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  createTripButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
+
   backButtonContainer: {
     width: 40,
     alignItems: 'flex-start',
@@ -4392,7 +4396,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     // Ensure background is fully opaque and covers the area
     overflow: 'hidden',
-    
+
   },
   addButtonContainer: {
     position: 'absolute',
@@ -4549,11 +4553,11 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   modalFooter: {
-    padding: 20,
+    padding: 0,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   modalFooterText: {
@@ -4571,12 +4575,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   createButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginVertical: 20,
+    width: '100%',
   },
   createButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   deleteButton: {
@@ -4945,7 +4953,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  
+
   bottomButtonText: {
     fontSize: 18,
     fontWeight: '600',

@@ -191,11 +191,7 @@ npx expo start --android # Android emulator
 
 ## 📋 **Current Status & Known Issues**
 
-### **Recently Completed**
-- ✅ Daily notification system
-- ✅ Spanish flashcards with TTS and randomization
-- ✅ TodoSpark with date management
-- ✅ iOS Dynamic Island spacing fixes
+
 
 ### **Important Development Reminders**
 - ⚠️ **ALWAYS CHECK CURRENT DIRECTORY**: When encountering `ConfigError: The expected package.json path: /path/to/ios/package.json does not exist`, immediately run `pwd` to verify you're in the correct directory (`/Users/mattdyor/SparksApp`). This error typically means you're in the wrong folder (often the `ios/` subdirectory instead of the project root).
@@ -207,6 +203,7 @@ npx expo start --android # Android emulator
 - **Type safety** - TypeScript throughout
 
 ### **Areas for Future Enhancement**
+- **Refactor Sparks** - Reduce duplicated code and increase use of Spark Components (e.g., shared notification logic like Tee Time Timer/Minute Minder, sortable lists, camera interop)
 - **Testing framework** - No tests currently implemented
 - **Performance optimization** - Large spark registry could be lazy-loaded
 - **Offline capability** - Currently requires online for notifications

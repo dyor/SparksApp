@@ -41,7 +41,7 @@ const getFocusedRouteNameFromRoute = (route: any) => {
 
 const MySparksStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visible: boolean) => void }) => {
   const { colors } = useTheme();
-  
+
   return (
     <MySparksStack.Navigator
       screenOptions={{
@@ -59,7 +59,7 @@ const MySparksStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visi
         name="MySparksList"
         component={SparkSelectionScreen}
         options={{
-          title: 'My Sparks',
+          title: 'Home',
           headerShown: false,
         }}
         listeners={{
@@ -86,7 +86,7 @@ const MySparksStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visi
 
 const MarketplaceStackNavigator = ({ setTabBarVisible }: { setTabBarVisible?: (visible: boolean) => void }) => {
   const { colors } = useTheme();
-  
+
   return (
     <MarketplaceStack.Navigator
       screenOptions={{
@@ -212,8 +212,8 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
             }
           };
 
-          const icon = route.name === 'MySparks' ? '⚡️' : route.name === 'Marketplace' ? '🔎' : '⚙️';
-          const label = route.name === 'MySparks' ? 'My Sparks' : route.name === 'Marketplace' ? 'Discover' : 'Settings';
+          const icon = route.name === 'MySparks' ? '🏠' : route.name === 'Marketplace' ? '🔎' : '⚙️';
+          const label = route.name === 'MySparks' ? 'Home' : route.name === 'Marketplace' ? 'Discover' : 'Settings';
 
           return (
             <React.Fragment key={route.key}>
@@ -228,7 +228,7 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
                   <Text style={styles.quickSwitchLabel}>Switch</Text>
                 </TouchableOpacity>
               )}
-              
+
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
@@ -248,7 +248,7 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
           );
         })}
       </View>
-      
+
       <QuickSwitchModal
         visible={showQuickSwitch}
         onClose={() => setShowQuickSwitch(false)}
@@ -263,7 +263,7 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
 export const AppNavigator: React.FC = () => {
   const { colors } = useTheme();
   const [tabBarVisible, setTabBarVisible] = React.useState(true);
-  
+
   return (
     <NavigationContainer ref={navigationRef}>
       <Tab.Navigator
@@ -278,9 +278,9 @@ export const AppNavigator: React.FC = () => {
         <Tab.Screen
           name="MySparks"
           options={{
-            tabBarLabel: 'My Sparks',
+            tabBarLabel: 'Home',
             tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>⚡️</Text>
+              <Text style={{ fontSize: size - 2, color, fontWeight: 'bold' }}>🏠</Text>
             ),
             headerShown: false,
           }}

@@ -1,18 +1,8 @@
 # Sparks App - Deployment Guide
 
+npx eas build --platform all --profile production --auto-submit
+
 ## Pre-Deployment Checklist
-
-### 1. App Configuration ✅
-- [x] Updated app.json with proper bundle identifiers
-- [x] Added app description and keywords
-- [x] Configured iOS and Android specific settings
-- [x] Set up EAS build configuration
-
-### 2. Assets Verification ✅
-- [x] App icon (1024x1024) - `assets/icon.png`
-- [x] Adaptive icon for Android - `assets/adaptive-icon.png`
-- [x] Splash screen - `assets/splash-icon.png`
-- [x] Favicon for web - `assets/favicon.png`
 
 ### 3. Code Quality
 - [ ] Run final tests: `npm test` (if tests exist)
@@ -49,7 +39,13 @@
    eas build --platform ios --profile development
    
    # Production build for App Store
-   eas build --platform ios --profile production
+  npx eas build --platform ios --profile production
+
+  # Consolidated Build & Submit (Both Platforms)
+  npx eas build --platform all --profile production --auto-submit
+
+  # Consolidated Build Only (Both Platforms)
+  npx eas build --platform all --profile production
 
 Need to remove simulator true for production builds (or not:)
    "resourceClass": "m-medium", 
