@@ -398,7 +398,10 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     // Track Card Component - Shows either colored card or embed
     const TrackCard: React.FC<{ track: SpotifyTrack; index: number }> = ({ track, index }) => (
         <TouchableOpacity
-            style={[styles.trackCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[
+                track.isEmbed ? styles.embedTrackCard : styles.trackCard,
+                { backgroundColor: colors.surface, borderColor: colors.border }
+            ]}
             onPress={() => handlePlayTrack(track)}
             onLongPress={() => handleTrackLongPress(track)}
             activeOpacity={0.7}
@@ -530,6 +533,14 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             borderRadius: 12,
             borderWidth: 1,
             overflow: 'hidden',
+        },
+        embedTrackCard: {
+            width: screenWidth - 40, // Full width with padding
+            height: 200, // Fixed height for embeds
+            borderRadius: 12,
+            borderWidth: 1,
+            overflow: 'hidden',
+            marginBottom: 12,
         },
         coloredCard: {
             width: '100%',
@@ -953,11 +964,21 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                                 </Text>
                             </View>
                         ) : (
-                            <View style={styles.tracksGrid}>
-                                {filteredTracks.map((track, index) => (
+                            <>
+                                {/* Embeds - Full Width at Top */}
+                                {filteredTracks.filter(track => track.isEmbed).map((track, index) => (
                                     <TrackCard key={track.id} track={track} index={index} />
                                 ))}
-                            </View>
+
+                                {/* Simple Cards - 2 Column Grid */}
+                                {filteredTracks.filter(track => !track.isEmbed).length > 0 && (
+                                    <View style={styles.tracksGrid}>
+                                        {filteredTracks.filter(track => !track.isEmbed).map((track, index) => (
+                                            <TrackCard key={track.id} track={track} index={index} />
+                                        ))}
+                                    </View>
+                                )}
+                            </>
                         )}
                     </View>
                 </ScrollView>
