@@ -1,6 +1,6 @@
 # Sparks App - Available Sparks
 
-Sparks is a collection of 24 unique, purpose-built mini-apps designed to make your daily life easier, more productive, and more fun. Each Spark is a focused tool that does one thing exceptionally well.
+Sparks is a collection of 25 unique, purpose-built mini-apps designed to make your daily life easier, more productive, and more fun. Each Spark is a focused tool that does one thing exceptionally well.
 
 ## 🎯 Productivity
 
@@ -27,6 +27,9 @@ Visual food diary with photo timeline and camera integration. Document your culi
 
 ### ⚖️ Weight Tracker
 Track your weight, set goals, and visualize progress. Simple and effective weight management.
+
+### ☠️ Final Clock
+Countdown to your projected death date based on actuarial data. See how lifestyle changes can add years to your life.
 
 ## 🎓 Education
 
@@ -96,6 +99,6 @@ Submit your own Spark idea and become a product manager. Help shape the future o
 
 ---
 
-**Total Sparks:** 24 unique mini-apps  
+**Total Sparks:** 25 unique mini-apps  
 **Categories:** Productivity, Travel, Food, Health, Education, Golf, Games, Media, Utilities, Community  
 **All Sparks:** Available now and ready to make your life...just a little bit better⚡️

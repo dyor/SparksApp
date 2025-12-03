@@ -1,6 +1,9 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useSettingsStore, ThemeColors } from '../store/settingsStore';
 
+// Re-export ThemeColors for use in other files
+export type { ThemeColors };
+
 interface ThemeContextType {
   colors: ThemeColors;
   isDarkMode: boolean;
@@ -15,7 +18,7 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const { darkMode, toggleDarkMode, getThemeColors } = useSettingsStore();
-  
+
   const contextValue: ThemeContextType = {
     colors: getThemeColors(),
     isDarkMode: darkMode,

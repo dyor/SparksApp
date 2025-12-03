@@ -4,15 +4,8 @@ import { FirebaseService } from './ServiceFactory';
 import { AnalyticsEvent, User } from '../types/analytics';
 import { HapticFeedback } from '../utils/haptics';
 
-// Import Firebase Analytics
-let firebaseAnalytics: any = null;
-try {
-  const analytics = require('@react-native-firebase/analytics');
-  firebaseAnalytics = analytics.default;
-  console.log('✅ Firebase Analytics available');
-} catch (error) {
-  console.log('⚠️ Firebase Analytics not available:', (error as any).message);
-}
+// Note: Using web Firebase SDK for analytics (via FirebaseService)
+// Native @react-native-firebase/analytics removed due to compilation issues
 
 export class AnalyticsService {
   private static sessionId: string = AnalyticsService.generateSessionId();
@@ -81,19 +74,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-
-    // Also send to Firebase Analytics
-    if (firebaseAnalytics) {
-      try {
-        await firebaseAnalytics().logEvent('spark_opened', {
-          spark_id: sparkId,
-          spark_name: sparkName || sparkId,
-        });
-        console.log('✅ Spark opened event sent to Firebase Analytics');
-      } catch (error) {
-        console.log('⚠️ Error sending spark_opened to Firebase Analytics:', (error as any).message);
-      }
-    }
+    // Native Firebase Analytics removed - using web SDK via FirebaseService
   }
 
   static async trackSparkComplete(
@@ -125,7 +106,7 @@ export class AnalyticsService {
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
-        await firebaseAnalytics().logEvent('spark_completed', {
+        await firebaseAnalytics.logEvent('spark_completed', {
           spark_id: sparkId,
           spark_name: sparkName,
           duration,
@@ -196,21 +177,7 @@ export class AnalyticsService {
 
     console.log('🔍 Event to be queued:', event);
     await this.queueEvent(event);
-
-    // Also send to Firebase Analytics
-    if (firebaseAnalytics) {
-      try {
-        await firebaseAnalytics().logEvent('feature_used', {
-          spark_id: sparkId,
-          spark_name: sparkName || sparkId,
-          feature_name: feature,
-          ...properties
-        });
-        console.log('✅ Event sent to Firebase Analytics');
-      } catch (error) {
-        console.log('⚠️ Error sending to Firebase Analytics:', (error as any).message);
-      }
-    }
+    // Native Firebase Analytics removed - using web SDK via FirebaseService
 
     console.log('✅ Event queued successfully');
   }
@@ -251,19 +218,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-
-    // Also send to Firebase Analytics
-    if (firebaseAnalytics) {
-      try {
-        await firebaseAnalytics().logEvent('spark_added', {
-          spark_id: sparkId,
-          spark_name: sparkName,
-        });
-        console.log('✅ Spark added event sent to Firebase Analytics');
-      } catch (error) {
-        console.log('⚠️ Error sending spark_added to Firebase Analytics:', (error as any).message);
-      }
-    }
+    // Native Firebase Analytics removed - using web SDK via FirebaseService
   }
 
   static async trackSparkRemoved(sparkId: string, sparkName: string): Promise<void> {
@@ -284,19 +239,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-
-    // Also send to Firebase Analytics
-    if (firebaseAnalytics) {
-      try {
-        await firebaseAnalytics().logEvent('spark_removed', {
-          spark_id: sparkId,
-          spark_name: sparkName,
-        });
-        console.log('✅ Spark removed event sent to Firebase Analytics');
-      } catch (error) {
-        console.log('⚠️ Error sending spark_removed to Firebase Analytics:', (error as any).message);
-      }
-    }
+    // Native Firebase Analytics removed - using web SDK via FirebaseService
   }
 
   static async trackUserEngagement(action: string, sparkId?: string): Promise<void> {

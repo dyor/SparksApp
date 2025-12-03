@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -17,6 +17,9 @@ import {
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
 import { useTheme } from '../contexts/ThemeContext';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
+import { CommonModal } from '../components/CommonModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 const wheelSize = Math.min(screenWidth - 80, 300);
@@ -82,6 +85,7 @@ interface DecisionSetManagerProps {
 // New component for managing multiple decision sets
 const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, onUpdate, onClose }) => {
   const { colors } = useTheme();
+  const commonStyles = createCommonStyles(colors);
   const [editingSet, setEditingSet] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -139,9 +143,7 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
 
   const styles = StyleSheet.create({
     setCard: {
-      backgroundColor: colors.background,
-      borderRadius: 12,
-      padding: 16,
+      ...commonStyles.card,
       marginBottom: 12,
       borderWidth: 2,
       borderColor: colors.border,
@@ -215,10 +217,10 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
       <SettingsContainer>
         <SettingsScrollView>
           <SettingsHeader
-              icon="🎡"
-              title="Decision Set Manager"
-              subtitle="Manage your decision wheels"
-            />
+            icon="🎡"
+            title="Decision Set Manager"
+            subtitle="Manage your decision wheels"
+          />
 
           <SettingsFeedbackSection sparkName="Spinner" sparkId="spinner" />
 
@@ -232,7 +234,7 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
                 )}
                 <Text style={styles.setName}>{set.name}</Text>
                 <Text style={styles.setInfo}>{set.options.length} options</Text>
-                
+
                 <View style={styles.buttonRow}>
                   {!set.active && (
                     <TouchableOpacity
@@ -242,14 +244,14 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
                       <Text style={[styles.actionButtonText, styles.primaryButtonText]}>Activate</Text>
                     </TouchableOpacity>
                   )}
-                  
+
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleEdit(set.id)}
                   >
                     <Text style={styles.actionButtonText}>Edit</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={[styles.actionButton, styles.dangerButton]}
                     onPress={() => handleDelete(set.id)}
@@ -276,16 +278,15 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
       </SettingsContainer>
 
       {/* Edit Modal */}
-      {showEditModal && setBeingEdited && (
-        <Modal
-          visible={showEditModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
-            setShowEditModal(false);
-            setEditingSet(null);
-          }}
-        >
+      <CommonModal
+        visible={showEditModal && !!setBeingEdited}
+        title="Edit Spinner"
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingSet(null);
+        }}
+      >
+        {setBeingEdited && (
           <SpinnerSettings
             options={setBeingEdited.options}
             onSave={(newOptions) => {
@@ -301,8 +302,8 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
               setEditingSet(null);
             }}
           />
-        </Modal>
-      )}
+        )}
+      </CommonModal>
     </>
   );
 };
@@ -338,7 +339,7 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
       Alert.alert('Cannot Delete', 'You need at least 2 options on the wheel.');
       return;
     }
-    
+
     Alert.alert(
       'Delete Option',
       'Are you sure you want to delete this option?',
@@ -360,12 +361,12 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
   const handleSave = () => {
     // Validate that all options have labels
     const validOptions = editingOptions.filter(option => option.label.trim().length > 0);
-    
+
     if (validOptions.length < 2) {
       Alert.alert('Invalid Configuration', 'You need at least 2 valid options with names.');
       return;
     }
-    
+
     HapticFeedback.success();
     onSave(validOptions);
     onClose();
@@ -506,13 +507,113 @@ interface SpinnerSparkProps {
   onComplete?: (result: any) => void;
 }
 
-export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({ 
+export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
-  onComplete 
+  onComplete
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
+  const { colors } = useTheme();
+  const commonStyles = createCommonStyles(colors);
+
+  const styles = StyleSheet.create({
+    ...commonStyles,
+    header: {
+      alignItems: 'center',
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xxl,
+    },
+    question: {
+      fontSize: StyleTokens.fontSize.lg,
+      fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+      marginTop: StyleTokens.spacing.sm,
+      marginBottom: StyleTokens.spacing.md,
+      paddingHorizontal: StyleTokens.spacing.lg,
+    },
+    wheelContainer: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 30,
+    },
+    wheel: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    pointer: {
+      position: 'absolute',
+      right: -5,
+      top: '50%',
+      marginTop: -12.5,
+      width: 0,
+      height: 0,
+      backgroundColor: 'transparent',
+      borderStyle: 'solid',
+      borderTopWidth: 12.5,
+      borderRightWidth: 0,
+      borderBottomWidth: 12.5,
+      borderLeftWidth: 25,
+      borderTopColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: colors.text,
+      zIndex: 10,
+    },
+    controls: {
+      width: '100%',
+      paddingHorizontal: 20,
+      gap: 12,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    spinButton: {
+      backgroundColor: colors.primary,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: 'bold',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    resultContainer: {
+      marginTop: 20,
+      marginBottom: 20,
+      padding: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    resultText: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.primary,
+      textAlign: 'center',
+    },
+  });
+
   const [decisionSets, setDecisionSets] = useState<DecisionSet[]>(getInitialDecisionSets());
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -538,18 +639,18 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
 
   const spin = () => {
     if (isSpinning) return;
-    
+
     HapticFeedback.medium();
     setIsSpinning(true);
     setResult(null);
-    
+
     // Random spin between 5-10 full rotations plus random angle
     const randomSpin = 5 + Math.random() * 5; // 5-10 rotations
     const finalAngle = randomSpin * 360 + Math.random() * 360;
-    
+
     // Reset animation value
     spinValue.setValue(0);
-    
+
     Animated.timing(spinValue, {
       toValue: finalAngle,
       duration: 4500, // Slower spinning for better visibility
@@ -559,7 +660,7 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
       const normalizedAngle = (finalAngle % 360);
       // Find which segment is at 90 degrees (right side)
       const selectedOption = getSelectedOptionAt0Degrees(normalizedAngle);
-      
+
       setResult(selectedOption.label);
       setIsSpinning(false);
       HapticFeedback.success();
@@ -568,34 +669,34 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
 
   const getSelectedOptionAt0Degrees = (wheelRotation: number) => {
     const totalWeight = options.reduce((sum, option) => sum + option.weight, 0);
-    
+
     let currentAngle = 0;
     for (let i = 0; i < options.length; i++) {
       const segmentAngle = (options[i].weight / totalWeight) * 360;
       const startDegrees = currentAngle;
       const endDegrees = currentAngle + segmentAngle;
-      
+
       // Calculate where this segment is after rotation
       const rotatedStart = (startDegrees + wheelRotation) % 360;
       const rotatedEnd = (endDegrees + wheelRotation) % 360;
-      
+
       // Check if this segment contains the 0-degree position
-      const contains0 = (rotatedStart <= 0 && rotatedEnd > 0) || 
-                        (rotatedStart > rotatedEnd && (rotatedStart <= 0 || 0 < rotatedEnd));
-      
+      const contains0 = (rotatedStart <= 0 && rotatedEnd > 0) ||
+        (rotatedStart > rotatedEnd && (rotatedStart <= 0 || 0 < rotatedEnd));
+
       if (contains0) {
         return options[i];
       }
-      
+
       currentAngle = endDegrees;
     }
-    
+
     // Fallback to first option
     return options[0];
   };
 
   const updateActiveSetOptions = (newOptions: SpinnerOption[]) => {
-    setDecisionSets(prev => prev.map(set => 
+    setDecisionSets(prev => prev.map(set =>
       set.active ? { ...set, options: newOptions } : set
     ));
   };
@@ -604,37 +705,37 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
     const segments = [];
     const totalWeight = options.reduce((sum, option) => sum + option.weight, 0);
     let currentAngle = 0;
-    
+
     for (let i = 0; i < options.length; i++) {
       const segmentAngle = (options[i].weight / totalWeight) * 360;
       const startAngle = currentAngle;
       const endAngle = currentAngle + segmentAngle;
-      
+
       // Convert angles to radians
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
-      
+
       // Calculate arc path
       const x1 = wheelRadius + wheelRadius * 0.8 * Math.cos(startRad);
       const y1 = wheelRadius + wheelRadius * 0.8 * Math.sin(startRad);
       const x2 = wheelRadius + wheelRadius * 0.8 * Math.cos(endRad);
       const y2 = wheelRadius + wheelRadius * 0.8 * Math.sin(endRad);
-      
+
       const largeArcFlag = segmentAngle > 180 ? 1 : 0;
-      
+
       const pathData = [
         `M ${wheelRadius} ${wheelRadius}`,
         `L ${x1} ${y1}`,
         `A ${wheelRadius * 0.8} ${wheelRadius * 0.8} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
         'Z'
       ].join(' ');
-      
+
       // Text position
       const textAngle = startAngle + segmentAngle / 2;
       const textRad = (textAngle * Math.PI) / 180;
       const textX = wheelRadius + wheelRadius * 0.5 * Math.cos(textRad);
       const textY = wheelRadius + wheelRadius * 0.5 * Math.sin(textRad);
-      
+
       segments.push(
         <React.Fragment key={i}>
           <Path
@@ -657,10 +758,10 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
           </SvgText>
         </React.Fragment>
       );
-      
+
       currentAngle += segmentAngle;
     }
-    
+
     return segments;
   };
 
@@ -674,7 +775,7 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
       <DecisionSetManager
         decisionSets={decisionSets}
         onUpdate={setDecisionSets}
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -689,7 +790,7 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
       <View style={styles.wheelContainer}>
         {/* Pointer */}
         <View style={styles.pointer} />
-        
+
         {/* Spinning Wheel */}
         <Animated.View
           style={[
@@ -759,152 +860,5 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContainer: {
-    alignItems: 'center',
-    padding: 20,
-    minHeight: '100%',
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  question: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 10,
-    paddingHorizontal: 20,
-  },
-  wheelContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 30,
-  },
-  wheel: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  pointer: {
-    position: 'absolute',
-    right: -5,
-    top: '50%',
-    marginTop: -12.5,
-    width: 0,
-    height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderRightWidth: 25,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderRightColor: '#FF4757',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  resultContainer: {
-    alignItems: 'center',
-    marginBottom: 10,
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  resultLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  resultText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  controls: {
-    alignItems: 'center',
-    gap: 15,
-  },
-  button: {
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    minWidth: 150,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  spinButton: {
-    backgroundColor: '#007AFF',
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  settingsButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#666',
-  },
-  settingsButtonText: {
-    color: '#666',
-  },
-  debugContainer: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    padding: 15,
-    marginVertical: 10,
-    maxHeight: 150,
-    overflow: 'scroll',
-  },
-  debugTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
-    fontFamily: 'monospace',
-    marginBottom: 2,
-  },
-  debugHighlight: {
-    color: '#FF4757',
-    fontWeight: 'bold',
-  },
-});
+
 

@@ -19,6 +19,8 @@ import {
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
 import AddPhraseModal, { Phrase } from '../components/AddPhraseModal';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -83,7 +85,7 @@ const defaultTranslations: TranslationCard[] = [
   { id: 48, english: "I lost my wallet", spanish: "Perdí mi cartera", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
   { id: 49, english: "Good morning", spanish: "Buenos días", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
   { id: 50, english: "Good night", spanish: "Buenas noches", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
-]; 
+];
 
 interface FlashcardSettings {
   english: string;
@@ -173,15 +175,16 @@ interface FlashcardsSparkProps {
   onComplete?: (result: any) => void;
 }
 
-export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({ 
+export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
-  onComplete 
+  onComplete
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
-  
+  const commonStyles = createCommonStyles(colors);
+
   const [cards, setCards] = useState<TranslationCard[]>(defaultTranslations);
   const [currentCard, setCurrentCard] = useState<TranslationCard | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -189,7 +192,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  
+
   // Session-based tracking
   const [sessionQueue, setSessionQueue] = useState<TranslationCard[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState<Set<number>>(new Set());
@@ -469,7 +472,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     if (!sessionActive || isCompleted || sessionQueue.length === 0) {
       return null;
     }
-    
+
     // Return the first card in the queue
     return sessionQueue[0];
   };
@@ -484,7 +487,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       lastAsked: null,
       needsReview: false
     };
-    
+
     const updatedCards = [...cards, newCard];
     setCards(updatedCards);
     setSparkData('flashcards', { cards: updatedCards });
@@ -680,7 +683,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       setCurrentCard(firstCard);
       setShowAnswer(false);
       setSessionQueue(shuffledCards.slice(1));
-      
+
       // Then start processing after a brief delay
       setTimeout(() => {
         processAutoPlayCard(firstCard, shuffledCards.slice(1));
@@ -708,7 +711,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     try {
       // Phase 1: Speak English and wait
       if (!autoPlayActiveRef.current) return;
-      
+
       // Start progress animation for phase 1 (red)
       const phase1Duration = 8000; // 8 seconds - increased to give more time
       const phase1Start = Date.now();
@@ -722,27 +725,27 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         setAutoPlayProgress(progress);
       }, 100);
       progressIntervalsRef.current.push(progressInterval);
-      
+
       await speakSpanish(card.english, 'en-US');
-      
+
       // Wait remaining time if speech finished early - ensure minimum duration
       const elapsed = Date.now() - phase1Start;
       if (elapsed < phase1Duration) {
         await new Promise(resolve => setTimeout(resolve, phase1Duration - elapsed));
       }
-      
+
       clearInterval(progressInterval);
       progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval);
       setAutoPlayProgress(1);
 
       // Phase 2: Show Spanish and speak first time
       if (!autoPlayActiveRef.current) return;
-      
+
       setShowAnswer(true);
       flipCard();
       setAutoPlayPhase('spanish1');
       setAutoPlayProgress(0);
-      
+
       const phase2Duration = 8000; // 8 seconds - increased to give more time
       const phase2Start = Date.now();
       const progressInterval2 = setInterval(() => {
@@ -755,25 +758,25 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         setAutoPlayProgress(progress);
       }, 100);
       progressIntervalsRef.current.push(progressInterval2);
-      
+
       await speakSpanish(card.spanish);
-      
+
       // Wait remaining time if speech finished early - ensure minimum duration
       const elapsed2 = Date.now() - phase2Start;
       if (elapsed2 < phase2Duration) {
         await new Promise(resolve => setTimeout(resolve, phase2Duration - elapsed2));
       }
-      
+
       clearInterval(progressInterval2);
       progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval2);
       setAutoPlayProgress(1);
 
       // Phase 3: Repeat Spanish
       if (!autoPlayActiveRef.current) return;
-      
+
       setAutoPlayPhase('spanish2');
       setAutoPlayProgress(0);
-      
+
       const phase3Duration = 5000; // 5 seconds - increased to give more time for repeat
       const phase3Start = Date.now();
       const progressInterval3 = setInterval(() => {
@@ -786,25 +789,25 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         setAutoPlayProgress(progress);
       }, 100);
       progressIntervalsRef.current.push(progressInterval3);
-      
+
       await speakSpanish(card.spanish);
-      
+
       // Wait remaining time if speech finished early - ensure minimum duration
       const elapsed3 = Date.now() - phase3Start;
       if (elapsed3 < phase3Duration) {
         await new Promise(resolve => setTimeout(resolve, phase3Duration - elapsed3));
       }
-      
+
       clearInterval(progressInterval3);
       progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval3);
       setAutoPlayProgress(1);
 
       // Mark as answered correctly and advance
       if (!autoPlayActiveRef.current) return;
-      
+
       setAnsweredCorrectly(prev => {
         const newAnsweredCorrectly = new Set([...prev, card.id]);
-        
+
         // Update card statistics
         const updatedCards = cards.map(c => {
           if (c.id === card.id) {
@@ -838,7 +841,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
           slideOutCard();
           setAutoPlayPhase(null);
           setAutoPlayProgress(0);
-          
+
           // Immediately set next card to avoid loading state
           if (remainingQueue.length > 0) {
             const nextCard = remainingQueue[0];
@@ -846,7 +849,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
             setCurrentCard(nextCard);
             setShowAnswer(false);
             setSessionQueue(remainingQueue.slice(1));
-            
+
             setTimeout(() => {
               processAutoPlayCard(nextCard, remainingQueue.slice(1));
             }, 300); // Brief delay for slide animation
@@ -860,14 +863,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
               setCurrentCard(nextCard);
               setShowAnswer(false);
               setSessionQueue(reshuffled.slice(1));
-              
+
               setTimeout(() => {
                 processAutoPlayCard(nextCard, reshuffled.slice(1));
               }, 300);
             }
           }
         }
-        
+
         return newAnsweredCorrectly;
       });
     } catch (error) {
@@ -888,25 +891,22 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const correctPercentage = answeredCorrectly.size > 0 ? (answeredCorrectly.size / cards.length) * 100 : 0;
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
+    ...commonStyles,
     scrollContainer: {
       flexGrow: 1,
-      padding: 20,
+      padding: StyleTokens.spacing.lg,
     },
     header: {
       alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xl,
     },
     centeredAddButton: {
       backgroundColor: colors.primary,
       paddingHorizontal: 32,
       paddingVertical: 16,
       borderRadius: 30,
-      marginBottom: 20,
+      marginBottom: StyleTokens.spacing.xl,
       alignSelf: 'center',
     },
     centeredAddButtonText: {
@@ -914,22 +914,10 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       fontSize: 18,
       fontWeight: '600',
     },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: 20,
-    },
     progressBars: {
       flexDirection: 'row',
       gap: 15,
-      marginBottom: 20,
+      marginBottom: StyleTokens.spacing.xl,
       paddingHorizontal: 10,
     },
     progressContainer: {
@@ -966,32 +954,20 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       fontWeight: '600',
     },
     cardContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 15,
+      ...commonStyles.card,
       padding: 30,
-      marginBottom: 20,
+      marginBottom: StyleTokens.spacing.xl,
       alignItems: 'center',
       minHeight: 200,
       justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 4,
     },
     animatedCardContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 15,
+      ...commonStyles.card,
       padding: 15,
       marginBottom: 10,
       alignItems: 'center',
       minHeight: 80,
       justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 4,
     },
     englishText: {
       fontSize: 24,
@@ -1256,7 +1232,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       <FlashcardSettings
         cards={cards}
         onSave={saveCustomCards}
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -1266,31 +1242,31 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       <View style={styles.header}>
         <Text style={styles.title}>🃏 Spanish Flashcards</Text>
         <Text style={styles.subtitle}>Learn Spanish. Easy. </Text>
-        
+
         <View style={styles.progressBars}>
           <View style={styles.progressContainer}>
             <Text style={styles.progressLabel}>Asked</Text>
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
-                  styles.askedProgress, 
+                  styles.progressFill,
+                  styles.askedProgress,
                   { width: `${askedPercentage}%` }
-                ]} 
+                ]}
               />
             </View>
             <Text style={styles.progressText}>{totalAsked}/{cards.length}</Text>
           </View>
-          
+
           <View style={styles.progressContainer}>
             <Text style={styles.progressLabel}>Completed</Text>
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
-                  styles.correctProgress, 
+                  styles.progressFill,
+                  styles.correctProgress,
                   { width: `${correctPercentage}%` }
-                ]} 
+                ]}
               />
             </View>
             <Text style={styles.progressText}>{answeredCorrectly.size}/{cards.length}</Text>
@@ -1425,24 +1401,24 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
       <View style={styles.bottomButtons}>
         {autoPlayActive && (
-          <TouchableOpacity 
-            style={[styles.bottomButton, styles.stopAutoPlayButton]} 
+          <TouchableOpacity
+            style={[styles.bottomButton, styles.stopAutoPlayButton]}
             onPress={stopAutoPlay}
           >
             <Text style={styles.stopAutoPlayButtonText} numberOfLines={1}>Stop Auto Play</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity 
-          style={[styles.bottomButton, styles.resetButton]} 
+        <TouchableOpacity
+          style={[styles.bottomButton, styles.resetButton]}
           onPress={resetSession}
         >
           <Text style={styles.resetButtonText}>Reset Session</Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Completion Celebration Modal */}
       {showCelebration && (
-        <Animated.View 
+        <Animated.View
           style={[
             styles.celebrationContainer,
             {
@@ -1467,7 +1443,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
             <Text style={styles.celebrationText}>
               Accuracy: {totalAsked > 0 ? Math.round((answeredCorrectly.size / totalAsked) * 100) : 100}%
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.celebrationButton}
               onPress={() => {
                 setShowCelebration(false);

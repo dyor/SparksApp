@@ -16,6 +16,8 @@ import {
   SettingsRemoveButton,
   SaveCancelButtons
 } from '../components/SettingsComponents';
+import { CommonModal } from '../components/CommonModal';
+import { createCommonStyles } from '../styles/CommonStyles';
 
 interface ToviewItem {
   id: number;

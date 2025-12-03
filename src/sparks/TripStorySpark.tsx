@@ -36,6 +36,7 @@ import {
   SettingsFeedbackSection,
   SettingsButton,
 } from '../components/SettingsComponents';
+import { NotificationService } from '../utils/notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -200,6 +201,37 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const activityPositions = useRef<Map<string, number>>(new Map());
   const scrollViewRef = useRef<any>(null);
   const currentScrollPosition = useRef<number>(0);
+
+  const getDaysRemaining = (dateStr: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(dateStr + 'T00:00:00');
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getProximityText = (days: number): string => {
+    if (days < 0) return 'Past';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days < 7) return `In ${days} days`;
+
+    const weeks = Math.round(days / 7);
+    if (days < 30) return `In ${weeks} week${weeks > 1 ? 's' : ''}`;
+
+    const months = Math.round(days / 30);
+    if (days < 365) return `In ${months} month${months > 1 ? 's' : ''}`;
+
+    return 'In 1 year+';
+  };
+
+  const getProximityColor = (days: number): string => {
+    if (days === 0) return '#FF3B30'; // Red for Today
+    if (days === 1) return '#FF9500'; // Orange for Tomorrow
+    if (days < 7) return '#FFCC00'; // Yellow for this week
+    if (days < 30) return '#34C759'; // Green for this month
+    return colors.textSecondary; // Gray for later
+  };
 
   // Refs for horizontal image scroll views (one per row)
   const dayPhotoScrollRefs = useRef<Map<string, any>>(new Map());
@@ -634,6 +666,33 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
     const updatedTrips = [...trips, newTrip];
     await saveTrips(updatedTrips);
+
+    // Schedule notifications if it's a planned trip (day before and day of at 8 AM)
+    if (newTrip.status === 'planned') {
+      const tripDate = new Date(newTrip.startDate + 'T08:00:00');
+      const dayBefore = new Date(tripDate);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+
+      // Schedule day-before notification
+      await NotificationService.scheduleActivityNotification(
+        `${newTrip.title} starts tomorrow`,
+        dayBefore,
+        `trip-${newTrip.id}-before`,
+        'Upcoming Trip',
+        'trip-story',
+        '✈️'
+      );
+
+      // Schedule day-of notification
+      await NotificationService.scheduleActivityNotification(
+        `${newTrip.title} is today`,
+        tripDate,
+        `trip-${newTrip.id}-day`,
+        'Trip Today',
+        'trip-story',
+        '✈️'
+      );
+    }
 
     // Reset form
     setNewTripTitle('');
@@ -1416,6 +1475,38 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
     const updatedTrips = trips.map(trip => trip.id === currentTrip.id ? updatedTrip : trip);
     await saveTrips(updatedTrips);
+
+    // Update notifications if status changes
+    if (currentTrip.status === 'planned' && newStatus !== 'planned') {
+      // Trip is no longer planned, notifications will auto-expire
+      // No explicit cancel needed
+    } else if (newStatus === 'planned') {
+      // Trip is now or still planned, schedule/reschedule notifications
+      const tripDate = new Date(updatedTrip.startDate + 'T08:00:00');
+      const dayBefore = new Date(tripDate);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+
+      // Schedule day-before notification
+      await NotificationService.scheduleActivityNotification(
+        `${updatedTrip.title} starts tomorrow`,
+        dayBefore,
+        `trip-${updatedTrip.id}-before`,
+        'Upcoming Trip',
+        'trip-story',
+        '✈️'
+      );
+
+      // Schedule day-of notification
+      await NotificationService.scheduleActivityNotification(
+        `${updatedTrip.title} is today`,
+        tripDate,
+        `trip-${updatedTrip.id}-day`,
+        'Trip Today',
+        'trip-story',
+        '✈️'
+      );
+    }
+
     setCurrentTrip(updatedTrip);
     setShowEditTrip(false);
     HapticFeedback.success();
@@ -1435,6 +1526,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           onPress: async () => {
             const updatedTrips = trips.filter(trip => trip.id !== currentTrip.id);
             await saveTrips(updatedTrips);
+
+            // Notifications will auto-expire if time has passed
+            // No explicit cancel needed
+
             setCurrentTrip(null);
             setShowTripDetail(false);
             setShowEditTrip(false);
@@ -2013,17 +2108,25 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.tripHeader}>
           <Text style={[styles.tripTitle, { color: colors.text }]}>{trip.title}</Text>
           <View style={styles.tripHeaderRight}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <Text style={styles.statusText}>{statusText}</Text>
-            </View>
+            {trip.status === 'planned' ? (
+              <View style={[styles.statusBadge, { backgroundColor: getProximityColor(getDaysRemaining(trip.startDate)) }]}>
+                <Text style={[styles.statusText, { color: colors.background }]}>{getProximityText(getDaysRemaining(trip.startDate))}</Text>
+              </View>
+            ) : (
+              <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                <Text style={styles.statusText}>{statusText}</Text>
+              </View>
+            )}
           </View>
         </View>
         <Text style={[styles.tripDates, { color: colors.textSecondary }]}>
           {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
         </Text>
-        <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
-          {trip.photos.length} photos • {trip.activities.length} activities
-        </Text>
+        {trip.status !== 'planned' && (
+          <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
+            {trip.photos.length} photos • {trip.activities.length} activities
+          </Text>
+        )}
       </TouchableOpacity>
     );
   };

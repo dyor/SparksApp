@@ -12,6 +12,8 @@ import {
   SettingsText,
   SaveCancelButtons
 } from '../components/SettingsComponents';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
 
 interface Printer {
   id: string;
@@ -182,6 +184,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
+  const commonStyles = createCommonStyles(colors);
 
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [showFinancials, setShowFinancials] = useState(false);
@@ -243,12 +246,12 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
     // Phone Operator: same capacity
     const dailyMax = 40; // 10 jobs/hour * 4 hours
     const weeklyMax = 50; // 10 jobs/hour * 4 hours * 5 days / 4 (to account for week cycle)
-    
+
     // Check if employee has worked 5 days this week
     if (employee.daysWorkedThisWeek >= 5) {
       return { daily: 0, weekly: 0 };
     }
-    
+
     return { daily: dailyMax, weekly: weeklyMax - (employee.daysWorkedThisWeek * 10) };
   };
 
@@ -261,12 +264,12 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       // 100 visits = 5 calls
       totalCalls += 5;
     });
-    
+
     // Subtract phone operator capacity (8 calls/day per operator)
     const phoneOperators = getEmployeesByType(state.employees, 'phone_operator');
     const callsHandledByOperators = phoneOperators.filter(emp => emp.daysWorkedThisWeek < 5).length * 8;
     const remainingCalls = Math.max(0, totalCalls - callsHandledByOperators);
-    
+
     return remainingCalls;
   };
 
@@ -274,10 +277,10 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
   const calculateOwnerPrintJobs = (state: GameState): number => {
     const workingPrinters = getWorkingPrinters(state.printers);
     const printer3DEmployees = getEmployeesByType(state.employees, '3d_printer');
-    
+
     // Printer capacity: 2 prints per day per printer
     const totalPrinterCapacity = workingPrinters.length * 2;
-    
+
     // Employee print capacity
     let employeePrintCapacity = 0;
     printer3DEmployees.forEach(emp => {
@@ -286,13 +289,13 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
         employeePrintCapacity += Math.min(capacity.daily, totalPrinterCapacity);
       }
     });
-    
+
     // Pending orders that need to be fulfilled
     const pendingOrdersCount = (state.pendingOrders || []).length;
-    
+
     // Orders that employees can't handle
     const ordersForOwner = Math.max(0, pendingOrdersCount - employeePrintCapacity);
-    
+
     // But owner is limited by printer capacity too
     return Math.min(ordersForOwner, totalPrinterCapacity - employeePrintCapacity);
   };
@@ -521,10 +524,10 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
     const allPendingOrders = [...(state.pendingOrders || []), ...newPendingOrders];
     const workingPrinters = getWorkingPrinters(state.printers);
     const printer3DEmployees = getEmployeesByType(state.employees, '3d_printer');
-    
+
     // Calculate printer capacity: 2 prints per day per printer
     const totalPrinterCapacity = workingPrinters.length * 2;
-    
+
     // Calculate employee capacity for printing
     let employeePrintCapacity = 0;
     printer3DEmployees.forEach(emp => {
@@ -536,16 +539,16 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
         dailyExpenses += 80; // $80/day salary
       }
     });
-    
+
     // Total print capacity (employee + owner can use remaining printer capacity)
     const totalPrintCapacity = totalPrinterCapacity; // Owner can use any remaining capacity
-    
+
     // Fulfill orders up to capacity
     let materialsAvailable = state.materialsInventory;
     const ordersToFulfill = Math.min(allPendingOrders.length, totalPrintCapacity, materialsAvailable);
     let fulfilledOrders: PendingOrder[] = [];
     let remainingOrders: PendingOrder[] = [];
-    
+
     for (let i = 0; i < allPendingOrders.length; i++) {
       if (i < ordersToFulfill && materialsAvailable > 0) {
         fulfilledOrders.push(allPendingOrders[i]);
@@ -556,15 +559,15 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
         remainingOrders.push(allPendingOrders[i]);
       }
     }
-    
+
     if (fulfilledOrders.length > 0) {
       log.push(`Fulfilled ${fulfilledOrders.length} orders: $${fulfilledOrders.length * 50} revenue`);
     }
-    
+
     if (remainingOrders.length > 0) {
       const lackingPrinters = remainingOrders.length > totalPrintCapacity;
       const lackingMaterials = materialsAvailable === 0 && remainingOrders.length > 0;
-      
+
       if (lackingPrinters) {
         log.push(`⚠️ ${remainingOrders.length} orders pending - need more printers (${totalPrintCapacity} capacity, ${allPendingOrders.length} orders)`);
       }
@@ -572,7 +575,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
         log.push(`⚠️ ${remainingOrders.length} orders pending - need more materials`);
       }
     }
-    
+
     // Calculate owner print jobs needed
     const employeePrintJobs = Math.min(employeePrintCapacity, ordersToFulfill);
     const ownerPrintJobs = Math.max(0, ordersToFulfill - employeePrintJobs);
@@ -633,7 +636,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
   const advanceDay = (state: GameState) => {
     // Process daily operations first
     const dailyOps = processDailyOperations(state);
-    
+
     // Age printers and handle repairs
     const updatedPrinters = dailyOps.newState.printers.map(printer => {
       if (printer.status === 'under_repair' && printer.repairDay === state.day - 1) {
@@ -683,7 +686,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
 
     // Process daily operations (this happens automatically each day)
     const dailyOps = processDailyOperations(newStateAfterDecision);
-    
+
     // Update state with daily operations
     const stateWithDailyOps = {
       ...newStateAfterDecision,
@@ -722,34 +725,34 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
     const printerValue = (state.printers || []).length * 200; // Depreciated value
     const materialsValue = state.materialsInventory * 15;
     const totalAssets = state.cash + printerValue + materialsValue;
-    
+
     const employees3D = getEmployeesByType(state.employees, '3d_printer').length;
     const employeesPhone = getEmployeesByType(state.employees, 'phone_operator').length;
-    
+
     // Calculate daily revenue and expenses (estimate based on current state)
     // This is an estimate for display - actual values come from processDailyOperations
     let estimatedDailyRevenue = 0;
     let estimatedDailyExpenses = 0;
-    
+
     // Estimate from Google Ads
     const activeAds = state.googleAdsCampaigns.filter(c => c.daysRemaining > 0);
     const totalCalls = activeAds.length * 5; // 5 calls per campaign per day
     const conversions = Math.floor(totalCalls * 0.4);
     estimatedDailyRevenue = conversions * 50;
     estimatedDailyExpenses = conversions * 15;
-    
+
     // Employee salaries
     estimatedDailyExpenses += (employees3D + employeesPhone) * 80;
-    
+
     // Shopify cost
     if (state.hasShopify) {
       estimatedDailyExpenses += 1; // $1/day = $30/month
     }
-    
+
     // Calculate owner responsibilities
     const ownerPhoneCalls = calculateOwnerPhoneCalls(state);
     const ownerPrintJobs = calculateOwnerPrintJobs(state);
-    
+
     return {
       cash: state.cash,
       revenue: state.cumulativeRevenue,
@@ -791,33 +794,19 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
   }, [gameState, currentDecisions.length]);
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
+    ...commonStyles,
     scrollContent: {
-      padding: 20,
+      padding: StyleTokens.spacing.lg,
     },
     header: {
       alignItems: 'center',
-      marginBottom: 20,
+      marginBottom: StyleTokens.spacing.xl,
     },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-    },
+    // title and subtitle removed as they are in commonStyles
     statusCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 20,
-      marginBottom: 20,
+      ...commonStyles.card,
+      padding: StyleTokens.spacing.lg,
+      marginBottom: StyleTokens.spacing.xl,
     },
     statusRow: {
       flexDirection: 'row',
@@ -834,17 +823,16 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       color: colors.text,
     },
     sectionTitle: {
-      fontSize: 20,
+      fontSize: StyleTokens.fontSize.lg,
       fontWeight: 'bold',
       color: colors.text,
-      marginBottom: 15,
-      marginTop: 10,
+      marginBottom: StyleTokens.spacing.md,
+      marginTop: StyleTokens.spacing.sm,
     },
     decisionCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
+      ...commonStyles.card,
+      padding: StyleTokens.spacing.md,
+      marginBottom: StyleTokens.spacing.sm,
       borderLeftWidth: 4,
     },
     investmentCard: {
@@ -870,16 +858,12 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       marginBottom: 12,
     },
     button: {
-      backgroundColor: colors.primary,
+      ...commonStyles.primaryButton,
       paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 8,
-      alignItems: 'center',
     },
     buttonText: {
-      color: '#fff',
+      ...commonStyles.primaryButtonText,
       fontSize: 16,
-      fontWeight: '600',
     },
     secondaryButton: {
       backgroundColor: colors.border,
@@ -895,10 +879,9 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       fontWeight: '600',
     },
     logCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
+      ...commonStyles.card,
+      padding: StyleTokens.spacing.md,
+      marginBottom: StyleTokens.spacing.xl,
     },
     logText: {
       fontSize: 14,
@@ -926,7 +909,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
   });
 
   if (showSettings) {
-    return <BusinessSimulatorSettings onClose={onCloseSettings || (() => {})} />;
+    return <BusinessSimulatorSettings onClose={onCloseSettings || (() => { })} />;
   }
 
   if (!gameState.gameStarted) {
@@ -1065,8 +1048,8 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
           />
 
           {/* Next Day Button */}
-          <TouchableOpacity 
-            style={styles.button} 
+          <TouchableOpacity
+            style={styles.button}
             onPress={() => {
               const nextDayState = advanceDay(gameState);
               setGameState(nextDayState);
@@ -1108,18 +1091,18 @@ const FinancialStatements: React.FC<{
   previous: FinancialSnapshot;
   colors: any;
 }> = ({ current, previous, colors }) => {
+  const commonStyles = createCommonStyles(colors);
   const styles = StyleSheet.create({
     financialCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
+      ...commonStyles.card,
+      padding: StyleTokens.spacing.md,
+      marginBottom: StyleTokens.spacing.md,
     },
     sectionTitle: {
-      fontSize: 18,
+      fontSize: StyleTokens.fontSize.lg,
       fontWeight: 'bold',
       color: colors.text,
-      marginBottom: 12,
+      marginBottom: StyleTokens.spacing.md,
     },
     financialRow: {
       flexDirection: 'row',

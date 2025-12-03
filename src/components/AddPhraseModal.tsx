@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -12,6 +11,9 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { TranslationService } from '../utils/translation';
+import { CommonModal } from './CommonModal';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
 
 export interface Phrase {
   id: string;
@@ -36,6 +38,7 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
   showSpeakerSelection = true
 }) => {
   const { colors } = useTheme();
+  const commonStyles = createCommonStyles(colors);
   const [spanishText, setSpanishText] = useState('');
   const [englishText, setEnglishText] = useState('');
   const [speaker, setSpeaker] = useState<'friend1' | 'friend2'>(initialSpeaker);
@@ -67,7 +70,7 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
     setSpanishText('');
     setEnglishText('');
     setSpeaker(initialSpeaker);
-    
+
     HapticFeedback.success();
     onClose();
   };
@@ -86,10 +89,10 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
     }
 
     setIsTranslating(true);
-    
+
     try {
       let result;
-      
+
       // Determine translation direction based on which field has text
       if (spanishText.trim() && !englishText.trim()) {
         // Spanish to English
@@ -118,55 +121,30 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
   // Button state logic
   const canAddPhrase = spanishText.trim() && englishText.trim();
   const canLookUp = isNetworkAvailable && (
-    (spanishText.trim() && !englishText.trim()) || 
+    (spanishText.trim() && !englishText.trim()) ||
     (!spanishText.trim() && englishText.trim())
   );
 
   const styles = StyleSheet.create({
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalContent: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 24,
-      width: '90%',
-      maxWidth: 400,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
+    ...commonStyles,
     fieldLabel: {
-      fontSize: 16,
+      fontSize: StyleTokens.fontSize.md,
       fontWeight: '600',
       color: colors.text,
-      marginBottom: 8,
+      marginBottom: StyleTokens.spacing.sm,
     },
     textInput: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: colors.text,
-      backgroundColor: colors.background,
-      marginBottom: 16,
+      ...commonStyles.input,
+      marginBottom: StyleTokens.spacing.md,
     },
     speakerContainer: {
       flexDirection: 'row',
-      marginBottom: 20,
+      marginBottom: StyleTokens.spacing.md,
     },
     speakerButton: {
       flex: 1,
-      padding: 12,
-      borderRadius: 8,
+      padding: StyleTokens.spacing.sm,
+      borderRadius: StyleTokens.borderRadius.md,
       borderWidth: 1,
       borderColor: colors.border,
       marginHorizontal: 4,
@@ -177,7 +155,7 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
       borderColor: colors.primary,
     },
     speakerButtonText: {
-      fontSize: 14,
+      fontSize: StyleTokens.fontSize.sm,
       fontWeight: '600',
       color: colors.text,
     },
@@ -187,12 +165,12 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
     buttonContainer: {
       flexDirection: 'row',
       justifyContent: 'space-around',
+      gap: StyleTokens.spacing.xs,
     },
     button: {
       flex: 1,
-      padding: 12,
-      borderRadius: 8,
-      marginHorizontal: 2,
+      padding: StyleTokens.spacing.sm,
+      borderRadius: StyleTokens.borderRadius.md,
       alignItems: 'center',
     },
     cancelButton: {
@@ -211,7 +189,7 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
       opacity: 0.6,
     },
     buttonText: {
-      fontSize: 16,
+      fontSize: StyleTokens.fontSize.md,
       fontWeight: '600',
     },
     cancelButtonText: {
@@ -226,102 +204,95 @@ const AddPhraseModal: React.FC<AddPhraseModalProps> = ({
   });
 
   return (
-    <Modal
+    <CommonModal
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleCancel}
+      title="Add New Phrase"
+      onClose={handleCancel}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Add New Phrase</Text>
+      <Text style={styles.fieldLabel}>Spanish phrase</Text>
+      <TextInput
+        style={styles.textInput}
+        placeholder="Enter Spanish phrase..."
+        placeholderTextColor={colors.textSecondary}
+        value={spanishText}
+        onChangeText={setSpanishText}
+        multiline
+        autoFocus
+      />
 
-          <Text style={styles.fieldLabel}>Spanish phrase</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter Spanish phrase..."
-            placeholderTextColor={colors.textSecondary}
-            value={spanishText}
-            onChangeText={setSpanishText}
-            multiline
-            autoFocus
-          />
+      <Text style={styles.fieldLabel}>English translation</Text>
+      <TextInput
+        style={styles.textInput}
+        placeholder="Enter English translation..."
+        placeholderTextColor={colors.textSecondary}
+        value={englishText}
+        onChangeText={setEnglishText}
+        multiline
+      />
 
-          <Text style={styles.fieldLabel}>English translation</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter English translation..."
-            placeholderTextColor={colors.textSecondary}
-            value={englishText}
-            onChangeText={setEnglishText}
-            multiline
-          />
-
-          {showSpeakerSelection && (
-            <>
-              <Text style={styles.fieldLabel}>Speaker</Text>
-              <View style={styles.speakerContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.speakerButton,
-                    speaker === 'friend1' && styles.speakerButtonActive
-                  ]}
-                  onPress={() => setSpeaker('friend1')}
-                >
-                  <Text style={[
-                    styles.speakerButtonText,
-                    speaker === 'friend1' && styles.speakerButtonTextActive
-                  ]}>
-                    Friend 1
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.speakerButton,
-                    speaker === 'friend2' && styles.speakerButtonActive
-                  ]}
-                  onPress={() => setSpeaker('friend2')}
-                >
-                  <Text style={[
-                    styles.speakerButtonText,
-                    speaker === 'friend2' && styles.speakerButtonTextActive
-                  ]}>
-                    Friend 2
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          <View style={styles.buttonContainer}>
+      {showSpeakerSelection && (
+        <>
+          <Text style={styles.fieldLabel}>Speaker</Text>
+          <View style={styles.speakerContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={handleCancel}
+              style={[
+                styles.speakerButton,
+                speaker === 'friend1' && styles.speakerButtonActive
+              ]}
+              onPress={() => setSpeaker('friend1')}
             >
-              <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+              <Text style={[
+                styles.speakerButtonText,
+                speaker === 'friend1' && styles.speakerButtonTextActive
+              ]}>
+                Friend 1
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.lookUpButton, !canLookUp && styles.disabledButton]}
-              onPress={handleLookUp}
-              disabled={!canLookUp || isTranslating}
+              style={[
+                styles.speakerButton,
+                speaker === 'friend2' && styles.speakerButtonActive
+              ]}
+              onPress={() => setSpeaker('friend2')}
             >
-              {isTranslating ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <Text style={[styles.buttonText, styles.lookUpButtonText]}>Look Up</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.addButton, !canAddPhrase && styles.disabledButton]}
-              onPress={handleAddPhrase}
-              disabled={!canAddPhrase}
-            >
-              <Text style={[styles.buttonText, styles.addButtonText]}>Add Phrase</Text>
+              <Text style={[
+                styles.speakerButtonText,
+                speaker === 'friend2' && styles.speakerButtonTextActive
+              ]}>
+                Friend 2
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </>
+      )}
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton]}
+          onPress={handleCancel}
+        >
+          <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.lookUpButton, !canLookUp && styles.disabledButton]}
+          onPress={handleLookUp}
+          disabled={!canLookUp || isTranslating}
+        >
+          {isTranslating ? (
+            <ActivityIndicator size="small" color={colors.background} />
+          ) : (
+            <Text style={[styles.buttonText, styles.lookUpButtonText]}>Look Up</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.addButton, !canAddPhrase && styles.disabledButton]}
+          onPress={handleAddPhrase}
+          disabled={!canAddPhrase}
+        >
+          <Text style={[styles.buttonText, styles.addButtonText]}>Add Phrase</Text>
+        </TouchableOpacity>
       </View>
-    </Modal>
+    </CommonModal>
   );
 };
 

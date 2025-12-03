@@ -27,6 +27,8 @@ import { GolfWisdomSpark } from '../sparks/GolfWisdomSpark';
 import WeightTrackerSpark from '../sparks/WeightTrackerSpark';
 import ShareSparks from '../sparks/ShareSparks';
 import ComingUpSpark from '../sparks/ComingUpSpark';
+import { FinalClockSpark } from '../sparks/FinalClockSpark';
+import TripSurveySpark from '../sparks/TripSurveySpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -338,6 +340,30 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.4,
     },
     component: ComingUpSpark,
+  },
+  'final-clock': {
+    metadata: {
+      id: 'final-clock',
+      title: 'Final Clock',
+      description: 'Countdown to your projected death date based on actuarial data',
+      icon: '☠️',
+      category: 'health',
+      createdAt: '2025-12-02T00:00:00.000Z',
+      rating: 4.5,
+    },
+    component: FinalClockSpark,
+  },
+  'trip-survey': {
+    metadata: {
+      id: 'trip-survey',
+      title: 'Trip Survey',
+      description: 'Plan trips with group input and collaborative decision-making',
+      icon: '🧭',
+      category: 'productivity',
+      createdAt: '2025-12-02T00:00:00.000Z',
+      rating: 4.6,
+    },
+    component: TripSurveySpark,
   },
 };
 

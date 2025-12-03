@@ -17,6 +17,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { SettingsContainer, SettingsScrollView, SettingsHeader, SettingsFeedbackSection } from '../components/SettingsComponents';
+import { NotificationService } from '../utils/notifications';
 
 interface Event {
     id: string;
@@ -146,6 +147,57 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                 category,
             };
             setEvents([...events, newEvent]);
+            // Schedule notifications (day before and day of)
+            const eventDateObj = new Date(newEvent.date + 'T08:00:00');
+            const dayBefore = new Date(eventDateObj);
+            dayBefore.setDate(dayBefore.getDate() - 1);
+
+            // Schedule day-before notification
+            NotificationService.scheduleActivityNotification(
+                `${newEvent.title} tomorrow`,
+                dayBefore,
+                `event-${newEvent.id}-before`,
+                `Upcoming ${newEvent.category}`,
+                'coming-up',
+                getCategoryEmoji(newEvent.category)
+            );
+
+            // Schedule day-of notification
+            NotificationService.scheduleActivityNotification(
+                newEvent.title,
+                eventDateObj,
+                `event-${newEvent.id}-day`,
+                newEvent.category.charAt(0).toUpperCase() + newEvent.category.slice(1),
+                'coming-up',
+                getCategoryEmoji(newEvent.category)
+            );
+        }
+
+        if (editingEvent) {
+            // Reschedule notifications for edited event
+            const eventDateObj = new Date(eventDate + 'T08:00:00');
+            const dayBeforeEdit = new Date(eventDateObj);
+            dayBeforeEdit.setDate(dayBeforeEdit.getDate() - 1);
+
+            // Cancel old notifications first (using identifier pattern)
+            // Then schedule new ones
+            NotificationService.scheduleActivityNotification(
+                `${title.trim()} tomorrow`,
+                dayBeforeEdit,
+                `event-${editingEvent.id}-before`,
+                `Upcoming ${category}`,
+                'coming-up',
+                getCategoryEmoji(category)
+            );
+
+            NotificationService.scheduleActivityNotification(
+                title.trim(),
+                eventDateObj,
+                `event-${editingEvent.id}-day`,
+                category.charAt(0).toUpperCase() + category.slice(1),
+                'coming-up',
+                getCategoryEmoji(category)
+            );
         }
 
         handleCloseModal();
@@ -160,8 +212,10 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             {
                 text: 'Delete',
                 style: 'destructive',
-                onPress: () => {
+                onPress: async () => {
                     setEvents(events.filter(e => e.id !== editingEvent.id));
+                    // Note: Notifications will auto-expire if time has passed
+                    // No cancel method needed since we use activity identifiers
                     handleCloseModal();
                     HapticFeedback.medium();
                 }

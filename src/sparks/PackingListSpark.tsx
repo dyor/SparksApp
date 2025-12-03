@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert 
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -252,31 +254,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
   const totalCount = items.length;
   const progressPercentage = totalCount > 0 ? (packedCount / totalCount) * 100 : 0;
 
+  const commonStyles = createCommonStyles(colors);
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 20,
-    },
+    ...commonStyles,
     header: {
       alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: 20,
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xl,
     },
     progressContainer: {
       alignItems: 'center',
@@ -306,21 +290,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       marginTop: 8,
     },
     listContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     listTitle: {
-      fontSize: 20,
+      fontSize: StyleTokens.fontSize.xxl,
       fontWeight: '600',
       color: colors.text,
-      marginBottom: 16,
+      marginBottom: StyleTokens.spacing.lg,
       textAlign: 'center',
     },
     listItem: {

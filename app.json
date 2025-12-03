@@ -36,7 +36,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "@react-native-firebase/app"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -63,6 +64,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mattdyor.sparks",
       "buildNumber": "1.0.4",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "requireFullScreen": false,
       "infoPlist": {
         "UIBackgroundModes": [

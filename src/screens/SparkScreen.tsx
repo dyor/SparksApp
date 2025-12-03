@@ -156,7 +156,11 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleClose = () => {
     HapticFeedback.light();
-    navigation.goBack();
+    // Always navigate to the Home screen (MySparks list)
+    // This ensures we don't go back to Marketplace/Discover if we came from there
+    (navigation as any).navigate('MySparks', {
+      screen: 'MySparksList',
+    });
   };
 
 

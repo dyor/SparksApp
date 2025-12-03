@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
+import { CommonModal } from '../components/CommonModal';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -530,66 +533,26 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     });
   };
 
+  const commonStyles = createCommonStyles(colors);
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 20,
-    },
+    ...commonStyles,
     header: {
       alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: 20,
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xl,
     },
     addSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     addRow: {
       flexDirection: 'row',
       gap: 12,
     },
     taskInput: {
-      backgroundColor: colors.background,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: colors.text,
+      ...commonStyles.input,
     },
     categoriesSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     categoryChips: {
       flexDirection: 'row',
@@ -626,22 +589,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       color: '#fff',
     },
     todosSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    sectionTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 16,
-      textAlign: 'center',
+      ...commonStyles.card,
     },
     todoItem: {
       flexDirection: 'row',
@@ -999,134 +947,125 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       </View>
 
       {/* Edit Task Modal */}
-      <Modal
+      <CommonModal
         visible={editModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Todo</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Task text"
-              placeholderTextColor={colors.textSecondary}
-              value={editText}
-              onChangeText={setEditText}
-              multiline={true}
-              onSubmitEditing={saveEditedTask}
-              returnKeyType="done"
-              blurOnSubmit={true}
-              onKeyPress={(e) => {
-                if (e.nativeEvent.key === 'Enter') {
-                  saveEditedTask();
-                }
-              }}
-            />
-
-            {/* Done Toggle */}
-            <View style={styles.doneToggleSection}>
-              <Text style={styles.doneToggleLabel}>Done</Text>
-              <TouchableOpacity
-                style={[styles.doneToggle, editCompleted && styles.doneToggleActive]}
-                onPress={() => setEditCompleted(!editCompleted)}
-              >
-                <Text style={[styles.doneToggleText, editCompleted && styles.doneToggleTextActive]}>
-                  {editCompleted ? '✓' : ''}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.quickDateSection}>
-              <Text style={styles.quickDateTitle}>Due Date</Text>
-              <View style={styles.quickDateButtons}>
-                {(() => {
-                  const today = new Date();
-                  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-
-                  // Build base options
-                  const baseOptions = [
-                    { label: 'Today', days: 0 },
-                    { label: '+1 Day', days: 1 },
-                    { label: '+1 Week', days: 7 },
-                  ];
-
-                  // Add logical date buttons based on current day
-                  const logicalOptions: Array<{ label: string; days: number }> = [];
-
-                  // If Monday (1) to Thursday (4), add Saturday button
-                  if (dayOfWeek >= 1 && dayOfWeek <= 4) {
-                    const daysUntilSaturday = 6 - dayOfWeek; // Saturday is day 6
-                    logicalOptions.push({ label: 'Saturday', days: daysUntilSaturday });
-                  }
-                  // If Saturday (6), add Monday button
-                  else if (dayOfWeek === 6) {
-                    const daysUntilMonday = 8 - dayOfWeek; // Monday is day 1, so 8 - 6 = 2 days
-                    logicalOptions.push({ label: 'Monday', days: daysUntilMonday });
-                  }
-
-                  // Combine base options with logical options
-                  const allOptions = [...baseOptions, ...logicalOptions];
-
-                  return allOptions.map((option) => {
-                    const optionDate = new Date();
-                    optionDate.setDate(optionDate.getDate() + option.days);
-                    const optionDateString = optionDate.toISOString().split('T')[0];
-                    const isSelected = selectedDate === optionDateString;
-
-                    return (
-                      <TouchableOpacity
-                        key={option.label}
-                        style={[styles.quickDateButton, isSelected && styles.selectedDateButton]}
-                        onPress={() => selectQuickDate(option.days)}
-                      >
-                        <Text style={[styles.quickDateButtonText, isSelected && styles.selectedDateButtonText]}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  });
-                })()}
-              </View>
-
-              {/* Manual Date Input */}
-              <Text style={styles.manualDateLabel}>Or enter date manually (YYYY-MM-DD):</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="2024-12-25"
-                placeholderTextColor={colors.textSecondary}
-                value={selectedDate}
-                onChangeText={setSelectedDate}
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setEditModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={deleteEditedTask}
-              >
-                <Text style={styles.deleteButtonText}>✕</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={saveEditedTask}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+        title="Edit Todo"
+        onClose={() => setEditModalVisible(false)}
+        footer={
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setEditModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: colors.error }]}
+              onPress={deleteEditedTask}
+            >
+              <Text style={styles.saveButtonText}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.saveButton]}
+              onPress={saveEditedTask}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
           </View>
+        }
+      >
+        <TextInput
+          style={styles.modalInput}
+          placeholder="Task text"
+          placeholderTextColor={colors.textSecondary}
+          value={editText}
+          onChangeText={setEditText}
+          multiline={true}
+          onSubmitEditing={saveEditedTask}
+          returnKeyType="done"
+          blurOnSubmit={true}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === 'Enter') {
+              saveEditedTask();
+            }
+          }}
+        />
+
+        {/* Done Toggle */}
+        <View style={styles.doneToggleSection}>
+          <Text style={styles.doneToggleLabel}>Done</Text>
+          <TouchableOpacity
+            style={[styles.doneToggle, editCompleted && styles.doneToggleActive]}
+            onPress={() => setEditCompleted(!editCompleted)}
+          >
+            <Text style={[styles.doneToggleText, editCompleted && styles.doneToggleTextActive]}>
+              {editCompleted ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+
+        <View style={styles.quickDateSection}>
+          <Text style={styles.quickDateTitle}>Due Date</Text>
+          <View style={styles.quickDateButtons}>
+            {(() => {
+              const today = new Date();
+              const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+              // Build base options
+              const baseOptions = [
+                { label: 'Today', days: 0 },
+                { label: '+1 Day', days: 1 },
+                { label: '+2 Days', days: 2 },
+                { label: '+3 Days', days: 3 },
+                { label: '+1 Week', days: 7 },
+              ];
+
+              // Add "Next Monday" if today is not Monday
+              if (dayOfWeek !== 1) {
+                const daysUntilMonday = (8 - dayOfWeek) % 7;
+                baseOptions.push({ label: 'Next Monday', days: daysUntilMonday });
+              }
+
+              return baseOptions.map((option) => {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() + option.days);
+                const dateString = targetDate.toISOString().split('T')[0];
+                const isSelected = selectedDate === dateString;
+
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[
+                      styles.quickDateButton,
+                      isSelected && styles.selectedDateButton,
+                    ]}
+                    onPress={() => selectQuickDate(option.days)}
+                  >
+                    <Text
+                      style={[
+                        styles.quickDateButtonText,
+                        isSelected && styles.selectedDateButtonText,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              });
+            })()}
+          </View>
+
+          {/* Manual Date Input */}
+          <Text style={styles.manualDateLabel}>Or enter date manually (YYYY-MM-DD):</Text>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="2024-12-25"
+            placeholderTextColor={colors.textSecondary}
+            value={selectedDate}
+            onChangeText={setSelectedDate}
+          />
+        </View>
+      </CommonModal>
     </ScrollView>
   );
 };
