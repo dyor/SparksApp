@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -580,7 +580,7 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
 
   const handleManualScoreSave = () => {
     const score = parseInt(manualScoreInput);
-    if (isNaN(score) || score < 0) {
+    if (isNaN(score)) {
       Alert.alert('Error', 'Please enter a valid score');
       return;
     }
@@ -589,6 +589,21 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
   };
 
   const handleCancelScore = () => {
+    if (!activeGame) return;
+    
+    // If we've started entering scores for this round, remove the entire round
+    if (currentPlayerIndex > 0) {
+      const updatedRounds = [...activeGame.rounds];
+      // Remove the last round if it exists (the one we were working on)
+      if (updatedRounds.length > 0) {
+        updatedRounds.pop();
+        setActiveGame({
+          ...activeGame,
+          rounds: updatedRounds,
+        });
+      }
+    }
+    
     setShowAddRoundModal(false);
     setCurrentPlayerIndex(0);
     setManualScoreInput('');
@@ -652,7 +667,7 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
 
   // Get color for player based on index
   const getPlayerColor = (index: number): string => {
-    const colors = ['#007AFF', '#FF3B30', '#FF9500', '#AF52DE']; // Blue, Red, Orange, Purple
+    const colors = ['#AF52DE', '#FF3B30', '#FF9500', '#007AFF']; // Purple, Red, Orange, Blue
     return colors[index % colors.length];
   };
 
@@ -733,13 +748,28 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
     tableHeader: {
       flexDirection: 'row',
       backgroundColor: colors.primary,
-      paddingVertical: 12,
+      paddingVertical: 8,
       paddingHorizontal: 8,
+      minHeight: 60,
+      alignItems: 'center',
     },
     tableHeaderText: {
       color: '#fff',
       fontWeight: '600',
       fontSize: 14,
+      textAlign: 'center',
+    },
+    tableHeaderTextRotated: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 12,
+      transform: [{ rotate: '-90deg' }],
+    },
+    tableHeaderCellRotated: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: 50,
+      paddingVertical: 8,
     },
     tableRow: {
       flexDirection: 'row',
@@ -755,12 +785,12 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
       borderBottomColor: colors.border,
     },
     tableCell: {
-      flex: 1,
       fontSize: 14,
       color: colors.text,
     },
     tableCellLabel: {
       fontWeight: '600',
+      textAlign: 'left',
     },
     tableCellValue: {
       textAlign: 'center',
@@ -842,6 +872,20 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
     manualInputRow: {
       flexDirection: 'row',
       gap: 8,
+      alignItems: 'center',
+    },
+    signButton: {
+      width: 44,
+      height: 44,
+      backgroundColor: colors.border,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    signButtonText: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
     },
     manualInput: {
       flex: 1,
@@ -919,62 +963,88 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
             <View style={styles.scoreTable}>
               {/* Header */}
               <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderText, { width: 80 }]}>Round</Text>
-                {playerSet.players.map((player, playerIndex) => (
-                  <Text 
-                    key={player} 
-                    style={[
-                      styles.tableHeaderText, 
-                      { width: 100 }
-                    ]}
-                  >
-                    {player}
-                  </Text>
-                ))}
+                <Text style={[styles.tableHeaderText, { width: 60, textAlign: 'left' }]}>Round</Text>
+                {playerSet.players.map((player, playerIndex) => {
+                  const shouldRotate = playerSet.players.length > 2;
+                  const columnWidth = shouldRotate ? 50 : 70;
+                  
+                  if (shouldRotate) {
+                    return (
+                      <View 
+                        key={player} 
+                        style={[styles.tableHeaderCellRotated, { width: columnWidth }]}
+                      >
+                        <Text style={styles.tableHeaderTextRotated}>
+                          {player}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  return (
+                    <Text 
+                      key={player} 
+                      style={[
+                        styles.tableHeaderText, 
+                        { width: columnWidth, textAlign: 'center' }
+                      ]}
+                    >
+                      {player}
+                    </Text>
+                  );
+                })}
               </View>
 
               {/* Total Row (Sticky) */}
               <View style={[styles.tableRow, styles.tableRowTotal]}>
-                <Text style={[styles.tableCell, styles.tableCellLabel, { width: 80 }]}>Total</Text>
-                {playerSet.players.map((player, playerIndex) => (
-                  <Text 
-                    key={player} 
-                    style={[
-                      styles.tableCell, 
-                      styles.tableCellValue, 
-                      { width: 100, color: getPlayerColor(playerIndex), fontWeight: 'bold' }
-                    ]}
-                  >
-                    {totals[player] || 0}
-                  </Text>
-                ))}
+                <Text style={[styles.tableCell, styles.tableCellLabel, { width: 60 }]}>Total</Text>
+                {playerSet.players.map((player, playerIndex) => {
+                  const columnWidth = playerSet.players.length > 2 ? 50 : 70;
+                  return (
+                    <Text 
+                      key={player} 
+                      style={[
+                        styles.tableCell, 
+                        styles.tableCellValue, 
+                        { width: columnWidth, color: getPlayerColor(playerIndex), fontWeight: 'bold' }
+                      ]}
+                    >
+                      {totals[player] || 0}
+                    </Text>
+                  );
+                })}
               </View>
 
               {/* Round Rows */}
               {reversedRounds.length === 0 ? (
                 <View style={styles.tableRow}>
-                  <Text style={[styles.tableCell, { width: 80 + (playerSet.players.length * 100) }]}>
+                  <Text style={[styles.tableCell, { 
+                    width: 60 + (playerSet.players.length * (playerSet.players.length > 2 ? 50 : 70)) 
+                  }]}>
                     No rounds yet. Tap "Add Round" to start!
                   </Text>
                 </View>
               ) : (
                 reversedRounds.map((round, index) => (
                   <View key={index} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, styles.tableCellLabel, { width: 80 }]}>
+                    <Text style={[styles.tableCell, styles.tableCellLabel, { width: 60 }]}>
                       Round {activeGame.rounds.length - index}
                     </Text>
-                    {playerSet.players.map((player, playerIndex) => (
-                      <Text 
-                        key={player} 
-                        style={[
-                          styles.tableCell, 
-                          styles.tableCellValue, 
-                          { width: 100, color: getPlayerColor(playerIndex) }
-                        ]}
-                      >
-                        {round[player] || 0}
-                      </Text>
-                    ))}
+                    {playerSet.players.map((player, playerIndex) => {
+                      const columnWidth = playerSet.players.length > 2 ? 50 : 70;
+                      return (
+                        <Text 
+                          key={player} 
+                          style={[
+                            styles.tableCell, 
+                            styles.tableCellValue, 
+                            { width: columnWidth, color: getPlayerColor(playerIndex) }
+                          ]}
+                        >
+                          {round[player] || 0}
+                        </Text>
+                      );
+                    })}
                   </View>
                 ))
               )}
@@ -1002,53 +1072,80 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
 
         {/* Add Round Modal */}
         <Modal visible={showAddRoundModal} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>
-                Enter Score for {playerSet.players[currentPlayerIndex]}:
-              </Text>
+          <KeyboardAvoidingView
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>
+                  Enter Score for {playerSet.players[currentPlayerIndex]}:
+                </Text>
 
-              <View style={styles.scoreButtonGrid}>
-                {Array.from({ length: 24 }, (_, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.scoreButton, { backgroundColor: getPlayerColor(currentPlayerIndex) }]}
-                    onPress={() => handleScoreButtonPress(i)}
-                  >
-                    <Text style={styles.scoreButtonText}>{i}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                <View style={styles.scoreButtonGrid}>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.scoreButton, { backgroundColor: getPlayerColor(currentPlayerIndex) }]}
+                      onPress={() => handleScoreButtonPress(i)}
+                    >
+                      <Text style={styles.scoreButtonText}>{i}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              <View style={styles.manualInputContainer}>
-                <Text style={styles.manualInputLabel}>Or enter score:</Text>
-                <View style={styles.manualInputRow}>
-                  <TextInput
-                    style={styles.manualInput}
-                    placeholder="Score > 24"
-                    placeholderTextColor={colors.textSecondary}
-                    value={manualScoreInput}
-                    onChangeText={setManualScoreInput}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.modalButtonRow}>
-                  <TouchableOpacity
-                    style={[styles.cancelButton, { flex: 1 }]}
-                    onPress={handleCancelScore}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.saveButton, { flex: 1, backgroundColor: getPlayerColor(currentPlayerIndex) }]}
-                    onPress={handleManualScoreSave}
-                  >
-                    <Text style={styles.saveButtonText}>Save</Text>
-                  </TouchableOpacity>
+                <View style={styles.manualInputContainer}>
+                  <Text style={styles.manualInputLabel}>Or enter score:</Text>
+                  <View style={styles.manualInputRow}>
+                    <TouchableOpacity
+                      style={styles.signButton}
+                      onPress={() => {
+                        if (manualScoreInput.startsWith('-')) {
+                          setManualScoreInput(manualScoreInput.substring(1));
+                        } else {
+                          setManualScoreInput('-' + manualScoreInput);
+                        }
+                      }}
+                    >
+                      <Text style={styles.signButtonText}>±</Text>
+                    </TouchableOpacity>
+                    <TextInput
+                      style={styles.manualInput}
+                      placeholder="Score"
+                      placeholderTextColor={colors.textSecondary}
+                      value={manualScoreInput}
+                      onChangeText={(text) => {
+                        // Allow negative sign and numbers
+                        if (text === '' || text === '-' || /^-?\d*$/.test(text)) {
+                          setManualScoreInput(text);
+                        }
+                      }}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                  <View style={styles.modalButtonRow}>
+                    <TouchableOpacity
+                      style={[styles.cancelButton, { flex: 1 }]}
+                      onPress={handleCancelScore}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.saveButton, { flex: 1, backgroundColor: '#007AFF' }]}
+                      onPress={handleManualScoreSave}
+                    >
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     );
