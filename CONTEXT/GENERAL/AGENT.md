@@ -188,6 +188,7 @@ npx expo start     # Expo development server
 npx expo start --ios    # iOS simulator
 npx expo start --android # Android emulator
 ```
+Instructions for developers are available in the `CONTRIBUTING.md` file. 
 
 ## 📋 **Current Status & Known Issues**
 
