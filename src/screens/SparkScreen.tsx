@@ -32,6 +32,16 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [showSparkSettings, setShowSparkSettings] = useState(false);
   const [showQuickSwitch, setShowQuickSwitch] = useState(false);
+  const [sparkDarkMode, setSparkDarkMode] = useState(false);
+
+  // Reset dark mode when leaving the spark
+  useEffect(() => {
+    return () => {
+      if (sparkId === 'final-clock') {
+        setSparkDarkMode(false);
+      }
+    };
+  }, [sparkId]);
 
   const styles = StyleSheet.create({
     container: {
@@ -59,9 +69,9 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       flexDirection: 'row',
       paddingHorizontal: 16,
       paddingVertical: 8,
-      backgroundColor: colors.surface,
+      backgroundColor: sparkDarkMode ? '#000000' : colors.surface,
       borderTopWidth: 1,
-      borderTopColor: colors.border,
+      borderTopColor: sparkDarkMode ? '#333333' : colors.border,
       justifyContent: 'space-around',
       alignItems: 'center',
       height: 60,
@@ -92,34 +102,34 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     },
     // Button colors
     closeIcon: {
-      color: colors.textSecondary,
+      color: sparkDarkMode ? '#666666' : colors.textSecondary,
     },
     closeLabel: {
-      color: colors.textSecondary,
+      color: sparkDarkMode ? '#666666' : colors.textSecondary,
     },
     addIcon: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
     addLabel: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
     quickSwitchIcon: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
     quickSwitchLabel: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
     recentSparkIcon: {
-      color: colors.textSecondary,
+      color: sparkDarkMode ? '#666666' : colors.textSecondary,
     },
     recentSparkLabel: {
-      color: colors.textSecondary,
+      color: sparkDarkMode ? '#666666' : colors.textSecondary,
     },
     settingsIcon: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
     settingsLabel: {
-      color: colors.primary,
+      color: sparkDarkMode ? '#666666' : colors.primary,
     },
   });
 
@@ -131,6 +141,8 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
   useEffect(() => {
     setCurrentSparkId(sparkId);
+    // Reset dark mode when spark changes
+    setSparkDarkMode(false);
 
     if (spark) {
       // Update play count when spark is accessed
@@ -151,11 +163,15 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
     return () => {
       setCurrentSparkId(null);
+      // Reset dark mode when leaving spark
+      setSparkDarkMode(false);
     };
   }, [sparkId, spark, setCurrentSparkId, updateSparkProgress, addRecentSpark]);
 
   const handleClose = () => {
     HapticFeedback.light();
+    // Reset dark mode when navigating away
+    setSparkDarkMode(false);
     // Always navigate to the Home screen (MySparks list)
     // This ensures we don't go back to Marketplace/Discover if we came from there
     (navigation as any).navigate('MySparks', {
@@ -236,6 +252,10 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             onStateChange: (state: any) => {
               // Handle spark state changes
               console.log('Spark state changed:', state);
+              // Handle dark mode for final-clock spark
+              if (sparkId === 'final-clock' && state.darkMode !== undefined) {
+                setSparkDarkMode(state.darkMode);
+              }
             },
             onComplete: (result: any) => {
               // Handle spark completion

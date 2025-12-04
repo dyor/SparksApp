@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Easing, View, TouchableOpacity, StyleSheet } from 'react-native';
-import { NavigationContainer, useNavigation, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, useNavigation, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { useTheme } from '../contexts/ThemeContext';
@@ -139,6 +139,62 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
     return null;
   }
 
+  // Check if we're currently on a Spark screen
+  const isOnSparkScreen = () => {
+    for (const route of state.routes) {
+      const routeState = route.state;
+      if (routeState && routeState.routes && routeState.routes.length > 0 && typeof routeState.index === 'number') {
+        const focusedRoute = routeState.routes[routeState.index];
+        if (focusedRoute && focusedRoute.name === 'Spark') {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const onSparkScreen = isOnSparkScreen();
+  
+  // Check if we're on a Spark screen within a specific tab's stack
+  const isOnSparkScreenInTab = (tabName: string) => {
+    const tabRoute = state.routes.find(r => r.name === tabName);
+    if (!tabRoute) return false;
+    const routeState = tabRoute.state;
+    if (routeState && routeState.routes && routeState.routes.length > 0 && typeof routeState.index === 'number') {
+      const focusedRoute = routeState.routes[routeState.index];
+      return focusedRoute && focusedRoute.name === 'Spark';
+    }
+    return false;
+  };
+  
+  // Get the most recent spark (excluding current if on a spark screen)
+  const getMostRecentSpark = () => {
+    if (recentSparks.length === 0) return null;
+    
+    if (onSparkScreen) {
+      // Get current spark ID from navigation state
+      let currentSparkId: string | null = null;
+      for (const route of state.routes) {
+        const routeState = route.state;
+        if (routeState && routeState.routes && routeState.routes.length > 0 && typeof routeState.index === 'number') {
+          const focusedRoute = routeState.routes[routeState.index];
+          if (focusedRoute && focusedRoute.name === 'Spark' && focusedRoute.params) {
+            currentSparkId = (focusedRoute.params as any).sparkId;
+            break;
+          }
+        }
+      }
+      
+      // Return the most recent spark that's not the current one
+      const otherSparks = recentSparks.filter(id => id !== currentSparkId);
+      return otherSparks.length > 0 ? otherSparks[0] : null;
+    }
+    
+    return recentSparks[0];
+  };
+
+  const mostRecentSpark = getMostRecentSpark();
+
   const handleQuickSwitch = () => {
     HapticFeedback.light();
     setShowQuickSwitch(true);
@@ -201,6 +257,48 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
           const isFocused = state.index === index;
 
           const onPress = () => {
+            // Special handling for Marketplace tab when on a spark screen
+            if (route.name === 'Marketplace' && onSparkScreen && mostRecentSpark) {
+              // Navigate to the most recent spark instead of Marketplace
+              const targetSpark = getSparkById(mostRecentSpark);
+              if (targetSpark) {
+                navigation.navigate('MySparks', {
+                  screen: 'Spark',
+                  params: { sparkId: mostRecentSpark },
+                });
+              }
+              return;
+            }
+
+            // Special handling for Home tab when on a spark screen - always go to root
+            if (route.name === 'MySparks' && isOnSparkScreenInTab('MySparks')) {
+              const routeState = state.routes[index]?.state;
+              if (routeState && routeState.routes && routeState.routes.length > 0) {
+                const rootScreenName = routeState.routes[0].name;
+                // Check if we're already at root
+                if (typeof routeState.index === 'number' && routeState.index === 0) {
+                  // Already at root - do nothing
+                  return;
+                }
+                // Prevent default tab press behavior and navigate to root
+                navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                // Use CommonActions to navigate to root, which properly handles stack navigation
+                navigation.dispatch(
+                  CommonActions.navigate({
+                    name: route.name,
+                    params: {
+                      screen: rootScreenName,
+                    },
+                  })
+                );
+                return;
+              }
+            }
+
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -208,23 +306,40 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
             });
 
             if (!isFocused && !event.defaultPrevented) {
+              // Not focused - navigate to this tab
               navigation.navigate(route.name as any);
             } else if (isFocused && !event.defaultPrevented) {
               // Tab is already focused - check if we're in a nested stack
               const routeState = state.routes[index]?.state;
-              if (routeState && routeState.index > 0) {
-                // We're in a nested stack, pop to root
+              if (routeState && routeState.routes && routeState.routes.length > 0 && typeof routeState.index === 'number') {
+                // Check if we're already at the root screen
+                if (routeState.index === 0) {
+                  // Already at root - do nothing to prevent unnecessary transitions
+                  return;
+                }
+                // We're in a nested stack, navigate to root
                 const rootScreenName = routeState.routes[0].name;
                 navigation.navigate(route.name as any, {
                   screen: rootScreenName,
                 });
               }
-              // If already at root, do nothing - this prevents the visual re-navigation
+              // If no route state or index is undefined, we're already at root - do nothing
             }
           };
 
-          const icon = route.name === 'MySparks' ? '🏠' : route.name === 'Marketplace' ? '🔎' : '⚙️';
-          const label = route.name === 'MySparks' ? 'Home' : route.name === 'Marketplace' ? 'Discover' : 'Settings';
+          // Determine icon and label for Marketplace tab based on context
+          let icon = route.name === 'MySparks' ? '🏠' : route.name === 'Marketplace' ? '🔎' : '⚙️';
+          let label = route.name === 'MySparks' ? 'Home' : route.name === 'Marketplace' ? 'Discover' : 'Settings';
+          
+          if (route.name === 'Marketplace') {
+            if (onSparkScreen && mostRecentSpark) {
+              icon = '∞';
+              label = 'Recent';
+            } else {
+              icon = '🔎';
+              label = 'Discover';
+            }
+          }
 
           return (
             <React.Fragment key={route.key}>

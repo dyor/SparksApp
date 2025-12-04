@@ -677,13 +677,6 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setEditingCard(null);
     setShowEditModal(false);
     HapticFeedback.success();
-
-    // Notify user that change will apply immediately
-    Alert.alert(
-      'Card Updated',
-      'The card has been updated. Changes are applied immediately.',
-      [{ text: 'OK' }]
-    );
   };
 
   const handleDeleteCardDuringSession = () => {

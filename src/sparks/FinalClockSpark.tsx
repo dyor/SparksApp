@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Dimensions } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -14,6 +14,7 @@ import {
 interface FinalClockSparkProps {
     showSettings?: boolean;
     onCloseSettings?: () => void;
+    onStateChange?: (state: any) => void;
 }
 
 type Gender = 'male' | 'female' | null;
@@ -28,10 +29,11 @@ interface TimeRemaining {
     hours: number;
     minutes: number;
     seconds: number;
+    decaseconds: number; // tenths of seconds
     totalDays: number;
 }
 
-export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings = false, onCloseSettings }) => {
+export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings = false, onCloseSettings, onStateChange }) => {
     const { colors } = useTheme();
     const { getSparkData, setSparkData } = useSparkStore();
 
@@ -49,11 +51,12 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
     const [isSetup, setIsSetup] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [storedAge, setStoredAge] = useState<number | null>(null);
+    const [darkMode, setDarkMode] = useState(false);
 
-    // Load saved death date
+    // Load saved death date and dark mode preference
     useEffect(() => {
-        const loadData = async () => {
-            const data = await getSparkData('final-clock');
+        const loadData = () => {
+            const data = getSparkData('final-clock');
             if (data?.deathDate) {
                 setDeathDate(new Date(data.deathDate));
                 if (data?.age) {
@@ -61,17 +64,25 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
                 }
                 setIsSetup(true);
             }
+            if (data?.darkMode !== undefined) {
+                setDarkMode(data.darkMode);
+            }
         };
         loadData();
     }, []);
 
-    // Update countdown every second
+    // Notify parent about dark mode state
+    useEffect(() => {
+        onStateChange?.({ darkMode });
+    }, [darkMode, onStateChange]);
+
+    // Update countdown every 100ms for decaseconds (tenths of seconds)
     useEffect(() => {
         if (!deathDate) return;
 
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 1000);
+        }, 100); // Update every 100ms for decaseconds
 
         return () => clearInterval(timer);
     }, [deathDate]);
@@ -92,12 +103,15 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
                 hours: 0,
                 minutes: 0,
                 seconds: 0,
+                decaseconds: 0,
                 totalDays: 0,
             });
             return;
         }
 
-        const seconds = Math.floor(diff / 1000);
+        const totalMilliseconds = diff;
+        const decaseconds = Math.floor((totalMilliseconds % 1000) / 100); // tenths of seconds
+        const seconds = Math.floor(totalMilliseconds / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
         const days = Math.floor(hours / 24);
@@ -111,6 +125,7 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
             hours: hours % 24,
             minutes: minutes % 60,
             seconds: seconds % 60,
+            decaseconds,
             totalDays: days,
         });
     }, [currentTime, deathDate]);
@@ -218,6 +233,16 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
 
     const formatNumber = (num: number): string => {
         return num.toString().padStart(2, '0');
+    };
+
+    const toggleDarkMode = () => {
+        const newDarkMode = !darkMode;
+        setDarkMode(newDarkMode);
+        setSparkData('final-clock', { 
+            ...getSparkData('final-clock'),
+            darkMode: newDarkMode 
+        });
+        HapticFeedback.light();
     };
 
     const styles = StyleSheet.create({
@@ -397,24 +422,62 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
         },
     });
 
-    const renderSettings = () => (
-        <SettingsContainer>
-            <SettingsScrollView>
-                <SettingsHeader
-                    title="Final Clock Settings"
-                    subtitle="Manage your life expectancy calculations"
-                    icon="☠️"
-                    sparkId="final-clock"
-                />
-                
-                <SettingsFeedbackSection sparkName="Final Clock" sparkId="final-clock" />
-                
-                <TouchableOpacity style={styles.closeButton} onPress={onCloseSettings}>
-                    <Text style={styles.closeButtonText}>Close</Text>
-                </TouchableOpacity>
-            </SettingsScrollView>
-        </SettingsContainer>
-    );
+    const renderSettings = () => {
+        const data = getSparkData('final-clock');
+        const currentDarkMode = data?.darkMode || false;
+
+        return (
+            <SettingsContainer>
+                <SettingsScrollView>
+                    <SettingsHeader
+                        title="Final Clock Settings"
+                        subtitle="Manage your life expectancy calculations"
+                        icon="☠️"
+                        sparkId="final-clock"
+                    />
+                    
+                    <SettingsFeedbackSection sparkName="Final Clock" sparkId="final-clock" />
+                    
+                    <View style={[styles.formGroup, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 }]}>
+                        <Text style={styles.label}>Dark Mode</Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                const newDarkMode = !currentDarkMode;
+                                setDarkMode(newDarkMode);
+                                setSparkData('final-clock', { 
+                                    ...data,
+                                    darkMode: newDarkMode 
+                                });
+                                HapticFeedback.light();
+                            }}
+                            style={{
+                                width: 50,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: currentDarkMode ? colors.primary : colors.border,
+                                justifyContent: 'center',
+                                paddingHorizontal: 2,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    backgroundColor: '#fff',
+                                    transform: [{ translateX: currentDarkMode ? 20 : 0 }],
+                                }}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                    
+                    <TouchableOpacity style={styles.closeButton} onPress={onCloseSettings}>
+                        <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                </SettingsScrollView>
+            </SettingsContainer>
+        );
+    };
 
     if (showSettings) {
         return renderSettings();
@@ -595,6 +658,129 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference * (1 - timeRemainingPercent);
 
+    // Dark mode styles
+    const darkModeStyles = StyleSheet.create({
+        container: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#000000',
+        },
+        darkModeText: {
+            fontSize: 30,
+            fontWeight: '900',
+            color: '#FF0000',
+            fontFamily: 'monospace',
+            textShadowColor: '#FF0000',
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 40,
+            letterSpacing: 2,
+            lineHeight: 40,
+            flexShrink: 0,
+            includeFontPadding: false,
+            textAlign: 'center',
+        },
+        darkModeTextWrapper: {
+            position: 'absolute',
+            left: 100, // Space for button
+            top: 0,
+            width: Dimensions.get('window').width - 100,
+            height: Dimensions.get('window').height,
+            justifyContent: 'flex-start',
+            alignItems: 'flex-start',
+            paddingTop: 20,
+        },
+        darkModeTextContainer: {
+            width: Dimensions.get('window').height - 200, // Full screen height minus padding
+            minHeight: 50, // Minimum height for text
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        darkModeContainer: {
+            flex: 1,
+            backgroundColor: '#000000',
+            width: '100%',
+            overflow: 'visible',
+        },
+        darkModeButton: {
+            backgroundColor: '#333333',
+            padding: 16,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 60,
+            minHeight: 60,
+        },
+        darkModeButtonContainer: {
+            position: 'absolute',
+            left: 20,
+            top: '50%',
+            transform: [{ translateY: -30 }, { rotate: '90deg' }],
+            zIndex: 10,
+        },
+        darkModeButtonText: {
+            fontSize: 24,
+            fontWeight: '600',
+            color: '#FFFFFF',
+        },
+    });
+
+    // Dark mode display
+    if (darkMode && isSetup && timeRemaining) {
+        const screenWidth = Dimensions.get('window').width;
+        const screenHeight = Dimensions.get('window').height;
+        
+        // Position text on left side (top when rotated 90deg)
+        // Position at top-left, rotate 90deg, translate to visible position
+        // After rotation: element's left becomes bottom, top becomes right
+        // We want it on the left side, so position at top and translate after rotation
+        const textWidth = screenHeight - 200;
+        const textHeight = 50;
+        
+        // Rotate around top-left corner, then translate to visible area
+        // After rotation, translate down (positive Y) to bring it into view
+        // The rotation happens around the element's center, so we need to account for that
+        const textTransform = [
+            { rotate: '90deg' },
+            { translateX: screenWidth - textHeight / 2 }, // Move to right edge
+            { translateY: screenHeight / 2 - textWidth / 2 } // Center vertically (becomes horizontal when rotated)
+        ];
+        
+        return (
+            <View style={darkModeStyles.container}>
+                <View style={darkModeStyles.darkModeContainer}>
+                    <View style={darkModeStyles.darkModeTextWrapper}>
+                        <View style={[
+                            darkModeStyles.darkModeTextContainer,
+                            { transform: textTransform }
+                        ]}>
+                            <Text 
+                                style={darkModeStyles.darkModeText}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit={false}
+                            >
+                                {timeRemaining.years.toString().padStart(2, '0')}:
+                                {timeRemaining.months.toString().padStart(3, '0')}:
+                                {timeRemaining.days.toString().padStart(2, '0')}:
+                                {timeRemaining.hours.toString().padStart(2, '0')}:
+                                {timeRemaining.minutes.toString().padStart(2, '0')}:
+                                {timeRemaining.seconds.toString().padStart(2, '0')}:
+                                {timeRemaining.decaseconds}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+                <View style={darkModeStyles.darkModeButtonContainer}>
+                    <TouchableOpacity style={darkModeStyles.darkModeButton} onPress={toggleDarkMode}>
+                        <Text style={darkModeStyles.darkModeButtonText}>🔥</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={styles.countdownContainer}>
@@ -660,9 +846,16 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
                     </View>
                 )}
 
-                <TouchableOpacity style={styles.editButton} onPress={handleRecalculate}>
-                    <Text style={styles.editButtonText}>Recalculate</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
+                    <TouchableOpacity style={styles.editButton} onPress={handleRecalculate}>
+                        <Text style={styles.editButtonText}>Recalculate</Text>
+                    </TouchableOpacity>
+                    {isSetup && (
+                        <TouchableOpacity style={styles.editButton} onPress={toggleDarkMode}>
+                            <Text style={styles.editButtonText}>Dark Mode</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
 
             </ScrollView>
