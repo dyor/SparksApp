@@ -23,6 +23,7 @@ import SparkSpark from '../sparks/SparkSpark';
 import { MinuteMinderSpark } from '../sparks/MinuteMinderSpark';
 import { BuzzyBingoSpark } from '../sparks/BuzzyBingoSpark';
 import { CardScoreSpark } from '../sparks/CardScoreSpark';
+import { BigDennySpark } from '../sparks/BigDennySpark';
 import { GolfWisdomSpark } from '../sparks/GolfWisdomSpark';
 import styled from 'styled-components/native';
 
@@ -287,6 +288,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.0,
     },
     component: CardScoreSpark,
+  },
+  'big-denny': {
+    metadata: {
+      id: 'big-denny',
+      title: 'Big Denny',
+      description: 'Track who wins holes on the course',
+      icon: '🏌️',
+      category: 'golf',
+      createdAt: new Date().toISOString(),
+      rating: 5.0,
+    },
+    component: BigDennySpark,
   },
   golfWisdom: {
     metadata: {

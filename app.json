@@ -49,7 +49,8 @@
     "privacy": "public",
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
