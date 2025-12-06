@@ -693,6 +693,7 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
     const { colors } = useTheme();
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
     const loadUserFeedback = async () => {

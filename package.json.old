@@ -1,6 +1,6 @@
 {
   "name": "sparksapp",
-  "version": "1.0.8",
+  "version": "1.0.7",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

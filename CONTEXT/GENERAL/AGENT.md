@@ -1,4 +1,11 @@
-# 🤖 Agent Instructions & Codebase Guide
+# 🤖# Agent Instructions
+
+> [!WARNING]
+> **NEVER USE gRPC or native Firestore** in this React Native project.
+> It introduces complex dependency conflicts ("non-modular header" errors).
+> **ALWAYS use the Firebase Web SDK (JS SDK)** for Firestore.
+
+ & Codebase Guide
 
 **READ THIS FIRST**: This document is your primary instruction manual for working on the SparksApp codebase. It defines the rules, patterns, and workflows you must follow to be effective.
 

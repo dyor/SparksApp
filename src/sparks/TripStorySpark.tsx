@@ -129,6 +129,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [newActivityName, setNewActivityName] = useState('');
   const [newActivityTime, setNewActivityTime] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [showManageActivities, setShowManageActivities] = useState(false);
 
   // Photo state
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
@@ -150,6 +151,12 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [selectedTripForDetail, setSelectedTripForDetail] = useState<Trip | null>(null);
   const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
   const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
+
+  // Map View State
+  const [showMapView, setShowMapView] = useState(false);
+  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
+  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
 
   // Photo Detail State
   const [photoName, setPhotoName] = useState('');
@@ -184,6 +191,33 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const scrollViewRef = useRef<ScrollView>(null);
   const dateScrollViewRef = useRef<ScrollView>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const borderAnimation = useRef(new Animated.Value(0)).current;
+  const dayPositions = useRef<Map<string, number>>(new Map());
+  const activityPositions = useRef<Map<string, number>>(new Map());
+  const dayPhotoScrollRefs = useRef<Map<string, React.RefObject<ScrollView | null>>>(new Map());
+  const activityPhotoScrollRefs = useRef<Map<string, React.RefObject<ScrollView | null>>>(new Map());
+  const currentScrollPosition = useRef(0);
+
+  // Animate border for loading states
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(borderAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(borderAnimation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, []);
 
   useEffect(() => {
     loadTrips();
@@ -693,7 +727,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         setSelectedPickerPhotos(new Set());
         setCustomPickerDate(dateToUse);
         setCustomPickerAllowMultiple(allowMultiple);
-        setCustomPickerActivity(activity);
+        setCustomPickerActivity(activity || null);
         setShowCustomPhotoPicker(true);
         setLoadingPhotosByDate(null);
         return;
