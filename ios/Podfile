@@ -22,7 +22,6 @@ prepare_react_native_project!
 
 target 'Sparks' do
   use_expo_modules!
-  pod 'GoogleUtilities', :modular_headers => true
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -57,29 +56,10 @@ target 'Sparks' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    
-    # Fix for React Native Firebase - allow non-modular includes and add header search paths
+
     installer.pods_project.targets.each do |target|
-      if target.name.start_with?('RNFB')
-        target.build_configurations.each do |config|
-          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-          
-          # Add React Native header search paths (without quotes - they're added as paths, not strings)
-          header_search_paths = config.build_settings['HEADER_SEARCH_PATHS'] || ['$(inherited)']
-          header_search_paths = [header_search_paths] unless header_search_paths.is_a?(Array)
-          header_search_paths << '${PODS_ROOT}/Headers/Public/React-Core'
-          header_search_paths << '${PODS_ROOT}/Headers/Public/React-Core-prebuilt'
-          header_search_paths << '${PODS_ROOT}/Headers/Private/React-Core'
-          header_search_paths << '${PODS_ROOT}/React-Core'
-          header_search_paths << '${PODS_ROOT}/ReactCommon/react/nativemodule/core'
-          config.build_settings['HEADER_SEARCH_PATHS'] = header_search_paths.uniq
-          
-          # Also ensure we can find React Native frameworks
-          framework_search_paths = config.build_settings['FRAMEWORK_SEARCH_PATHS'] || ['$(inherited)']
-          framework_search_paths = [framework_search_paths] unless framework_search_paths.is_a?(Array)
-          framework_search_paths << '${PODS_CONFIGURATION_BUILD_DIR}/React-Core'
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = framework_search_paths.uniq
-        end
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end
   end
