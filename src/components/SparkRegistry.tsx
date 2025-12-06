@@ -25,6 +25,7 @@ import { BuzzyBingoSpark } from '../sparks/BuzzyBingoSpark';
 import { CardScoreSpark } from '../sparks/CardScoreSpark';
 import { SkinsSpark } from '../sparks/SkinsSpark';
 import { GolfWisdomSpark } from '../sparks/GolfWisdomSpark';
+import IdeasSpark from '../sparks/IdeasSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -312,6 +313,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.3,
     },
     component: GolfWisdomSpark,
+  },
+  ideas: {
+    metadata: {
+      id: 'ideas',
+      title: 'Ideas',
+      description: 'Record your random ideas and search them later',
+      icon: '💡',
+      category: 'productivity',
+      createdAt: new Date().toISOString(),
+      rating: 5.0,
+    },
+    component: IdeasSpark,
   },
 };
 
