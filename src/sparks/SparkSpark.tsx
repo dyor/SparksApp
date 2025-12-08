@@ -23,6 +23,7 @@ import {
   SettingsContainer,
   SettingsScrollView,
   SettingsHeader,
+
   SettingsSection,
   SettingsFeedbackSection,
   SettingsText,
@@ -51,7 +52,7 @@ const Dropdown: React.FC<{
         <Text style={textStyle}>{selectedValue || placeholder}</Text>
         <Text style={[textStyle, { fontSize: 12 }]}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
-      
+
       <Modal
         visible={isOpen}
         transparent={true}
@@ -255,7 +256,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
     if (currentPage < pageCount - 1 && canProceedToNext()) {
       HapticFeedback.medium();
       const nextPage = currentPage + 1;
-      
+
       // Simple transition without intermediate screen
       setCurrentPage(nextPage);
     }
@@ -300,7 +301,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
 
       const db = getFirestore();
       await setDoc(doc(collection(db, 'sparkSubmissions'), submission.id), submission);
-      
+
       setSubmitted(true);
       setCurrentPage(8);
     } catch (error) {
@@ -319,11 +320,11 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
     const count = getCharCount(field);
     const min = getMinChars(page);
     const isValid = count >= min;
-    
+
     return (
       <Text style={[
         styles.charCounter,
-        { 
+        {
           color: isValid ? '#4CAF50' : colors.textSecondary,
           fontWeight: isValid ? '600' : '400'
         }
@@ -335,7 +336,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
 
   const renderProgressBar = () => {
     const progress = currentPage / totalSteps;
-    
+
     return (
       <View style={[styles.progressBarContainer, { backgroundColor: colors.surface }]}>
         <View style={styles.progressTrack}>
@@ -362,7 +363,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
         {JOURNEY_THEMES.slice(1, 8).map((theme, index) => {
           const isActive = currentPage === index + 1;
           const isCompleted = currentPage > index + 1;
-          
+
           return (
             <React.Fragment key={index}>
               <View style={styles.mapPoint}>
@@ -395,9 +396,9 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
 
   const renderIntro = () => {
     const theme = JOURNEY_THEMES[0];
-    
+
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.pageContainer,
           { opacity: fadeAnim },
@@ -411,7 +412,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
           }
         ]}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.introScrollView}
           contentContainerStyle={styles.introScrollContent}
           showsVerticalScrollIndicator={true}
@@ -419,20 +420,20 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
           <View style={styles.introBackground}>
             <Text style={styles.journeyEmoji}>🗺️</Text>
           </View>
-          
+
           <View style={[styles.introCard, { backgroundColor: colors.surface }]}>
             <Text style={styles.introIcon}>{theme.icon}</Text>
             <Text style={[styles.introTitle, { color: colors.text }]}>Greetings, Adventurer!</Text>
             <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
               I am the Spark Wizard
             </Text>
-            
+
             <Text style={[styles.introDescription, { color: colors.text }]}>
               I can see that you have come to me with a vision.{'\n\n'}
               You are going to tell me about your Spark. I will use my spells & potions to bring it to life before the sun next rises.{'\n\n'}
               Together, we will summon a magical Spark that will bring joy to some needy villagers.
             </Text>
-            
+
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: colors.primary }]}
@@ -443,19 +444,19 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
               >
                 <Text style={styles.primaryButtonText}>Let's begin your Quest 🧙‍♂️</Text>
               </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: colors.border }]}
-              onPress={() => {
-                HapticFeedback.light();
-                if (onCloseSettings) {
-                  onCloseSettings();
-                }
-              }}
-            >
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                Close Spark Wizard
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, { borderColor: colors.border }]}
+                onPress={() => {
+                  HapticFeedback.light();
+                  if (onCloseSettings) {
+                    onCloseSettings();
+                  }
+                }}
+              >
+                <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                  Close Spark Wizard
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
@@ -533,10 +534,10 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <Animated.View 
+        <Animated.View
           style={[
             styles.pageContainer,
-            { 
+            {
               opacity: fadeAnim,
               backgroundColor: colors.background,
             },
@@ -558,10 +559,10 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
           >
             {/* Journey Map */}
             {renderJourneyMap()}
-            
+
             {/* Progress Bar */}
             {renderProgressBar()}
-            
+
             {/* Themed Background */}
             <View style={[styles.themedBackground, { opacity: 0.05 }]}>
               <Text style={styles.backgroundEmoji}>{theme.icon}</Text>
@@ -578,7 +579,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
 
               <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>{page.subtitle}</Text>
               <Text style={[styles.formMessage, { color: colors.text }]}>{page.message}</Text>
-              
+
               {page.dropdown ? (
                 <Dropdown
                   options={PAYMENT_OPTIONS}
@@ -592,7 +593,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
                   <TextInput
                     style={[
                       styles.input,
-                      { 
+                      {
                         backgroundColor: colors.background,
                         borderColor: colors.border,
                         color: colors.text,
@@ -621,12 +622,12 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
     const theme = JOURNEY_THEMES[7];
     const icons = ['🧙‍♂️', '🥚', '🐉', '🏰', '💰', '💎', '🍺', '✨'];
     const currentIcon = icons[reviewIconIndex];
-    
+
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.pageContainer,
-          { 
+          {
             opacity: fadeAnim,
             backgroundColor: colors.background,
           },
@@ -640,7 +641,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
           }
         ]}
       >
-        <ScrollView 
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={styles.reviewScrollContent}
           showsVerticalScrollIndicator={true}
@@ -659,7 +660,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
             <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>
               Let me review the magical incantations we have prepared for your Spark...
             </Text>
-            
+
             <View style={styles.reviewSection}>
               <Text style={[styles.reviewLabel, { color: colors.textSecondary }]}>Spark Name</Text>
               <Text style={[styles.reviewValue, { color: colors.text }]}>{formData.sparkName}</Text>
@@ -697,12 +698,12 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
 
   const renderSuccess = () => {
     const theme = JOURNEY_THEMES[8];
-    
+
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.pageContainer,
-          { 
+          {
             opacity: fadeAnim,
             backgroundColor: colors.background,
           }
@@ -795,26 +796,26 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
   // Settings implementation (keeping existing settings code)
   const loadPastSubmissions = async () => {
     if (!showSettings) return;
-    
+
     setLoadingSubmissions(true);
     try {
       const db = getFirestore();
       const AnalyticsService = await ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       const userId = sessionInfo.userId || sessionInfo.sessionId || 'anonymous';
-      
+
       const submissionsQuery = query(
         collection(db, 'sparkSubmissions'),
         where('userId', '==', userId),
         orderBy('timestamp', 'desc')
       );
-      
+
       const snapshot = await getDocs(submissionsQuery);
       const submissions = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as SparkSubmission));
-      
+
       setPastSubmissions(submissions);
     } catch (error) {
       console.error('Error loading past submissions:', error);
@@ -832,8 +833,8 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
   const renderSettings = () => {
     const formatDate = (timestamp: number) => {
       const date = new Date(timestamp);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
         day: 'numeric',
         year: 'numeric',
         hour: '2-digit',

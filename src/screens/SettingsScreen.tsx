@@ -9,6 +9,7 @@ import { SettingsFeedbackSection, SettingsScrollView } from '../components/Setti
 import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
 import { AdminReviewsManager } from '../components/AdminReviewsManager';
 import { NotificationBadge } from '../components/NotificationBadge';
+import { AccountSettingsSection } from '../components/AccountSettingsSection';
 import { AdminResponseService } from '../services/AdminResponseService';
 import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
 import { ServiceFactory } from '../services/ServiceFactory';
@@ -253,6 +254,9 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.feedbackSection}>
         <SettingsFeedbackSection sparkName="Sparks App" />
       </View>
+
+      {/* Account Section */}
+      <AccountSettingsSection />
 
       {/* Debug Section - Remove after testing */}
       <View style={styles.section}>

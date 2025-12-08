@@ -40,7 +40,15 @@
           <string>exp+sparks-app</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.229332029977-ok836lt8vduk9du4t4d90ou4drrcbo43</string>
+        </array>
+      </dict>
     </array>
+    <key>GIDClientID</key>
+    <string>229332029977-ok836lt8vduk9du4t4d90ou4drrcbo43.apps.googleusercontent.com</string>
     <key>CFBundleVersion</key>
     <string>1.0.9</string>
     <key>ITSAppUsesNonExemptEncryption</key>

@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>229332029977-ok836lt8vduk9du4t4d90ou4drrcbo43.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.229332029977-ok836lt8vduk9du4t4d90ou4drrcbo43</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAVliooxJ1yRLjIb1TTKHY9m9R7hgPdwoU</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.sparkopedia.sparks</string>
+	<string>com.mattdyor.sparks</string>
 	<key>PROJECT_ID</key>
 	<string>sparkopedia-330f6</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:229332029977:ios:54183b3b1fe645434a9088</string>
+	<string>1:229332029977:ios:033171c378ff16934a9088</string>
 </dict>
 </plist>

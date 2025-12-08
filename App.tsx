@@ -6,9 +6,11 @@ import * as Notifications from 'expo-notifications';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useAppStore } from './src/store';
+import { useAuthStore } from './src/store/authStore';
 import { NotificationService } from './src/utils/notifications';
 import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
 import { ServiceFactory } from './src/services/ServiceFactory';
+import AuthService from './src/services/AuthService';
 
 // Initialize Firebase
 let firebaseApp: any = null;
@@ -39,6 +41,52 @@ export default function App() {
 
 function AppContent() {
   const { preferences } = useAppStore();
+  const { setUser, setRole, setSparkAdminRoles } = useAuthStore();
+
+  // Initialize authentication when app starts
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        console.log('🚀 App: Initializing AuthService...');
+        await AuthService.initialize();
+        
+        // Set up auth state listener
+        const unsubscribe = AuthService.onAuthStateChanged(async (user) => {
+          console.log('🔐 App: Auth state changed', user ? user.email : 'signed out');
+          setUser(user);
+          
+          if (user) {
+            // Load user roles
+            try {
+              const role = await AuthService.getUserRole();
+              const sparkAdminRoles = await AuthService.getSparkAdminRoles();
+              setRole(role);
+              setSparkAdminRoles(sparkAdminRoles);
+              console.log('✅ App: User roles loaded', { role, sparkAdminRoles });
+            } catch (error) {
+              console.error('❌ App: Error loading user roles', error);
+            }
+          } else {
+            // Clear roles when signed out
+            setRole('standard');
+            setSparkAdminRoles([]);
+          }
+        });
+        
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ App: Failed to initialize AuthService', error);
+      }
+    };
+
+    const unsubscribePromise = initializeAuth();
+    
+    return () => {
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe) unsubscribe();
+      });
+    };
+  }, []);
 
   // Initialize notifications when app starts
   useEffect(() => {

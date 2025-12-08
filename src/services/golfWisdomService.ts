@@ -1,4 +1,4 @@
-import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, Timestamp, addDoc, limit } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WisdomQuote } from '../sparks/GolfWisdomSpark/wisdomData';
 
@@ -11,6 +11,8 @@ export interface FirestoreWisdomPage {
     order: number;
     updatedAt: Timestamp;
     contributor?: string;
+    createdAt?: Timestamp;
+    status?: string; // "Suggested", "Approved", "Rejected", etc.
 }
 
 /**
@@ -199,5 +201,67 @@ export const loadWisdomPages = async (): Promise<{
         console.error('Error loading wisdom pages:', error);
         // Return empty array if both cache and fetch fail
         return { pages: [], fromCache: false };
+    }
+};
+
+/**
+ * Submit a wisdom suggestion to Firestore
+ */
+export const submitWisdomSuggestion = async (suggestion: {
+    content: string;
+    contributor: string;
+}): Promise<void> => {
+    try {
+        console.log('📝 Submitting wisdom suggestion...');
+        const { initializeApp, getApps } = require('firebase/app');
+        const { getFirestore } = require('firebase/firestore');
+        const { getAuth, signInAnonymously } = require('firebase/auth');
+
+        // Get or initialize Firebase app
+        let app;
+        if (getApps().length === 0) {
+            console.log('🔥 Initializing Firebase app for suggestion...');
+            app = initializeApp(firebaseConfig);
+        } else {
+            app = getApps()[0];
+        }
+
+        // Sign in anonymously if not already signed in
+        const auth = getAuth(app);
+        if (!auth.currentUser) {
+            console.log('🔐 Signing in anonymously for suggestion...');
+            await signInAnonymously(auth);
+        }
+
+        const db = getFirestore(app);
+
+        // Get the highest order value
+        const pagesCollection = collection(db, COLLECTION_NAME);
+        const orderQuery = query(pagesCollection, orderBy('order', 'desc'), limit(1));
+        const orderSnapshot = await getDocs(orderQuery);
+
+        let nextOrder = 1;
+        if (!orderSnapshot.empty) {
+            const highestDoc = orderSnapshot.docs[0];
+            const data = highestDoc.data() as FirestoreWisdomPage;
+            nextOrder = (data.order || 0) + 1;
+        }
+
+        // Create the suggestion document
+        const suggestionData = {
+            content: suggestion.content,
+            contributor: suggestion.contributor,
+            order: nextOrder,
+            status: 'Suggested',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+        };
+
+        await addDoc(collection(db, COLLECTION_NAME), suggestionData);
+
+        console.log(`✅ Successfully submitted wisdom suggestion with order ${nextOrder}`);
+    } catch (error) {
+        console.error('❌ Error submitting wisdom suggestion:', error);
+        throw error;
     }
 };
