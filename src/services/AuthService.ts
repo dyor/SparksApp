@@ -1,7 +1,18 @@
 import { Platform } from 'react-native';
 import { getAuth, signInWithCredential, signOut as firebaseSignOut, onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+
+// Gracefully handle GoogleSignin in Expo Go (where native modules aren't available)
+let GoogleSignin: any = null;
+let statusCodes: any = null;
+try {
+  const googleSigninModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = googleSigninModule.GoogleSignin;
+  statusCodes = googleSigninModule.statusCodes;
+} catch (error) {
+  console.log('⚠️ Google Sign-In not available (running in Expo Go or module not installed)');
+}
+
 import { ServiceFactory } from './ServiceFactory';
 
 export interface User {
@@ -50,6 +61,13 @@ class AuthService {
         console.warn('⚠️ Neither EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID nor EXPO_PUBLIC_FIREBASE_APP_ID is set. Google Sign-In will not work.');
         console.warn('⚠️ Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in your .env file or EAS secrets.');
         // Don't configure Google Sign-In if webClientId is missing
+        this._initialized = true;
+        return;
+      }
+
+      // Check if GoogleSignin is available (not in Expo Go)
+      if (!GoogleSignin) {
+        console.log('⚠️ Google Sign-In module not available. Skipping configuration (Expo Go).');
         this._initialized = true;
         return;
       }
@@ -103,6 +121,11 @@ class AuthService {
   static async signInWithGoogle(): Promise<User | null> {
     if (!this._initialized) {
       throw new Error('AuthService not initialized. Please call initialize() first.');
+    }
+
+    // Check if GoogleSignin is available (not in Expo Go)
+    if (!GoogleSignin) {
+      throw new Error('Google Sign-In is not available in Expo Go. Please use a development build or production app.');
     }
 
     const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_FIREBASE_APP_ID;

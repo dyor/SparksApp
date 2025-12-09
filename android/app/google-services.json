@@ -7,12 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:229332029977:android:def2e3323b9c48324a9088",
+        "mobilesdk_app_id": "1:229332029977:android:b8267aaec71c784f4a9088",
         "android_client_info": {
           "package_name": "com.mattdyor.sparks"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "229332029977-16v0no8l5hfnr74ej7eepsjsje2srl8n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mattdyor.sparks",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "229332029977-v7gtb7jk63r8kv34q0j4ffhtcrbf9i5d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDQl7qj01kr3HCmdQADKocgNHZIvoklEds"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "229332029977-v7gtb7jk63r8kv34q0j4ffhtcrbf9i5d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "229332029977-la1dj5binjm5ksbc8insto0kjneuddk6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.sparkopedia.sparks"
+              }
+            }
+          ]
         }
       }
     }

@@ -2,10 +2,7 @@
 
 SparksApp is a mobile application featuring a collection of micro-experiences ("sparks") - interactive, vibe-coded experiences like spin the wheel, flashcards, and business simulations. Built with React Native and Expo, it offers a modular platform for small, engaging utilities.
 
-![SparksApp Banner](https://via.placeholder.com/800x200?text=SparksApp)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Expo SDK 52](https://img.shields.io/badge/Expo%20SDK-52-blue)](https://expo.dev/)
+Check out https://sparks.febak.com/check-out-the-sparks-app for details, including links to download the app on Google Play and the App Store.
 
 ## Features
 

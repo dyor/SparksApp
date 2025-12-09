@@ -300,19 +300,24 @@ export class MockFirebaseService {
     return Math.abs(hash);
   }
 
+  static isInitialized(): boolean {
+    // Mock service is always "initialized"
+    return true;
+  }
+
   static async getGlobalAnalytics(days: number = 14): Promise<AnalyticsEvent[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    
+
     const allEvents = Array.from(this.mockData.analytics.values());
     const filteredEvents = allEvents.filter(event => {
       if (!event.timestamp) return false;
-      const eventDate = (event.timestamp as any).toDate ? 
-        (event.timestamp as any).toDate() : 
+      const eventDate = (event.timestamp as any).toDate ?
+        (event.timestamp as any).toDate() :
         new Date(event.timestamp as any);
       return eventDate >= startDate;
     });
-    
+
     console.log(`Mock: Returning ${filteredEvents.length} analytics events for last ${days} days`);
     return filteredEvents;
   }

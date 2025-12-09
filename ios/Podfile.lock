@@ -14,7 +14,7 @@ PODS:
   - EXAV (16.0.7):
     - ExpoModulesCore
     - ReactCommon/turbomodule/core
-  - EXConstants (18.0.10):
+  - EXConstants (18.0.11):
     - ExpoModulesCore
   - EXImageLoader (6.0.0):
     - ExpoModulesCore
@@ -24,7 +24,7 @@ PODS:
     - ExpoModulesCore
   - EXNotifications (0.32.13):
     - ExpoModulesCore
-  - Expo (54.0.25):
+  - Expo (54.0.27):
     - ExpoModulesCore
     - hermes-engine
     - RCTRequired
@@ -225,15 +225,15 @@ PODS:
     - ExpoModulesCore
     - GoogleSignIn (~> 9.0)
     - React-Core
-  - ExpoAsset (12.0.10):
+  - ExpoAsset (12.0.11):
     - ExpoModulesCore
   - ExpoAudio (1.0.14):
     - ExpoModulesCore
   - ExpoDocumentPicker (14.0.7):
     - ExpoModulesCore
-  - ExpoFileSystem (19.0.19):
+  - ExpoFileSystem (19.0.20):
     - ExpoModulesCore
-  - ExpoFont (14.0.9):
+  - ExpoFont (14.0.10):
     - ExpoModulesCore
   - ExpoHaptics (15.0.7):
     - ExpoModulesCore
@@ -243,7 +243,7 @@ PODS:
     - SDWebImageWebPCoder
   - ExpoImagePicker (17.0.8):
     - ExpoModulesCore
-  - ExpoKeepAwake (15.0.7):
+  - ExpoKeepAwake (15.0.8):
     - ExpoModulesCore
   - ExpoLinearGradient (15.0.7):
     - ExpoModulesCore
@@ -252,7 +252,7 @@ PODS:
   - ExpoMediaLibrary (18.2.0):
     - ExpoModulesCore
     - React-Core
-  - ExpoModulesCore (3.0.26):
+  - ExpoModulesCore (3.0.28):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -280,6 +280,8 @@ PODS:
   - ExpoSharing (14.0.7):
     - ExpoModulesCore
   - ExpoSpeech (14.0.7):
+    - ExpoModulesCore
+  - ExpoSplashScreen (31.0.12):
     - ExpoModulesCore
   - EXTaskManager (14.0.8):
     - ExpoModulesCore
@@ -2273,6 +2275,7 @@ DEPENDENCIES:
   - ExpoPrint (from `../node_modules/expo-print/ios`)
   - ExpoSharing (from `../node_modules/expo-sharing/ios`)
   - ExpoSpeech (from `../node_modules/expo-speech/ios`)
+  - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - EXTaskManager (from `../node_modules/expo-task-manager/ios`)
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -2429,6 +2432,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-sharing/ios"
   ExpoSpeech:
     :path: "../node_modules/expo-speech/ios"
+  ExpoSplashScreen:
+    :path: "../node_modules/expo-splash-screen/ios"
   EXTaskManager:
     :path: "../node_modules/expo-task-manager/ios"
   EXUpdatesInterface:
@@ -2594,33 +2599,34 @@ SPEC CHECKSUMS:
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   EXApplication: 296622817d459f46b6c5fe8691f4aac44d2b79e7
   EXAV: e3fefaca88f14624bca01d9a128562a5f8e738f8
-  EXConstants: fd688cef4e401dcf798a021cfb5d87c890c30ba3
+  EXConstants: c378c1b344ff1ecfbad27b90f0e48d1d0ead8cbb
   EXImageLoader: 189e3476581efe3ad4d1d3fb4735b7179eb26f05
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: 26e15640538c3d5ef028077ebcaf004b744d4932
   EXNotifications: a62e1f8e3edd258dc3b155d3caa49f32920f1c6c
-  Expo: c347cdb69706ea3de83da97ce956042aafd8e62a
+  Expo: ea42a626a8236ba1bc30e9a16cd1555ae8c034d1
   expo-dev-client: cc9491ad3e25a7a89f367c30f72884584c682b77
   expo-dev-launcher: 61322d7e368e7fa78e355b8882df90f5e8eafe93
   expo-dev-menu: 66daef3e1fce372ac93fd079ad8172a9c1206cc3
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAdapterGoogleSignIn: 5965ec283d2c0f53c483c4e2080ea055a881dfe9
-  ExpoAsset: d839c8eae8124470332408427327e8f88beb2dfd
+  ExpoAsset: 23a958e97d3d340919fe6774db35d563241e6c03
   ExpoAudio: 6a923f661e3360a183503fd96728ff9010ae8afd
   ExpoDocumentPicker: 2200eefc2817f19315fa18f0147e0b80ece86926
-  ExpoFileSystem: 77157a101e03150a4ea4f854b4dd44883c93ae0a
-  ExpoFont: cf9d90ec1d3b97c4f513211905724c8171f82961
+  ExpoFileSystem: 3592defb5faa3c5866a2900eae87ceec8cc0489f
+  ExpoFont: 35ac6191ed86bbf56b3ebd2d9154eda9fad5b509
   ExpoHaptics: 807476b0c39e9d82b7270349d6487928ce32df84
   ExpoImageManipulator: ead6e7cca441603bfaecc898a69a093adef8b4ef
   ExpoImagePicker: d251aab45a1b1857e4156fed88511b278b4eee1c
-  ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
+  ExpoKeepAwake: 55f75eca6499bb9e4231ebad6f3e9cb8f99c0296
   ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
   ExpoLocation: 93d7faa0c2adbd5a04686af0c1a61bc6ed3ee2f7
   ExpoMediaLibrary: 641a6952299b395159ccd459bd8f5f6764bf55fe
-  ExpoModulesCore: 9460546192590b0ed13493d9b01bed256d3440b0
+  ExpoModulesCore: 4c2be03d4c38a9ea4eb2eedc202dfa980b2f3666
   ExpoPrint: 3fa0bd322ea8effa81893a099803c914e59ad46f
   ExpoSharing: 032c01bb034319e2374badf082ae935be866d2e9
   ExpoSpeech: 18a7f92a932028e16d3df1891377a8b626ab5cc0
+  ExpoSplashScreen: 76af87337650d06926aa7d0157fe98b4fddca336
   EXTaskManager: cbbb80cbccea6487ccca0631809fbba2ed3e5271
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12

@@ -31,6 +31,7 @@ import { FinalClockSpark } from '../sparks/FinalClockSpark';
 import TripSurveySpark from '../sparks/TripSurveySpark';
 import RecAIpeSpark from '../sparks/RecAIpeSpark';
 import { SparkStatsSpark } from '../sparks/SparkStatsSpark';
+import { BigDennySpark } from '../sparks/BigDennySpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -47,10 +48,10 @@ const PlaceholderText = styled.Text`
 
 const PlaceholderSpark: React.FC = () => (
     <BaseSparkComponent>
-    <PlaceholderContainer>
-    <PlaceholderText>This spark is under construction</PlaceholderText>
+        <PlaceholderContainer>
+            <PlaceholderText>This spark is under construction</PlaceholderText>
         </PlaceholderContainer>
-        </BaseSparkComponent>
+    </BaseSparkComponent>
 );
 
 // Registry of all available sparks
@@ -378,6 +379,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
             rating: 4.5,
         },
         component: SparkStatsSpark,
+    },
+    'big-denny': {
+        metadata: {
+            id: 'big-denny',
+            title: 'Skins',
+            description: 'Track who wins holes on the course',
+            icon: '⛳',
+            category: 'golf',
+            createdAt: '2025-12-08T00:00:00.000Z',
+            rating: 4.5,
+        },
+        component: BigDennySpark,
     },
     'recaipe': {
         metadata: {

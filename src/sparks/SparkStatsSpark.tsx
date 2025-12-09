@@ -166,7 +166,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
         const sortedSparks = Array.from(sparkOpens.entries())
             .map(([id, data]) => ({ sparkId: id, name: data.name, opens: data.count }))
             .sort((a, b) => b.opens - a.opens)
-            .slice(0, 5); // Top 5
+            .slice(0, 10); // Top 10
 
         console.log('📊 SparkStats: Top sparks calculated:', sortedSparks);
         setTopSparks(sortedSparks);
