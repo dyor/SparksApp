@@ -2,12 +2,14 @@
 
 SparksApp is a mobile application featuring a collection of micro-experiences ("sparks") - interactive, vibe-coded experiences like spin the wheel, flashcards, and business simulations. Built with React Native and Expo, it offers a modular platform for small, engaging utilities.
 
-Check out https://sparks.febak.com/check-out-the-sparks-app for details, including links to download the app on Google Play and the App Store.
+Check out https://sparks.febak.com/check-out-the-sparks-app for details.
+
+# [Download the App](https://linkly.link/2TcvP)
 
 ## Features
 
-*   **Modular "Sparks"**: 24+ independent micro-apps across multiple categories:
-    *   **Productivity**: Todo List, Packing List, Minute Minder, Trip Survey, Coming Up
+*   **Modular "Sparks"**: 25+ independent micro-apps across multiple categories:
+    *   **Productivity**: Speak Spark (Voice Control), Todo List, Packing List, Minute Minder, Trip Survey, Coming Up
     *   **Education**: Spanish Flashcards, Spanish Friend (Amigo), Spanish Reader
     *   **Media**: Toview (movies/books/shows), Short Saver (YouTube), Song Saver (Spotify), Sound Board
     *   **Golf**: Golf Brain, Tee Time Timer, Golf Wisdom

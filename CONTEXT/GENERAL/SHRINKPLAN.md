@@ -8,7 +8,8 @@
 
 ## 🏆 BIG WINS (High Impact)
 
-### 1. Centralize StyleSheet Definitions (~15-20KB reduction)
+### 1. [/] Centralize StyleSheet Definitions (~15-20KB reduction)
+**Status**: In Progress - `CommonStyles.ts` created, adopted in ~2 sparks.
 **Estimated Reduction**: 15,000-20,000 bytes
 **Effort**: Medium
 **Files Affected**: All 25+ Spark files
@@ -49,7 +50,8 @@ const styles = {
 
 ---
 
-### 2. Extract Modal Component (~8-12KB reduction)
+### 2. [/] Extract Modal Component (~8-12KB reduction)
+**Status**: In Progress - `CommonModal.tsx` created, adopted in ~2 sparks.
 **Estimated Reduction**: 8,000-12,000 bytes
 **Effort**: Medium
 **Files Affected**: 15+ Sparks with modals
@@ -76,7 +78,8 @@ Each modal has:
 
 ---
 
-### 3. Remove SongSaver Embed Functionality (~3-4KB reduction)
+### 3. [x] Remove SongSaver Embed Functionality (~3-4KB reduction)
+**Status**: Completed
 **Estimated Reduction**: 3,000-4,000 bytes
 **Effort**: Low
 **Files Affected**: `SongSaverSpark.tsx`

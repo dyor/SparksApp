@@ -16,6 +16,9 @@ Track your daily activities with start times and countdown timers. Perfect for m
 ### 🍳 RecAIpe
 AI-powered recipe generator with shopping and cooking modes. Describe what you want to cook and let AI create a custom recipe with inline measurements. Includes shopping list and step-by-step cooking mode with progress tracking.
 
+### 🎤 Speak Spark
+Voice-controlled command interface. Use Gemini AI to translate spoken instructions into actions like creating todos, logging weight, or adding items to your lists. Control other Sparks with just your voice.
+
 ## 🌍 Travel
 
 ### ✈️ TripStory

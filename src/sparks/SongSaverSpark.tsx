@@ -58,9 +58,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     const [editName, setEditName] = useState('');
     const [editCategory, setEditCategory] = useState('');
     const [editUrl, setEditUrl] = useState('');
-    const [embedInput, setEmbedInput] = useState('');
-    const [embedCategory, setEmbedCategory] = useState('');
-    const [embedName, setEmbedName] = useState('');
+
     const isInitializing = useRef(true);
 
     // Load saved tracks on mount
@@ -325,52 +323,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
         );
     };
 
-    // Handle add embed from settings
-    const handleAddEmbed = async () => {
-        if (!embedInput.trim()) {
-            Alert.alert('Error', 'Please paste the Spotify embed code');
-            return;
-        }
 
-        const { trackId, isEmbed } = parseSpotifyInput(embedInput.trim());
-
-        if (!trackId || !isEmbed) {
-            Alert.alert('Error', 'Please paste a valid Spotify embed iframe code');
-            return;
-        }
-
-        // Check if track already exists
-        if (tracks.some(track => track.id === trackId)) {
-            Alert.alert('Error', 'This track is already saved');
-            return;
-        }
-
-        HapticFeedback.light();
-
-        try {
-            const newTrack: SpotifyTrack = {
-                id: trackId,
-                url: embedInput.trim(),
-                addedAt: Date.now(),
-                category: embedCategory.trim() || 'Uncategorized',
-                name: embedName.trim() || undefined,
-            };
-
-            const updatedTracks = [...tracks, newTrack];
-            setTracks(updatedTracks);
-
-            // Clear inputs
-            setEmbedInput('');
-            setEmbedCategory('');
-            setEmbedName('');
-
-            HapticFeedback.success();
-            Alert.alert('Success', 'Embed track added successfully!');
-        } catch (error) {
-            console.error('Error adding embed:', error);
-            Alert.alert('Error', 'Failed to add embed. Please try again.');
-        }
-    };
 
     // Track Card Component - Shows embed
     const TrackCard: React.FC<{ track: SpotifyTrack; index: number }> = ({ track, index }) => (
@@ -691,50 +644,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             fontSize: 16,
             fontWeight: '600',
         },
-        settingsSection: {
-            padding: 20,
-            paddingTop: 0,
-        },
-        sectionTitle: {
-            fontSize: 20,
-            fontWeight: '700',
-            marginBottom: 8,
-        },
-        sectionSubtitle: {
-            fontSize: 14,
-            marginBottom: 20,
-            lineHeight: 20,
-        },
-        settingsInputGroup: {
-            marginBottom: 16,
-        },
-        settingsInputLabel: {
-            fontSize: 14,
-            fontWeight: '600',
-            marginBottom: 8,
-        },
-        settingsInput: {
-            height: 50,
-            borderWidth: 1,
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            fontSize: 16,
-        },
-        settingsMultilineInput: {
-            height: 150,
-            textAlignVertical: 'top',
-            paddingTop: 12,
-        },
-        addEmbedButton: {
-            paddingVertical: 16,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginTop: 8,
-        },
-        addEmbedButtonText: {
-            fontSize: 16,
-            fontWeight: '600',
-        },
+
     });
 
     if (showSettings) {
@@ -750,78 +660,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
 
                     <SettingsFeedbackSection sparkName="Song Saver" sparkId="song-saver" />
 
-                    {/* Add Embed Section */}
-                    <View style={styles.settingsSection}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Add Song as Embed
-                        </Text>
-                        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                            Paste the full Spotify embed iframe code below
-                        </Text>
 
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Category (Optional)
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder="e.g., Workout, Chill, etc."
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedCategory}
-                                onChangeText={setEmbedCategory}
-                            />
-                        </View>
-
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Name (Optional)
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder="Give this track a custom name"
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedName}
-                                onChangeText={setEmbedName}
-                            />
-                        </View>
-
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Embed Code *
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, styles.settingsMultilineInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder='<iframe src="https://open.spotify.com/embed/track/..." ...'
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedInput}
-                                onChangeText={setEmbedInput}
-                                multiline
-                                numberOfLines={6}
-                                textAlignVertical="top"
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.addEmbedButton, { backgroundColor: colors.primary }]}
-                            onPress={handleAddEmbed}
-                        >
-                            <Text style={[styles.addEmbedButtonText, { color: colors.background }]}>
-                                Add Embed Track
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
 
                     <View style={styles.settingsButtonContainer}>
                         <TouchableOpacity
