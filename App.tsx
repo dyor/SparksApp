@@ -15,7 +15,8 @@ import AuthService from './src/services/AuthService';
 // Initialize Firebase
 let firebaseApp: any = null;
 try {
-  const firebase = require('@react-native-firebase/app');
+  // const firebase = require('@react-native-firebase/app');
+  const firebase = { default: { apps: [] } }; // Mock for web
   firebaseApp = firebase.default;
 
   // Initialize Firebase app if not already initialized
