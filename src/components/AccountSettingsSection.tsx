@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { SettingsSection } from './SettingsComponents';
-import { SignInButton, UserProfile, SignOutButton } from './AuthComponents';
+import { SignInButton, SignInWithAppleButton, UserProfile, SignOutButton } from './AuthComponents';
 import { useAuthStore } from '../store/authStore';
 import AuthService from '../services/AuthService';
 import { HapticFeedback } from '../utils/haptics';
@@ -11,6 +11,7 @@ export const AccountSettingsSection: React.FC = () => {
   const { colors } = useTheme();
   const { user, role, setUser, setRole, setSparkAdminRoles, setIsLoading, clearAuth } = useAuthStore();
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSigningInWithApple, setIsSigningInWithApple] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Verify persisted user still exists in Firebase on mount
@@ -75,12 +76,12 @@ export const AccountSettingsSection: React.FC = () => {
     } catch (error: any) {
       console.error('Sign-in error:', error);
       HapticFeedback.error();
-      
+
       if (error.message === 'Sign-in was cancelled') {
         // User cancelled, don't show error
         return;
       }
-      
+
       Alert.alert(
         'Sign-In Failed',
         error.message || 'Failed to sign in with Google. Please try again.',
@@ -88,6 +89,35 @@ export const AccountSettingsSection: React.FC = () => {
       );
     } finally {
       setIsSigningIn(false);
+    }
+  };
+
+  const handleSignInWithApple = async () => {
+    try {
+      setIsSigningInWithApple(true);
+      HapticFeedback.light();
+
+      const signedInUser = await AuthService.signInWithApple();
+      if (signedInUser) {
+        setUser(signedInUser);
+        HapticFeedback.success();
+      }
+    } catch (error: any) {
+      console.error('Apple Sign-in error:', error);
+      HapticFeedback.error();
+
+      if (error.message === 'Sign-in was cancelled') {
+        // User cancelled, don't show error
+        return;
+      }
+
+      Alert.alert(
+        'Sign-In Failed',
+        error.message || 'Failed to sign in with Apple. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsSigningInWithApple(false);
     }
   };
 
@@ -113,15 +143,15 @@ export const AccountSettingsSection: React.FC = () => {
 
               await AuthService.signOut();
               clearAuth();
-              
+
               HapticFeedback.success();
             } catch (error: any) {
               console.error('Sign-out error:', error);
               HapticFeedback.error();
-              
+
               // Even if sign-out fails, clear local auth state
               clearAuth();
-              
+
               Alert.alert(
                 'Sign-Out Failed',
                 error?.message || 'Failed to sign out. Local session cleared.',
@@ -146,7 +176,7 @@ export const AccountSettingsSection: React.FC = () => {
       {isValidUser ? (
         <View style={styles.signedInContainer}>
           <UserProfile user={user} onSignOut={handleSignOut} loading={isSigningOut} />
-          
+
           {/* Role display (for debugging/admin visibility) */}
           {(role !== 'standard' || __DEV__) && (
             <View style={styles.roleContainer}>
@@ -163,6 +193,9 @@ export const AccountSettingsSection: React.FC = () => {
             Sign in to sync your data across devices and access admin features.
           </Text>
           <SignInButton onPress={handleSignIn} loading={isSigningIn} />
+          {Platform.OS === 'ios' && (
+            <SignInWithAppleButton onPress={handleSignInWithApple} loading={isSigningInWithApple} />
+          )}
         </View>
       )}
     </SettingsSection>

@@ -1,9 +1,19 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { createCommonStyles } from '../styles/CommonStyles';
 import { HapticFeedback } from '../utils/haptics';
 import AuthService, { User } from '../services/AuthService';
+
+// Import Apple Authentication Button (iOS only)
+let AppleAuthentication: any = null;
+try {
+  if (Platform.OS === 'ios') {
+    AppleAuthentication = require('expo-apple-authentication');
+  }
+} catch (error) {
+  // Apple Authentication not available
+}
 
 interface SignInButtonProps {
   onPress: () => void;
@@ -29,6 +39,58 @@ export const SignInButton: React.FC<SignInButtonProps> = ({ onPress, loading = f
         </View>
       )}
     </TouchableOpacity>
+  );
+};
+
+interface SignInWithAppleButtonProps {
+  onPress: () => void;
+  loading?: boolean;
+}
+
+export const SignInWithAppleButton: React.FC<SignInWithAppleButtonProps> = ({ onPress, loading = false }) => {
+  const [isAvailable, setIsAvailable] = useState(false);
+
+  // Only show on iOS/iPadOS
+  if (Platform.OS !== 'ios' || !AppleAuthentication) {
+    return null;
+  }
+
+  // Check if Apple Sign-In is available on this device
+  useEffect(() => {
+    const checkAvailability = async () => {
+      try {
+        const available = await AppleAuthentication.isAvailableAsync();
+        setIsAvailable(available);
+      } catch (error) {
+        setIsAvailable(false);
+      }
+    };
+    checkAvailability();
+  }, []);
+
+  if (!isAvailable) {
+    return null;
+  }
+
+  // Use the official Apple Authentication Button component
+  const AppleButton = AppleAuthentication.AppleAuthenticationButton;
+
+  return (
+    <View style={styles.appleButtonContainer}>
+      {loading ? (
+        <View style={[styles.appleButtonLoading, styles.appleButton]}>
+          <ActivityIndicator color="#fff" />
+        </View>
+      ) : (
+        <AppleButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={8}
+          style={styles.appleButton}
+          onPress={onPress}
+        />
+      )}
+    </View>
   );
 };
 
@@ -112,6 +174,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  appleButtonContainer: {
+    width: '100%',
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
+  },
+  appleButtonLoading: {
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
   },
   profileContainer: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { getAuth, signInWithCredential, signOut as firebaseSignOut, onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, signInWithCredential, signOut as firebaseSignOut, onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 
 // Gracefully handle GoogleSignin in Expo Go (where native modules aren't available)
@@ -11,6 +11,20 @@ try {
   statusCodes = googleSigninModule.statusCodes;
 } catch (error) {
   console.log('⚠️ Google Sign-In not available (running in Expo Go or module not installed)');
+}
+
+// Gracefully handle AppleAuthentication in Expo Go or non-iOS platforms
+let AppleAuthentication: any = null;
+let Crypto: any = null;
+try {
+  if (Platform.OS === 'ios') {
+    const appleAuthModule = require('expo-apple-authentication');
+    AppleAuthentication = appleAuthModule;
+    const cryptoModule = require('expo-crypto');
+    Crypto = cryptoModule;
+  }
+} catch (error) {
+  console.log('⚠️ Apple Authentication not available (not iOS or module not installed)');
 }
 
 import { ServiceFactory } from './ServiceFactory';
@@ -194,6 +208,107 @@ class AuthService {
         throw new Error('Google Play Services not available');
       } else {
         throw new Error(error.message || 'Sign-in failed');
+      }
+    }
+  }
+
+  /**
+   * Sign in with Apple
+   */
+  static async signInWithApple(): Promise<User | null> {
+    if (!this._initialized) {
+      throw new Error('AuthService not initialized. Please call initialize() first.');
+    }
+
+    // Check if AppleAuthentication is available (iOS only)
+    if (!AppleAuthentication || Platform.OS !== 'ios') {
+      throw new Error('Apple Sign-In is only available on iOS devices.');
+    }
+
+    try {
+      console.log('🔐 AuthService: Starting Apple Sign-In...');
+
+      // Check if Apple Sign-In is available on this device
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        throw new Error('Apple Sign-In is not available. Please test on a physical iOS device (Sign in with Apple does not work in the iOS Simulator).');
+      }
+
+      // Generate a random nonce and hash it
+      const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        nonce
+      );
+
+      // Request Apple authentication with hashed nonce
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      // Get the identity token from Apple
+      const { identityToken } = credential;
+      
+      if (!identityToken) {
+        throw new Error('Failed to get identity token from Apple Sign-In');
+      }
+
+      // Create a Firebase credential with Apple ID token and original nonce
+      const appleProvider = new OAuthProvider('apple.com');
+      const appleCredential = appleProvider.credential({
+        idToken: identityToken,
+        rawNonce: nonce,
+      });
+
+      // Sign in to Firebase with the Apple credential
+      const { initializeApp, getApps } = require('firebase/app');
+      const firebaseConfig = {
+        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+        measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+      };
+
+      let app;
+      if (getApps().length === 0) {
+        app = initializeApp(firebaseConfig);
+      } else {
+        app = getApps()[0];
+      }
+
+      const auth = getAuth(app);
+      const userCredential = await signInWithCredential(auth, appleCredential);
+      const firebaseUser = userCredential.user;
+
+      // If this is the first time signing in with Apple, update the user's display name
+      // Apple only provides name on first sign-in
+      if (credential.fullName && credential.fullName.givenName && credential.fullName.familyName) {
+        const displayName = `${credential.fullName.givenName} ${credential.fullName.familyName}`;
+        if (firebaseUser.displayName !== displayName) {
+          await firebaseUser.updateProfile({ displayName });
+        }
+      }
+
+      // Create or update user profile in Firestore
+      await this.createOrUpdateUserProfile(firebaseUser);
+
+      const user = this.convertFirebaseUser(firebaseUser);
+      console.log('✅ AuthService: Apple Sign-in successful', user.email);
+      return user;
+    } catch (error: any) {
+      console.error('❌ AuthService: Apple Sign-in failed', error);
+
+      if (error.code === 'ERR_REQUEST_CANCELED') {
+        throw new Error('Sign-in was cancelled');
+      } else {
+        throw new Error(error.message || 'Apple Sign-in failed');
       }
     }
   }
