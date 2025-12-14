@@ -31,6 +31,7 @@ import ComingUpSpark from '../sparks/ComingUpSpark';
 import { FinalClockSpark } from '../sparks/FinalClockSpark';
 import TripSurveySpark from '../sparks/TripSurveySpark';
 import RecAIpeSpark from '../sparks/RecAIpeSpark';
+import ShopSpark from '../sparks/ShopSpark';
 import { SparkStatsSpark } from '../sparks/SparkStatsSpark';
 import { BigDennySpark } from '../sparks/BigDennySpark';
 import { SpeakSpark } from '../sparks/SpeakSpark';
@@ -417,6 +418,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
             rating: 4.6,
         },
         component: RecAIpeSpark,
+    },
+    'shop': {
+        metadata: {
+            id: 'shop',
+            title: 'Shop',
+            description: 'Simple shopping list with editable items and local persistence',
+            icon: '🛒',
+            category: 'productivity',
+            createdAt: '2025-12-14T00:00:00.000Z',
+            rating: 4.6,
+        },
+        component: ShopSpark,
     },
     'speak-spark': {
         metadata: {
