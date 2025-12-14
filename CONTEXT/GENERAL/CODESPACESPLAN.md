@@ -228,6 +228,189 @@ EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 - [ ] Verify hot reload works
 - [ ] Test all major Sparks features
 
+## How to Create a GitHub Codespace
+
+### Prerequisites
+
+Before you start:
+- ✅ GitHub account (free tier includes 120 core-hours/month)
+- ✅ Access to the SparksApp repository (must be a collaborator or have it forked)
+- ✅ Firebase project with credentials ready
+- ✅ Gemini API key (optional, but needed for RecAIpe and Minute Minder)
+
+### Method 1: From GitHub Repository (Recommended)
+
+This is the easiest way to create a Codespace.
+
+1. **Navigate to the Repository**
+   - Go to https://github.com/yourusername/SparksApp
+   - Make sure you're on the branch you want to work on (usually `main`)
+
+2. **Open the Codespaces Menu**
+   - Click the green **"Code"** button (top right of the file list)
+   - Select the **"Codespaces"** tab
+   
+   > You'll see a list of any existing Codespaces or an option to create a new one
+
+3. **Create New Codespace**
+   - Click **"Create codespace on main"** (or your branch name)
+   - Alternatively, click the **"+"** button to create with default settings
+   
+   > **Tip**: Click the dropdown arrow (⌄) next to the "+" for advanced options (machine type, region)
+
+4. **Wait for Container Build**
+   - GitHub will provision a container (first time: 3-5 minutes)
+   - You'll see progress in the browser
+   - The setup script will automatically run
+   
+   > **What's happening**: Installing Node.js, npm packages, creating .env template
+
+5. **Codespace Opens in Browser**
+   - VS Code will open in your browser
+   - Terminal at the bottom will show setup completion message
+   - File explorer on the left shows project files
+
+### Method 2: From GitHub Codespaces Dashboard
+
+Useful for managing multiple Codespaces or resuming work.
+
+1. **Go to Codespaces Dashboard**
+   - Visit https://github.com/codespaces
+   - Or: GitHub profile → Settings → Codespaces
+
+2. **Create New Codespace**
+   - Click **"New codespace"** button (top right)
+   - Select repository: `yourusername/SparksApp`
+   - Select branch: `main` (or your working branch)
+   - Choose machine type: **4-core** (recommended minimum)
+   - Click **"Create codespace"**
+
+3. **Wait for Setup**
+   - Same 3-5 minute build process as Method 1
+   - Opens automatically when ready
+
+### Method 3: Using GitHub CLI (Advanced)
+
+For command-line users who have `gh` CLI installed.
+
+```bash
+# Create a new Codespace
+gh codespace create --repo yourusername/SparksApp --branch main
+
+# Or create and connect immediately
+gh codespace create --repo yourusername/SparksApp --branch main --web
+```
+
+### Method 4: Using VS Code Desktop (Optional)
+
+If you prefer VS Code desktop over browser.
+
+1. **Install GitHub Codespaces Extension**
+   - Open VS Code desktop application
+   - Install extension: `GitHub.codespaces`
+
+2. **Sign in to GitHub**
+   - Command Palette (Cmd/Ctrl + Shift + P)
+   - Type: "Codespaces: Sign In"
+
+3. **Create Codespace**
+   - Command Palette → "Codespaces: Create New Codespace"
+   - Select repository and branch
+   - Codespace opens in VS Code desktop
+
+### After Codespace is Created
+
+Once your Codespace is running, you'll see:
+
+```
+🚀 Setting up SparksApp development environment...
+📦 Installing npm packages...
+🔑 Creating .env file from template...
+⚠️  IMPORTANT: Edit .env file with your Firebase credentials!
+✅ Setup complete!
+
+📱 To start developing with Expo Go:
+   1. Run: npx expo start --tunnel
+   2. Open Expo Go app on your phone
+   3. Scan the QR code that appears
+```
+
+**Next Steps**:
+1. Edit the `.env` file with your credentials (see below)
+2. Start Expo development server
+3. Connect your phone
+
+### Configuring Environment Variables
+
+After Codespace creation, configure your environment:
+
+1. **Open `.env` file**
+   - In VS Code file explorer, click `.env`
+   - File was auto-created from `.env.example`
+
+2. **Get Firebase Credentials**
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Select your project → ⚙️ Settings → Project Settings
+   - Scroll to "Your apps" → Web app
+   - Copy all config values
+
+3. **Get Gemini API Key**
+   - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Click "Create API Key"
+   - Copy the key
+
+4. **Update `.env` File**
+   Replace placeholder values with real credentials:
+   ```bash
+   EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSy... (your real key)
+   EXPO_PUBLIC_FIREBASE_PROJECT_ID=sparks-app-12345
+   # ... etc for all variables
+   EXPO_PUBLIC_GEMINI_API_KEY=AIzaSy... (your Gemini key)
+   ```
+
+5. **Save the File**
+   - Press Cmd/Ctrl + S to save
+   - Changes are auto-synced to the cloud
+
+### Managing Your Codespace
+
+**Stopping a Codespace** (to save core-hours):
+- Click your Codespace name (bottom left of VS Code)
+- Select "Stop Current Codespace"
+- Or: Visit https://github.com/codespaces and click "Stop"
+
+**Resuming a Codespace**:
+- Visit https://github.com/codespaces
+- Find your Codespace in the list
+- Click the name to reopen
+
+**Deleting a Codespace**:
+- Visit https://github.com/codespaces
+- Click "..." menu next to Codespace
+- Select "Delete"
+- Confirm deletion
+
+**Auto-sleep Settings**:
+- Codespaces auto-sleep after 30 minutes of inactivity (default)
+- Configure in: Settings → Codespaces → Default idle timeout
+
+### Troubleshooting Codespace Creation
+
+**"Codespace creation failed"**:
+- Check if you have available core-hours (GitHub settings)
+- Try selecting a different region
+- Verify repository access permissions
+
+**"Setup script failed"**:
+- Check `.devcontainer/setup.sh` exists
+- Verify `package.json` is present
+- Delete and recreate the Codespace
+
+**"Out of storage"**:
+- Delete old Codespaces you're not using
+- Free tier includes 15GB storage total
+- Each Codespace uses ~2-4GB
+
 ## Developer Workflow
 
 ### First-Time Setup
@@ -243,13 +426,16 @@ EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 
 3. **Start Development Server**
    ```bash
-   npx expo start --tunnel
+   npx expo start --tunnel --go
    ```
+   - `--tunnel`: Required for Codespaces (creates public URL)
+   - `--go`: Forces Expo Go mode (prevents dev build mode)
 
 4. **Connect Phone**
    - Install Expo Go on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
    - Open Expo Go app
    - Scan QR code from terminal
+   - Look for tunnel URL: `exp://xxx.tunnel.exp.dev:8081`
 
 5. **Start Developing**
    - Edit code in VS Code (in browser)
@@ -264,7 +450,7 @@ EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 
 2. **Start Expo**
    ```bash
-   npx expo start --tunnel
+   npx expo start --tunnel --go
    ```
 
 3. **Connect Device**
@@ -292,7 +478,7 @@ EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 
 **Command:**
 ```bash
-npx expo start --tunnel
+npx expo start --tunnel --go
 ```
 
 ### Option 2: LAN (Faster, Local Network Only)
@@ -314,6 +500,92 @@ npx expo start --lan
 **Note**: For Codespaces, tunnel mode is highly recommended as LAN mode won't work without VPN.
 
 ## Troubleshooting
+
+### Tunnel Not Working / Site Cannot Be Reached
+
+**Problem**: Getting "site cannot be reached" error or seeing local IP (10.0.0.x:8081) instead of tunnel URL
+
+**Symptoms**:
+- Error connecting to `10.0.0.137:8081` or similar local IP
+- No tunnel URL appears (no `.tunnel.exp.dev` domain)
+- QR code shows `exp://10.0.0.x:8081` instead of tunnel URL
+
+**Solutions:**
+
+1. **Install ngrok dependency**:
+   ```bash
+   npm install --save-dev @expo/ngrok --legacy-peer-deps
+   ```
+
+2. **Stop and restart with tunnel flag**:
+   ```bash
+   # Stop current server (Ctrl+C)
+   npx expo start --tunnel --go --clear
+   ```
+
+3. **Verify tunnel is actually running**:
+   Look for output like:
+   ```
+   › Metro waiting on exp://xxx-xxx.tunnel.exp.dev:8081
+   › Tunnel ready
+   ```
+
+4. **Check for firewall/network blocks**:
+   - Some corporate networks block tunneling
+   - Try from personal WiFi/hotspot if possible
+
+5. **Use explicit tunnel service**:
+   ```bash
+   npx expo start --tunnel --tunnel-service ngrok --go
+   ```
+
+**Why this happens**:
+- Codespaces is in the cloud, your phone can't reach it via local network
+- Tunnel creates a public URL that works from anywhere
+- Without tunnel, Expo defaults to LAN mode which won't work
+
+### Starting in Development Build Instead of Expo Go
+
+**Problem**: Expo opens in "development build" mode instead of Expo Go
+
+**Symptoms**:
+- Message says "Open with development build"
+- Can't select Expo Go option
+- App won't load in Expo Go
+
+**Solutions:**
+
+1. **Use --go flag explicitly**:
+   ```bash
+   npx expo start --tunnel --go
+   ```
+
+2. **Clear Expo cache**:
+   ```bash
+   npx expo start --tunnel --go --clear
+   ```
+
+3. **Check for dev build config**:
+   Look in `app.json` or `app.config.js` for:
+   ```json
+   {
+     "expo": {
+       "developmentClient": true  // Remove or set to false
+     }
+   }
+   ```
+
+4. **Remove ios/android folders** (if they exist):
+   ```bash
+   # These folders trigger dev build mode
+   rm -rf ios android
+   npx expo start --tunnel --go
+   ```
+
+**Why this happens**:
+- If you've run `npx expo run:ios` or `npx expo run:android`, it creates native folders
+- Those folders make Expo think you want dev build mode
+- The `--go` flag forces Expo Go mode
 
 ### QR Code Won't Scan
 
@@ -363,6 +635,41 @@ npx expo start --lan
 2. Clear watchman: `watchman watch-del-all` (if available)
 3. Clear Metro cache: `rm -rf .expo`
 4. Reinstall: `rm -rf node_modules package-lock.json && npm install`
+
+### Dependency Resolution Errors
+
+**Problem**: `npm install` fails with "ERESOLVE unable to resolve dependency tree" or React version conflicts
+
+**Error Example**:
+```
+npm error ERESOLVE unable to resolve dependency tree
+npm error While resolving: sparksapp@1.0.10
+npm error Found: react@19.1.0
+```
+
+**Solutions:**
+1. **Use legacy peer deps** (bypasses strict peer dependency checking):
+   ```bash
+   npm install --legacy-peer-deps
+   ```
+
+2. **Full clean reinstall**:
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install --legacy-peer-deps
+   ```
+
+3. **Force installation** (alternative to legacy-peer-deps):
+   ```bash
+   npm install --force
+   ```
+
+**Why this happens**: 
+- React Native and Expo projects often have complex peer dependencies
+- React 19 is newer and some packages haven't updated their peer dep declarations
+- The `--legacy-peer-deps` flag tells npm to install despite warnings (safe for this project)
+
+**Note**: The setup script now uses `--legacy-peer-deps` automatically to prevent this issue.
 
 ## Limitations
 
