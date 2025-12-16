@@ -31,6 +31,14 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
           } catch (error) {
             console.error('Error loading GolfWisdom notification count:', error);
           }
+        } else if (sparkId === 'friend-spark') {
+          // For friend-spark, check FriendInvitationNotificationService
+          try {
+            const { FriendInvitationNotificationService } = await import('../services/FriendInvitationNotificationService');
+            count = await FriendInvitationNotificationService.getUnreadCount();
+          } catch (error) {
+            console.error('Error loading Friend invitation notification count:', error);
+          }
         } else {
           // For other sparks, use FeedbackNotificationService
           const deviceId = await FeedbackNotificationService.getPersistentDeviceId();

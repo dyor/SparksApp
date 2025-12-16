@@ -21,6 +21,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { SettingsContainer, SettingsScrollView, SettingsHeader, SettingsFeedbackSection } from '../components/SettingsComponents';
+import ShareableSparkService, { ShareableItem } from '../services/ShareableSparkService';
+import { FriendSelectionModal } from '../components/FriendSelectionModal';
+import { Friend } from '../services/FriendService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -59,7 +62,33 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editUrl, setEditUrl] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
   const isInitializing = useRef(true);
+
+  // Register as shareable spark
+  useEffect(() => {
+    ShareableSparkService.registerSpark({
+      sparkId: 'short-saver',
+      sharingModel: 'copy',
+      getShareableItems: async (): Promise<ShareableItem[]> => {
+        return videos.map(video => ({
+          id: video.id,
+          title: video.name || video.title,
+          description: video.category,
+          preview: video.thumbnail,
+          sparkId: 'short-saver',
+          data: video,
+        }));
+      },
+      onShareItem: async (itemId: string, friendId: string) => {
+        const video = videos.find(v => v.id === itemId);
+        if (!video) {
+          throw new Error('Video not found');
+        }
+        await ShareableSparkService.shareItemCopy('short-saver', itemId, friendId, video);
+      },
+    });
+  }, [videos]);
 
   // Load saved videos on mount
   useEffect(() => {
@@ -330,6 +359,43 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
           }
         }
       ]
+    );
+  };
+
+  // Handle share video
+  const handleShareVideo = () => {
+    if (!editingVideo) return;
+    setShowShareModal(true);
+    HapticFeedback.light();
+  };
+
+  const handleSelectFriend = async (friend: Friend) => {
+    if (!editingVideo) return;
+
+    try {
+      await ShareableSparkService.shareItemCopy(
+        'short-saver',
+        editingVideo.id,
+        friend.userId,
+        editingVideo
+      );
+      HapticFeedback.notification('success');
+      Alert.alert('Success', `Video shared with ${friend.displayName}!`);
+    } catch (error: any) {
+      console.error('Error sharing video:', error);
+      HapticFeedback.notification('error');
+      Alert.alert('Error', error.message || 'Failed to share video');
+    }
+  };
+
+  const handleAddFriend = () => {
+    // Close modals and let user navigate to Friend Spark manually
+    setShowShareModal(false);
+    handleCloseModal();
+    Alert.alert(
+      'Add Friend',
+      'Please go to Friend Spark to add friends, then come back to share videos.',
+      [{ text: 'OK' }]
     );
   };
 
@@ -611,8 +677,8 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       marginBottom: 12,
     },
     previewCard: {
-      width: 200,
-      height: 300,
+      width: (screenWidth - 52) / 2, // Match video card width
+      aspectRatio: 9 / 16, // YouTube Shorts aspect ratio (match video card)
       borderRadius: 12,
       borderWidth: 1,
       overflow: 'hidden',
@@ -631,13 +697,13 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     previewPlaceholderText: {
       fontSize: 48,
     },
-    previewNamePill: {
+    previewCategoryPill: {
       position: 'absolute',
       top: 8,
       left: 8,
       right: 8,
     },
-    previewCategoryPill: {
+    previewNamePill: {
       position: 'absolute',
       bottom: 8,
       left: 8,
@@ -665,6 +731,9 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     },
     saveButton: {
       // Primary color applied via backgroundColor
+    },
+    shareButton: {
+      // Secondary color applied via backgroundColor
     },
     modalButtonText: {
       fontSize: 16,
@@ -891,20 +960,20 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
                       </View>
                     )}
 
-                    {/* Name pill preview */}
-                    {editName.trim() && (
-                      <View style={[styles.namePill, styles.previewNamePill, { backgroundColor: colors.secondary }]}>
-                        <Text style={[styles.namePillText, { color: colors.background }]}>
-                          {editName.trim()}
+                    {/* Category pill overlay - Top (matching main card) */}
+                    {parseCategoryAndUrl(editUrl).category && (
+                      <View style={[styles.categoryPill, styles.previewCategoryPill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+                        <Text style={[styles.categoryPillText, { color: '#ffffff' }]}>
+                          {parseCategoryAndUrl(editUrl).category}
                         </Text>
                       </View>
                     )}
 
-                    {/* Category pill preview */}
-                    {parseCategoryAndUrl(editUrl).category && (
-                      <View style={[styles.categoryPill, styles.previewCategoryPill, { backgroundColor: colors.primary }]}>
-                        <Text style={[styles.categoryPillText, { color: colors.background }]}>
-                          {parseCategoryAndUrl(editUrl).category}
+                    {/* Name pill overlay - Bottom (matching main card) */}
+                    {editName.trim() && (
+                      <View style={[styles.namePill, styles.previewNamePill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+                        <Text style={[styles.namePillText, { color: '#ffffff' }]}>
+                          {editName.trim()}
                         </Text>
                       </View>
                     )}
@@ -920,6 +989,15 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
               >
                 <Text style={[styles.modalButtonText, { color: colors.text }]}>
                   Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.shareButton, { backgroundColor: colors.secondary }]}
+                onPress={handleShareVideo}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  Share
                 </Text>
               </TouchableOpacity>
 
@@ -943,6 +1021,14 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* Friend Selection Modal */}
+        <FriendSelectionModal
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          onSelectFriend={handleSelectFriend}
+          onAddFriend={handleAddFriend}
+        />
       </View>
     </TouchableWithoutFeedback>
   );

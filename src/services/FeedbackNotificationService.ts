@@ -340,6 +340,7 @@ export class FeedbackNotificationService {
       // Check if user is admin and get unread feedback count
       let totalUnreadFeedback = 0;
       let totalUnreadSuggestions = 0;
+      let totalUnreadInvitations = 0;
       try {
         const { AdminResponseService } = await import('./AdminResponseService');
         const isAdmin = await AdminResponseService.isAdmin();
@@ -360,13 +361,30 @@ export class FeedbackNotificationService {
           // If GolfWisdom admin check fails, ignore
           console.log('GolfWisdom admin check failed:', error);
         }
+
+        // Check for friend invitations (requires authentication)
+        try {
+          const { FriendInvitationNotificationService } = await import('./FriendInvitationNotificationService');
+          totalUnreadInvitations = await FriendInvitationNotificationService.getUnreadCount();
+        } catch (error) {
+          // If friend invitation check fails, ignore (user might not be authenticated)
+          console.log('Friend invitation check failed:', error);
+        }
       } catch (error) {
         // If admin check fails, assume not admin
         console.log('Admin check failed, assuming not admin:', error);
+        
+        // Still try to get friend invitations even if admin check fails
+        try {
+          const { FriendInvitationNotificationService } = await import('./FriendInvitationNotificationService');
+          totalUnreadInvitations = await FriendInvitationNotificationService.getUnreadCount();
+        } catch (error) {
+          console.log('Friend invitation check failed:', error);
+        }
       }
       
       // Aggregate total unread count
-      const totalUnread = totalUnreadReplies + totalUnreadFeedback + totalUnreadSuggestions;
+      const totalUnread = totalUnreadReplies + totalUnreadFeedback + totalUnreadSuggestions + totalUnreadInvitations;
       
       // Update app icon badge
       await Notifications.setBadgeCountAsync(totalUnread);

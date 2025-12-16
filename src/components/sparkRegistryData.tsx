@@ -35,6 +35,7 @@ import ShopSpark from '../sparks/ShopSpark';
 import { SparkStatsSpark } from '../sparks/SparkStatsSpark';
 import { BigDennySpark } from '../sparks/BigDennySpark';
 import { SpeakSpark } from '../sparks/SpeakSpark';
+import FriendSpark from '../sparks/FriendSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -442,6 +443,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
             rating: 4.5,
         },
         component: SpeakSpark,
+    },
+    'friend-spark': {
+        metadata: {
+            id: 'friend-spark',
+            title: 'Friend Spark',
+            description: 'Connect with friends and share sparks',
+            icon: '👥',
+            category: 'social',
+            createdAt: '2025-12-15T00:00:00.000Z',
+            rating: 4.5,
+        },
+        component: FriendSpark,
     },
 };
 
