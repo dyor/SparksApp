@@ -10,8 +10,8 @@
                 "msjsdiag.vscode-react-native",
                 "expo.vscode-expo",
                 "EditorConfig.EditorConfig",
-                "dbaeumer.vscode-eslint",
-                "esbenp.prettier-vscode"
+                "esbenp.prettier-vscode",
+                "seunlanlege.action-buttons"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "bash",

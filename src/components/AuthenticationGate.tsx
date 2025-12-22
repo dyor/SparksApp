@@ -10,13 +10,14 @@ import { HapticFeedback } from '../utils/haptics';
 interface AuthenticationGateProps {
     children: React.ReactNode;
     onSignInSuccess?: () => void;
+    renderUnauthenticated?: () => React.ReactNode;
 }
 
 /**
  * Component that requires authentication before showing children
  * Shows sign-in UI if user is not authenticated
  */
-export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children, onSignInSuccess }) => {
+export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children, onSignInSuccess, renderUnauthenticated }) => {
     const { colors } = useTheme();
     const commonStyles = createCommonStyles(colors);
     const { user, setUser, setRole, setSparkAdminRoles } = useAuthStore();
@@ -28,12 +29,15 @@ export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children
         return <>{children}</>;
     }
 
+    if (renderUnauthenticated) {
+        return <>{renderUnauthenticated()}</>;
+    }
+
     // Otherwise, show sign-in prompt
     const handleSignIn = async () => {
         try {
             setIsSigningIn(true);
-            HapticFeedback.impact('light');
-
+            HapticFeedback.light();
             const user = await AuthService.signInWithGoogle();
             if (user) {
                 setUser(user);
@@ -41,12 +45,12 @@ export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children
                 setRole(role);
                 const sparkAdminRoles = await AuthService.getSparkAdminRoles();
                 setSparkAdminRoles(sparkAdminRoles);
-                HapticFeedback.notification('success');
+                HapticFeedback.success();
                 onSignInSuccess?.();
             }
         } catch (error: any) {
             console.error('Sign-in error:', error);
-            HapticFeedback.notification('error');
+            HapticFeedback.error();
             Alert.alert('Sign-In Failed', error.message || 'Unable to sign in. Please try again.');
         } finally {
             setIsSigningIn(false);
@@ -56,7 +60,7 @@ export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children
     const handleSignInWithApple = async () => {
         try {
             setIsSigningInWithApple(true);
-            HapticFeedback.impact('light');
+            HapticFeedback.light();
 
             const user = await AuthService.signInWithApple();
             if (user) {
@@ -65,12 +69,12 @@ export const AuthenticationGate: React.FC<AuthenticationGateProps> = ({ children
                 setRole(role);
                 const sparkAdminRoles = await AuthService.getSparkAdminRoles();
                 setSparkAdminRoles(sparkAdminRoles);
-                HapticFeedback.notification('success');
+                HapticFeedback.success();
                 onSignInSuccess?.();
             }
         } catch (error: any) {
             console.error('Apple Sign-in error:', error);
-            HapticFeedback.notification('error');
+            HapticFeedback.error();
             Alert.alert('Sign-In Failed', error.message || 'Unable to sign in. Please try again.');
         } finally {
             setIsSigningInWithApple(false);

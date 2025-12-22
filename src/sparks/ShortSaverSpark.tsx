@@ -68,6 +68,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const [editCategory, setEditCategory] = useState('');
   const [editUrl, setEditUrl] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
+  const [sharingVideo, setSharingVideo] = useState<ShortVideo | null>(null);
   const isInitializing = useRef(true);
 
   // Register as shareable spark
@@ -100,7 +101,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     const loadVideos = async () => {
       const data = getSparkData('short-saver');
       let userVideos: ShortVideo[] = [];
-      
+
       if (data?.videos && data.videos.length > 0) {
         // Load saved videos
         userVideos = data.videos;
@@ -254,54 +255,54 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
   };
 
-    // Add new video
-    const handleAddVideo = async () => {
-      if (!newUrl.trim()) {
-        Alert.alert('Error', 'Please enter a YouTube URL');
-        return;
-      }
+  // Add new video
+  const handleAddVideo = async () => {
+    if (!newUrl.trim()) {
+      Alert.alert('Error', 'Please enter a YouTube URL');
+      return;
+    }
 
-      // Parse category and URL
-      const { category, url } = parseCategoryAndUrl(newUrl.trim());
-      const videoId = parseYouTubeUrl(url);
+    // Parse category and URL
+    const { category, url } = parseCategoryAndUrl(newUrl.trim());
+    const videoId = parseYouTubeUrl(url);
 
-      if (!videoId) {
-        Alert.alert('Error', 'Please enter a valid YouTube URL');
-        return;
-      }
+    if (!videoId) {
+      Alert.alert('Error', 'Please enter a valid YouTube URL');
+      return;
+    }
 
-      // Check if video already exists
-      if (videos.some(video => video.id === videoId)) {
-        Alert.alert('Error', 'This video is already saved');
-        return;
-      }
+    // Check if video already exists
+    if (videos.some(video => video.id === videoId)) {
+      Alert.alert('Error', 'This video is already saved');
+      return;
+    }
 
-      setIsAdding(true);
-      HapticFeedback.light();
+    setIsAdding(true);
+    HapticFeedback.light();
 
-      try {
-        const newVideo: ShortVideo = {
-          id: videoId,
-          url: url,
-          title: `YouTube Short ${videoId}`, // We'll try to get the real title later
-          thumbnail: getThumbnailUrl(videoId),
-          addedAt: Date.now(),
-          category: category || 'Uncategorized',
-        };
+    try {
+      const newVideo: ShortVideo = {
+        id: videoId,
+        url: url,
+        title: `YouTube Short ${videoId}`, // We'll try to get the real title later
+        thumbnail: getThumbnailUrl(videoId),
+        addedAt: Date.now(),
+        category: category || 'Uncategorized',
+      };
 
-        // Add to beginning of array (newest first)
-        const updatedVideos = [newVideo, ...videos];
-        setVideos(updatedVideos);
-        setNewUrl('');
+      // Add to beginning of array (newest first)
+      const updatedVideos = [newVideo, ...videos];
+      setVideos(updatedVideos);
+      setNewUrl('');
 
-        HapticFeedback.success();
-      } catch (error) {
-        console.error('Error adding video:', error);
-        Alert.alert('Error', 'Failed to add video. Please try again.');
-      } finally {
-        setIsAdding(false);
-      }
-    };
+      HapticFeedback.success();
+    } catch (error) {
+      console.error('Error adding video:', error);
+      Alert.alert('Error', 'Failed to add video. Please try again.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
 
   // Play video directly in YouTube
@@ -413,6 +414,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   };
 
   // Handle share video
+  // Handle share video
   const handleShareVideo = () => {
     console.log('📤 ShortSaver: Share button pressed');
     if (!editingVideo) {
@@ -421,25 +423,35 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       return;
     }
     console.log('📤 ShortSaver: Opening share modal for video:', editingVideo.id);
-    setShowShareModal(true);
-    HapticFeedback.light();
+
+    // Store video to share and close edit modal first to avoid stacking issues
+    setSharingVideo(editingVideo);
+    handleCloseModal();
+
+    // Slight delay to allow edit modal to close completely
+    setTimeout(() => {
+      setShowShareModal(true);
+      HapticFeedback.light();
+    }, 500);
   };
 
   const handleSelectFriend = async (friend: Friend) => {
-    if (!editingVideo) return;
+    const videoToShare = sharingVideo || editingVideo;
+    if (!videoToShare) return;
 
     try {
       console.log('📤 ShortSaver: Sharing video with friend:', friend.userId);
       await ShareableSparkService.shareItemCopy(
         'short-saver',
-        editingVideo.id,
+        videoToShare.id,
         friend.userId,
-        editingVideo
+        videoToShare
       );
       console.log('✅ ShortSaver: Video shared successfully');
       HapticFeedback.success();
       Alert.alert('Success', `Video shared with ${friend.displayName}!`);
       setShowShareModal(false);
+      setSharingVideo(null);
     } catch (error: any) {
       console.error('❌ ShortSaver: Error sharing video:', error);
       HapticFeedback.error();
@@ -464,7 +476,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const VideoCard: React.FC<{ video: ShortVideo; index: number }> = ({ video, index }) => (
     <TouchableOpacity
       style={[
-        styles.videoCard, 
+        styles.videoCard,
         { backgroundColor: colors.surface, borderColor: video.isShared ? '#9B59B6' : colors.border },
         video.isShared && { borderWidth: 2 }
       ]}
@@ -1144,7 +1156,10 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
         {/* Friend Selection Modal */}
         <FriendSelectionModal
           visible={showShareModal}
-          onClose={() => setShowShareModal(false)}
+          onClose={() => {
+            setShowShareModal(false);
+            setSharingVideo(null);
+          }}
           onSelectFriend={handleSelectFriend}
           onAddFriend={handleAddFriend}
         />

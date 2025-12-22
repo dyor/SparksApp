@@ -1,0 +1,303 @@
+
+> sparksapp@1.0.12 test
+> jest src/components/__tests__/RecordSwing.test.tsx
+
+FAIL src/components/__tests__/RecordSwing.test.tsx
+  RecordSwing
+    ✓ renders Record Swing button (306 ms)
+    ✕ shows countdown when recording starts (1052 ms)
+    ✕ updates countdown every second (16 ms)
+    ✕ shows recording duration during recording (13 ms)
+    ✕ calls onRecordingComplete with metadata when recording finishes (6 ms)
+    ✓ auto-stops recording after duration seconds (5 ms)
+    ✕ displays thumbnail after recording (1006 ms)
+    ✕ shows correct shot info in thumbnail label (1005 ms)
+    ✓ uses custom countdown seconds from settings (6 ms)
+    ✓ uses custom duration seconds from settings (10 ms)
+
+  ● RecordSwing › shows countdown when recording starts
+
+    Unable to find an element with text: 5
+
+    [
+      [36m<View[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": true,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+      [36m>[39m
+        [36m<Text>[39m
+          [0m4[0m
+        [36m</Text>[39m
+      [36m</View>[39m,
+      [36m<Modal>[39m
+        [36m<View>[39m
+          [36m<View>[39m
+            [36m<View>[39m
+              [36m<Text>[39m
+                [0m4[0m
+              [36m</Text>[39m
+            [36m</View>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+              [36m>[39m
+                [36m<Text>[39m
+                  [0mCancel[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</View>[39m
+      [36m</Modal>[39m,
+    ]
+
+      105 |         fireEvent.press(getByText('🎥 Record Swing'));
+      106 |
+    > 107 |         await waitFor(() => {
+          |                      ^
+      108 |             expect(getByText('5')).toBeTruthy();
+      109 |         });
+      110 |     });
+
+      at Object.<anonymous> (src/components/__tests__/RecordSwing.test.tsx:107:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● RecordSwing › updates countdown every second
+
+    Unable to find an element with text: 5
+
+    [
+      [36m<View[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": true,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+      [36m>[39m
+        [36m<Text>[39m
+          [0m4[0m
+        [36m</Text>[39m
+      [36m</View>[39m,
+      [36m<Modal>[39m
+        [36m<View>[39m
+          [36m<View>[39m
+            [36m<View>[39m
+              [36m<Text>[39m
+                [0m4[0m
+              [36m</Text>[39m
+            [36m</View>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+              [36m>[39m
+                [36m<Text>[39m
+                  [0mCancel[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</View>[39m
+      [36m</Modal>[39m,
+    ]
+
+      116 |         fireEvent.press(getByText('🎥 Record Swing'));
+      117 |
+    > 118 |         await waitFor(() => expect(getByText('5')).toBeTruthy());
+          |                      ^
+      119 |
+      120 |         jest.advanceTimersByTime(1000);
+      121 |         await waitFor(() => expect(getByText('4')).toBeTruthy());
+
+      at Object.<anonymous> (src/components/__tests__/RecordSwing.test.tsx:118:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● RecordSwing › shows recording duration during recording
+
+    Found multiple elements with text: /Stop Recording/
+
+      136 |         jest.advanceTimersByTime(5000);
+      137 |
+    > 138 |         await waitFor(() => {
+          |                      ^
+      139 |             expect(getByText(/Stop Recording/)).toBeTruthy();
+      140 |         });
+      141 |
+
+      at Object.<anonymous> (src/components/__tests__/RecordSwing.test.tsx:138:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● RecordSwing › calls onRecordingComplete with metadata when recording finishes
+
+    Unable to find an element with text: /Stop Recording/
+
+    [
+      [36m<View[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": true,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+      [36m>[39m
+        [36m<Text>[39m
+          [0m5[0m
+        [36m</Text>[39m
+      [36m</View>[39m,
+      [36m<Modal>[39m
+        [36m<View>[39m
+          [36m<View>[39m
+            [36m<View>[39m
+              [36m<Text>[39m
+                [0m5[0m
+              [36m</Text>[39m
+            [36m</View>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+              [36m>[39m
+                [36m<Text>[39m
+                  [0mCancel[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</View>[39m
+      [36m</Modal>[39m,
+    ]
+
+      153 |
+      154 |         // Stop recording
+    > 155 |         fireEvent.press(getByText(/Stop Recording/));
+          |                         ^
+      156 |
+      157 |         await waitFor(() => {
+      158 |             expect(mockOnRecordingComplete).toHaveBeenCalledWith(
+
+      at Object.getByText (src/components/__tests__/RecordSwing.test.tsx:155:25)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● RecordSwing › displays thumbnail after recording
+
+    Unable to find an element with testID: video-thumbnail
+
+    [
+      [36m<View[39m
+        [33maccessibilityState[39m=[32m{
+          {
+            "disabled": true,
+          }
+        }[39m
+        [33maccessible[39m=[32m{true}[39m
+      [36m>[39m
+        [36m<Text>[39m
+          [0m5[0m
+        [36m</Text>[39m
+      [36m</View>[39m,
+      [36m<Modal>[39m
+        [36m<View>[39m
+          [36m<View>[39m
+            [36m<View>[39m
+              [36m<Text>[39m
+                [0m5[0m
+              [36m</Text>[39m
+            [36m</View>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+              [36m>[39m
+                [36m<Text>[39m
+                  [0mCancel[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</View>[39m
+      [36m</Modal>[39m,
+    ]
+
+      193 |
+      194 |         // Mock recording complete
+    > 195 |         await waitFor(() => {
+          |                      ^
+      196 |             const thumbnail = getByTestId('video-thumbnail');
+      197 |             expect(thumbnail).toBeTruthy();
+      198 |         });
+
+      at Object.<anonymous> (src/components/__tests__/RecordSwing.test.tsx:195:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● RecordSwing › shows correct shot info in thumbnail label
+
+    Unable to find an element with text: /Hole 1 Shot 2 - Driver/
+
+    [36m<View[39m
+      [33maccessibilityState[39m=[32m{
+        {
+          "disabled": false,
+        }
+      }[39m
+      [33maccessible[39m=[32m{true}[39m
+    [36m>[39m
+      [36m<Text>[39m
+        [0m🎥 Record Swing[0m
+      [36m</Text>[39m
+    [36m</View>[39m
+
+      203 |
+      204 |         // After recording, should show shot info
+    > 205 |         await waitFor(() => {
+          |                      ^
+      206 |             expect(getByText(/Hole 1 Shot 2 - Driver/)).toBeTruthy();
+      207 |         });
+      208 |     });
+
+      at Object.<anonymous> (src/components/__tests__/RecordSwing.test.tsx:205:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+Test Suites: 1 failed, 1 total
+Tests:       6 failed, 4 passed, 10 total
+Snapshots:   0 total
+Time:        3.906 s, estimated 5 s
+Ran all test suites matching /src\/components\/__tests__\/RecordSwing.test.tsx/i.
+node:internal/process/promises:289
+            triggerUncaughtException(err, true /* fromPromise */);
+            ^
+
+Error: Unable to find node on an unmounted component.
+    at Object.<anonymous> (/Users/mattdyor/SparksApp/src/components/__tests__/RecordSwing.test.tsx:215:16)
+    at Promise.then.completed (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/run.js:121:9)
+    at run (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/Users/mattdyor/SparksApp/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/Users/mattdyor/SparksApp/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/mattdyor/SparksApp/node_modules/jest-runner/build/runTest.js:444:34)
+
+Node.js v20.11.0

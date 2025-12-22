@@ -161,7 +161,7 @@ export const FriendSparkSettings: React.FC<FriendSparkSettingsProps> = ({ onClos
 
     return (
         <SettingsContainer>
-            <SettingsHeader title="Friend Spark Settings" onClose={onClose} />
+            <SettingsHeader title="Friend Spark Settings" subtitle="Manage your friend connections" />
             <SettingsScrollView>
                 <SettingsSection title="Invitations">
                     <View style={{ position: 'relative' }}>

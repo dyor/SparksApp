@@ -1,4 +1,24 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "workbench.sideBar.location": "right",
+    "workbench.activityBar.location": "hidden",
+    "workbench.statusBar.visible": true,
+    "actionButtons": {
+        "defaultColor": "#ff0034",
+        "commands": [
+            {
+                "cwd": "${workspaceFolder}",
+                "name": "🌐 Preview",
+                "command": "npx expo start --web",
+                "singleInstance": true
+            },
+            {
+                "cwd": "${workspaceFolder}",
+                "name": "🚀 Publish",
+                "command": "bash .vscode/publish.sh",
+                "singleInstance": true
+            }
+        ]
+    }
 }
