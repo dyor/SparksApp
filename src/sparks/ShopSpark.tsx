@@ -117,10 +117,7 @@ export const ShopSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings 
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>🛒 Shop</Text>
-                <TouchableOpacity onPress={openEditor} style={{ padding: 8 }}>
-                    <Text style={{ color: colors.primary, fontSize: 18 }}>Edit</Text>
-                </TouchableOpacity>
-            </View>
+            </View> 
 
             <ScrollView style={styles.content}>
                 {data.items.length === 0 ? (

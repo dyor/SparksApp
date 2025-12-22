@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { createCommonStyles } from '../styles/CommonStyles';
@@ -42,11 +42,10 @@ export const CommonModal: React.FC<CommonModalProps> = ({
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                 >
-                    <TouchableOpacity
-                        style={commonStyles.modalOverlay}
-                        activeOpacity={1}
-                        onPress={onClose}
-                    >
+                    <View style={commonStyles.modalOverlay}>
+                        <TouchableWithoutFeedback testID="modal-backdrop" onPress={onClose}>
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+                        </TouchableWithoutFeedback>
                         <View
                             style={commonStyles.modalContent}
                             onStartShouldSetResponder={() => true}
@@ -54,13 +53,13 @@ export const CommonModal: React.FC<CommonModalProps> = ({
                             <Text style={commonStyles.modalTitle}>{title}</Text>
                             <ContentWrapper
                                 showsVerticalScrollIndicator={scrollable}
-                                keyboardShouldPersistTaps="handled"
+                                keyboardShouldPersistTaps="always"
                             >
                                 {children}
                             </ContentWrapper>
                             {footer && <View style={{ marginTop: 16 }}>{footer}</View>}
                         </View>
-                    </TouchableOpacity>
+                    </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </Modal>

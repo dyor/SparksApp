@@ -56,16 +56,16 @@ describe('CommonModal', () => {
     });
 
     it('calls onClose when overlay is pressed', () => {
-        const { getByTestId, UNSAFE_getByType } = render(
+        const { getByTestId } = render(
             <CommonModal {...defaultProps}>
                 <></>
             </CommonModal>,
             { wrapper: TestWrapper }
         );
 
-        // The modal overlay is the first TouchableOpacity
-        const overlays = UNSAFE_getByType(require('react-native').TouchableOpacity);
-        fireEvent.press(overlays);
+        // Press the backdrop area
+        const backdrop = getByTestId('modal-backdrop');
+        fireEvent.press(backdrop);
 
         expect(mockOnClose).toHaveBeenCalled();
     });
