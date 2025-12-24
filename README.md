@@ -8,14 +8,14 @@ Check out https://sparks.febak.com/check-out-the-sparks-app for details.
 
 ## Features
 
-*   **Modular "Sparks"**: 25+ independent micro-apps across multiple categories:
+*   **Modular "Sparks"**: 30+ vibe-coded sparks (basically mini apps) across multiple categories:
     *   **Productivity**: Speak Spark (Voice Control), Todo List, Packing List, Minute Minder, Trip Survey, Coming Up
-    *   **Education**: Spanish Flashcards, Spanish Friend (Amigo), Spanish Reader
+    *   **Spanish**: Spanish Flashcards, Spanish Friend (Amigo), Spanish Reader
     *   **Media**: Toview (movies/books/shows), Short Saver (YouTube), Song Saver (Spotify), Sound Board
     *   **Golf**: Golf Brain, Tee Time Timer, Golf Wisdom
     *   **Health**: FoodCam, Weight Tracker, Final Clock
     *   **Utility**: Decision Spinner, Quick Convert, CardScore, Share Sparks
-    *   **Travel**: TripStory
+    *   **Travel**: TripStory, Trip Survey
     *   **Games**: Business Simulator, Buzzy Bingo
     *   **Community**: Spark Wizard (submit your own ideas)
 *   **Marketplace**: Browse and manage your collection of Sparks.
@@ -23,12 +23,11 @@ Check out https://sparks.febak.com/check-out-the-sparks-app for details.
 *   **Persistence**: Data saved locally via AsyncStorage.
 *   **Settings System**: Comprehensive settings for each spark with feedback integration.
 *   **Cross-platform**: iOS, Android, and Web support via Expo.
+> ![Sparks Marketplace](SparksSummary.png)
 
 # Contributing New Sparks
 
 We welcome contributions! There are three ways you can add new sparks to the app, ranging from a simple in-app wizard to full code contributions via GitHub.
-
----
 
 ## 1. Using the Spark Wizard (In-App)
 The most user-friendly way to contribute is directly through the interface of the Sparks app.
@@ -41,9 +40,7 @@ The most user-friendly way to contribute is directly through the interface of th
 4.  **Submit:** Submit your spark for review directly through the app.
 
 > **Note:** The Spark Wizard is designed for a seamless, no-code experience.
-> ![Sparks Marketplace](SparksSummary.png)
-
----
+> ![Spark Wizard](SparkWizard.png)
 
 ## 2. Using GitHub Codespaces
 Use a pre-configured cloud environment to add sparks via the codebase without any local setup.
@@ -72,8 +69,6 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
     * Open the **Source Control** tab in the sidebar.
     * Commit your changes.
     * Click **"Create Pull Request"** to submit your changes to the main repository.
-
----
 
 ## 3. Forking the Repository
 For developers who prefer a traditional Git workflow.
