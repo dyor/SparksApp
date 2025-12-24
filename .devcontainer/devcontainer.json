@@ -3,6 +3,7 @@
     "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
     // Setup script handles environment and dependencies
     "postCreateCommand": "bash .devcontainer/setup.sh",
+    "postStartCommand": "bash .devcontainer/start-expo.sh",
     // VS Code customizations
     "customizations": {
         "vscode": {

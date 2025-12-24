@@ -65,7 +65,7 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
       ```
 3.  **Preview Your Change:** In the terminal, run:
     ```bash
-    npx expo start --web
+    npx expo start --web --tunnel
     ```
     This will provide a web-based preview of the app so you can verify your spark looks correct.
 4.  **Submit a PR:** 

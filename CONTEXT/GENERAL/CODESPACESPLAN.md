@@ -19,7 +19,7 @@ As of the latest update, Codespaces is functional for web-based development:
 
 3. **Web Development**: Expo can be run in web mode:
    ```bash
-   npx expo start --web
+   npx expo start --web --tunnel
    ```
    This allows testing the app in a browser within the Codespace
 
@@ -42,7 +42,7 @@ As of the latest update, Codespaces is functional for web-based development:
    - This limits development to web-only mode currently
 
 2. **Command Execution UX**:
-   - Users must manually open a terminal, know the exact command (`npx expo start --web`), paste it, and run it
+   - Users must manually open a terminal, know the exact command (`npx expo start --web --tunnel`), paste it, and run it
    - No prominent UI element (like a big button) to start the development server
    - This creates friction for new users who may not know the command
 
@@ -812,12 +812,12 @@ GitHub Codespaces has usage limits:
      {
        "version": "2.0.0",
        "tasks": [
-         {
-           "label": "Start Expo (Web)",
-           "type": "shell",
-           "command": "npx expo start --web",
-           "problemMatcher": []
-         },
+             {
+                "label": "Start Expo (Web)",
+                "type": "shell",
+                "command": "npx expo start --web --tunnel",
+                "problemMatcher": []
+             },
          {
            "label": "Start Expo (Tunnel)",
            "type": "shell",
@@ -839,7 +839,7 @@ GitHub Codespaces has usage limits:
      "customizations": {
        "codespaces": {
          "commands": {
-           "start-web": "npx expo start --web",
+           "start-web": "npx expo start --web --tunnel",
            "start-tunnel": "npx expo start --tunnel --go"
          }
        }

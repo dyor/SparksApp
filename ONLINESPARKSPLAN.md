@@ -14,7 +14,7 @@ Configure `.vscode/settings.json` to move the Primary Side Bar to the right and 
 
 Install the "Action Buttons" extension via `.devcontainer/devcontainer.json`.
 
-- Add a high-visibility button in the Editor Title Menu (top right) labeled "🌐 Preview". This button must trigger `npx expo start --web`.
+- Add a high-visibility button in the Editor Title Menu (top right) labeled "🌐 Preview". This button must trigger `npx expo start --web --tunnel`.
 - Add a high-visibility button in the Editor Title Menu labeled "🚀 Publish". This button must trigger a custom script: `.vscode/publish.sh`.
 
 ## Step 3: Automation Scripts

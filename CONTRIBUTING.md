@@ -24,7 +24,7 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
 1. **Create a Codespace:** Click [this link](https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest) to launch the environment.
 2. **Edit with Agent:** Use the built-in Copilot/AI agent to help generate or modify the spark files.
    * *Tip:* You can tell the Agent to build a new spark based on an existing one but with the changes you want.
-3. **Preview Your Change:** In the terminal, run `npx expo start --web`
+3. **Preview Your Change:** In the terminal, run `npx expo start --web --tunnel`
 4. **Submit a PR:** Open the Source Control tab, commit your changes, and click "Create Pull Request".
 
 ---

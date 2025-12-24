@@ -10,7 +10,7 @@
             {
                 "cwd": "${workspaceFolder}",
                 "name": "🌐 Preview",
-                "command": "npx expo start --web",
+                "command": "npx expo start --web --tunnel",
                 "singleInstance": true
             },
             {
