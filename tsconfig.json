@@ -3,6 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-native",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "downlevelIteration": true,
+    "target": "ESNext"
   }
 }

@@ -22,7 +22,7 @@ const { width: screenWidth } = Dimensions.get('window');
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import * as ImageManipulator from 'expo-image-manipulator';

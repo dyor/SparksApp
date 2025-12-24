@@ -40,7 +40,8 @@
       "@react-native-google-signin/google-signin",
       "@react-native-firebase/app",
       "expo-speech-recognition",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "@react-native-community/datetimepicker"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -117,6 +118,9 @@
       "eas": {
         "projectId": "18230acd-b45d-4f62-8406-6f3c8de209c7"
       }
+    },
+    "web": {
+      "bundler": "metro"
     }
   }
 }

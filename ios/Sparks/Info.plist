@@ -82,8 +82,6 @@
     <string>Spanish Flashcards and Amigo sparks uses speech synthesis for language Spanish.</string>
     <key>NSUserNotificationsUsageDescription</key>
     <string>Sparks uses notifications to send you daily reminders and updates about your activities.</string>
-    <key>RCTNewArchEnabled</key>
-    <true/>
     <key>UIBackgroundModes</key>
     <array>
       <string>remote-notification</string>
