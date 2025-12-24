@@ -1,22 +1,22 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Start Expo Web",
-            "type": "shell",
-            "command": "npx expo start --web --tunnel",
-            "isBackground": true,
-            "problemMatcher": [],
-            "runOptions": {
-                "runOn": "folderOpen"
-            },
-            "env": {
-                "REACT_NATIVE_PACKAGER_HOSTNAME": "127.0.0.1"
-            },
-            "presentation": {
-                "reveal": "silent",
-                "panel": "hidden"
-            }
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Expo Web",
+      "type": "shell",
+      "command": "npx expo start --web --tunnel",
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "env": {
+        "REACT_NATIVE_PACKAGER_HOSTNAME": "127.0.0.1"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "hidden"
+      }
+    }
+  ]
 }
