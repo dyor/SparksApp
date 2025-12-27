@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.13",
+    "version": "1.0.19",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -37,7 +37,7 @@
           }
         }
       ],
-      "@react-native-google-signin/google-signin",
+      "./withAndroid16KBSupport",
       "@react-native-firebase/app",
       "expo-speech-recognition",
       "expo-apple-authentication",
@@ -68,7 +68,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mattdyor.sparks",
-      "buildNumber": "1.0.13",
+      "buildNumber": "1.0.19",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "requireFullScreen": false,
@@ -84,14 +84,21 @@
         "NSSpeechRecognitionUsageDescription": "Spanish Flashcards and Amigo sparks uses speech synthesis for language Spanish.",
         "AVAudioSessionCategoryPlayback": true,
         "AVAudioSessionCategoryPlayAndRecord": false,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.229332029977-ok836lt8vduk9du4t4d90ou4drrcbo43"
+            ]
+          }
+        ]
       }
     },
     "android": {
       "package": "com.mattdyor.sparks",
       "versionCode": 30,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -112,7 +119,7 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.13"
+      "versionName": "1.0.19"
     },
     "extra": {
       "eas": {
@@ -120,7 +127,9 @@
       }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "output": "static"
     }
   }
 }

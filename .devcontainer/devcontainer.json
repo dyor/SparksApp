@@ -45,8 +45,9 @@
     ],
     "portsAttributes": {
         "8081": {
-            "label": "Metro Bundler",
-            "onAutoForward": "notify"
+            "label": "Expo Web Server",
+            "onAutoForward": "openBrowser",
+            "protocol": "http"
         },
         "19000": {
             "label": "Expo DevTools",

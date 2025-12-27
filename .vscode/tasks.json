@@ -4,18 +4,21 @@
     {
       "label": "Start Expo Web",
       "type": "shell",
-      "command": "npx expo start --web --tunnel",
+      "command": "npm run web",
       "isBackground": true,
       "problemMatcher": [],
       "runOptions": {
         "runOn": "folderOpen"
       },
       "env": {
-        "REACT_NATIVE_PACKAGER_HOSTNAME": "127.0.0.1"
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_NO_GIT_STATUS": "1",
+        "CI": "true"
       },
       "presentation": {
-        "reveal": "silent",
-        "panel": "hidden"
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false
       }
     }
   ]
