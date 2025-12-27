@@ -40,6 +40,9 @@ const sparkEmojis = [
   "🎛️",
   "🏌️‍♂️",
   "💱",
+  "🎉",
+  "🔥",
+  "⭐",
 ];
 
 interface Player {
@@ -81,6 +84,7 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
   const [gameStarted, setGameStarted] = useState(false);
   const [gameWon, setGameWon] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [rounds, setRounds] = useState(0);
   const [poopAnimation, setPoopAnimation] = useState<{
     visible: boolean;
     poops: Array<{
@@ -133,6 +137,7 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
     setFlippedCards([]);
     setGameStarted(true);
     setGameWon(false);
+    setRounds(0);
   };
 
   // Handle card press
@@ -156,6 +161,7 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
     );
 
     if (newFlippedCards.length === 2) {
+      setRounds((prev) => prev + 1);
       // Check for match after a brief delay
       setTimeout(() => {
         const [firstId, secondId] = newFlippedCards;
@@ -231,7 +237,7 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
 
   // Get card style based on match status and player
   const getCardStyle = (card: Card) => {
-    const baseStyle = [styles.card];
+    const baseStyle: any[] = [styles.card];
 
     if (card.isFlipped) {
       baseStyle.push(styles.cardFlipped);
@@ -298,6 +304,7 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
     setCards([]);
     setFlippedCards([]);
     setGameWon(false);
+    setRounds(0);
     setCurrentPlayerIndex(0);
   };
 
@@ -405,7 +412,6 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
           <SaveCancelButtons
             onSave={() => onCloseSettings?.()}
             onCancel={() => onCloseSettings?.()}
-            saveLabel="Close"
           />
         </SettingsScrollView>
       </SettingsContainer>
@@ -477,6 +483,17 @@ const MemorySpark: React.FC<MemorySparkProps> = ({
             </TouchableOpacity>
           ))}
         </View>
+
+        <Text
+          style={{
+            textAlign: "center",
+            fontSize: 18,
+            color: colors.text,
+            marginVertical: 10,
+          }}
+        >
+          Rounds: {rounds}
+        </Text>
 
         <View style={styles.controls}>
           <TouchableOpacity style={styles.controlButton} onPress={resetGame}>
