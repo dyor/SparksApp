@@ -1,8 +1,6 @@
 # SparksApp
 
-SparksApp is a mobile application featuring a collection of micro-experiences ("sparks") - interactive, vibe-coded experiences like spin the wheel, flashcards, and business simulations. Built with React Native and Expo, it offers a modular platform for small, engaging utilities.
-
-Check out https://sparks.febak.com/check-out-the-sparks-app for details.
+SparksApp is a mobile application featuring a collection of micro-experiences ("sparks") - 30+ interactive, vibe-coded experiences like decision spinners, spanish flashcards, trip journal, and golf analyzer. You can either install the app for yourself at https://sparks.febak.com/check-out-the-sparks-app or create your own spark [down below 👇](https://github.com/dyor/SparksApp/blob/main/README.md#2-using-github-codespaces) 
 
 # [Download the App](https://linkly.link/2TcvP)
 
@@ -40,12 +38,14 @@ The most user-friendly way to contribute is directly through the interface of th
 3.  **Create:** Follow the step-by-step prompts to define your spark's content.
 4.  **Submit:** Submit your spark for review directly through the app.
 
-> **Note:** The Spark Wizard is designed for a seamless, no-code experience.
-> <img src="SparkWizard.png" width="200" alt="Spark Wizard">
+> **Note:** The Spark Wizard allows you to share.
+<img src="SparkWizard.png" width="200" alt="Spark Wizard">
 
 ## 2. Using GitHub Codespaces
 
 Use a pre-configured cloud environment to add sparks via the codebase without any local setup.
+
+# [Create Codespace]([https://linkly.link/2TcvP](https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest))
 
 1.  **Create a Codespace:** Click [this link](https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest) to launch the environment.
 2.  **Edit with Agent:** Use the built-in Copilot/AI agent to help generate or modify the spark files.
