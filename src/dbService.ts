@@ -168,6 +168,14 @@ export async function deleteCourse(courseId: number): Promise<void> {
   await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(remaining));
 }
 
+export async function deleteRound(roundId: number): Promise<void> {
+  const rounds = await getRounds();
+  const remaining = rounds.filter((r) => r.id !== roundId);
+  await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(remaining));
+  // Also clean up scores
+  await AsyncStorage.removeItem(SCORES_KEY_PREFIX + roundId);
+}
+
 // Rounds
 export async function createRoundForCourse(courseId: number): Promise<Round> {
   const courses = await getCourses();

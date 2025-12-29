@@ -21,6 +21,8 @@ import { useTheme } from "../contexts/ThemeContext";
 import {
   createCourse,
   createRoundForCourse,
+  deleteCourse,
+  deleteRound,
   getCourses,
   getHoles,
   getRounds,
@@ -37,7 +39,11 @@ const HoleRow = React.forwardRef<
   {
     hole: Hole;
     score: { strokes: string; putts: string };
-    onSave: (holeNumber: number, strokes: string, putts: string) => void;
+    onSave: (
+      holeNumber: number,
+      strokes: string,
+      putts: string
+    ) => Promise<boolean>;
     colors: any;
     styles: any;
     onAutoAdvance?: () => void;
@@ -65,8 +71,19 @@ const HoleRow = React.forwardRef<
     localPuttsRef.current = score.putts;
   }, [score.strokes, score.putts]);
 
-  const handleBlur = () => {
-    onSave(hole.hole_number, localStrokesRef.current, localPuttsRef.current);
+  const handleBlur = async () => {
+    const success = await onSave(
+      hole.hole_number,
+      localStrokesRef.current,
+      localPuttsRef.current
+    );
+    if (!success) {
+      // Revert to props if save failed
+      setLocalStrokes(score.strokes);
+      localStrokesRef.current = score.strokes;
+      setLocalPutts(score.putts);
+      localPuttsRef.current = score.putts;
+    }
   };
 
   const strokesValue = parseInt(localStrokes);
@@ -454,6 +471,10 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [courseName, setCourseName] = useState("");
   const [numHoles, setNumHoles] = useState(18);
   const [holePars, setHolePars] = useState<Record<number, number>>({});
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [roundSummaries, setRoundSummaries] = useState<
+    Record<number, { strokes: number; putts: number }>
+  >({});
 
   // Load all rounds for Recent Rounds screen
   useEffect(() => {
@@ -468,6 +489,20 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           : 0
       );
       setRounds(allRounds);
+
+      const summaries: Record<number, { strokes: number; putts: number }> = {};
+      for (const r of allRounds) {
+        const scores = await getScores(r.id);
+        let totalStrokes = 0;
+        let totalPutts = 0;
+        scores.forEach((s) => {
+          if (s.strokes) totalStrokes += s.strokes;
+          if (s.putts) totalPutts += s.putts;
+        });
+        summaries[r.id] = { strokes: totalStrokes, putts: totalPutts };
+      }
+      setRoundSummaries(summaries);
+
       setIsLoading(false);
     };
     if (screen === "recent-rounds") fetchRounds();
@@ -516,17 +551,112 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     if (screen === "courses") fetchCourses();
   }, [screen]);
 
+  const handleDeleteRound = async (id: number) => {
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to delete this round?")) {
+        await deleteRound(id);
+        // Refresh rounds
+        const allRounds = await getRounds();
+        allRounds.sort((a, b) =>
+          b.createdAt && a.createdAt
+            ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            : 0
+        );
+        setRounds(allRounds);
+      }
+    } else {
+      Alert.alert(
+        "Delete Round",
+        "Are you sure you want to delete this round?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              await deleteRound(id);
+              // Refresh rounds
+              const allRounds = await getRounds();
+              allRounds.sort((a, b) =>
+                b.createdAt && a.createdAt
+                  ? new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+                  : 0
+              );
+              setRounds(allRounds);
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleDeleteCourse = async (id: number) => {
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to delete this course?")) {
+        await deleteCourse(id);
+        // Refresh courses
+        const allCourses = await getCourses();
+        setCourses(allCourses);
+      }
+    } else {
+      Alert.alert(
+        "Delete Course",
+        "Are you sure you want to delete this course?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              await deleteCourse(id);
+              // Refresh courses
+              const allCourses = await getCourses();
+              setCourses(allCourses);
+            },
+          },
+        ]
+      );
+    }
+  };
+
   const handleSaveScore = useCallback(
-    async (holeNumber: number, strokes: string, putts: string) => {
-      if (!roundId) return;
+    async (
+      holeNumber: number,
+      strokes: string,
+      putts: string
+    ): Promise<boolean> => {
+      console.log(
+        `[Scorecard] handleSaveScore called for Hole ${holeNumber}. Strokes: "${strokes}", Putts: "${putts}"`
+      );
+
+      if (!roundId) {
+        console.log("[Scorecard] No roundId, aborting save.");
+        return false;
+      }
+
       const s = parseInt(strokes);
       const p = parseInt(putts);
+      console.log(`[Scorecard] Parsed values - Strokes: ${s}, Putts: ${p}`);
 
       // Validate that putts don't exceed strokes
-      if (!isNaN(s) && !isNaN(p) && s > 0 && p > s) {
-        Alert.alert("Invalid Score", "Putts cannot be greater than strokes.");
-        return;
+      if (!isNaN(s) && !isNaN(p) && s > 0 && p >= s) {
+        console.log("[Scorecard] Validation FAILED: Putts >= Strokes");
+        const errorMessage = "Putts must be less than strokes.";
+        setErrorMsg(errorMessage);
+        setTimeout(() => setErrorMsg(null), 3000);
+
+        if (Platform.OS === "web") {
+          console.log("[Scorecard] Triggering window.alert");
+          window.alert(errorMessage);
+        } else {
+          console.log("[Scorecard] Triggering Alert.alert");
+          Alert.alert("Invalid Score", errorMessage);
+        }
+        return false;
       }
+
+      console.log("[Scorecard] Validation PASSED. Proceeding to save.");
 
       // Optimistic update
       setScores((prev) => ({
@@ -541,9 +671,11 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           isNaN(s) ? null : s,
           isNaN(p) ? null : p
         );
+        return true;
       } catch (error) {
         console.error("Error saving score:", error);
         // Revert could be implemented here if needed
+        return false;
       }
     },
     [roundId]
@@ -618,9 +750,9 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       match = normalized.match(regex);
     }
 
-    // Pattern 3: "number X enter Y and Z"
+    // Pattern 3: "number X enter/is Y and Z"
     if (!match) {
-      regex = /number\s+(\w+)\s+enter\s+(\w+)\s+and\s+(\w+)/i;
+      regex = /number\s+(\w+)\s+(?:enter|is)\s+(\w+)\s+and\s+(\w+)/i;
       match = normalized.match(regex);
     }
 
@@ -639,7 +771,12 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         isNaN(parseInt(strokes)) ||
         isNaN(parseInt(putts))
       ) {
-        Alert.alert("Error", "Could not parse numbers from voice command.");
+        const msg = "Could not parse numbers from voice command.";
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Error", msg);
+        }
         return;
       }
 
@@ -648,14 +785,22 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         handleSaveScore(holeNum, strokes, putts);
         // Silent success - no alert
       } else {
-        Alert.alert("Error", `Hole number ${holeNum} not found.`);
+        const msg = `Hole number ${holeNum} not found.`;
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Error", msg);
+        }
       }
     } else {
       console.log("No match found for voice command");
-      Alert.alert(
-        "Voice Command Not Recognized",
-        `I heard: "${text}"\n\nAccepted format:\n• "number [number] enter [strokes] and [putts]"\n\nExample:\n• "number 5 enter 6 and 2"`
-      );
+      const msg = `Voice Command Not Recognized\n\nI heard: "${text}"\n\nAccepted formats:\n• "Number [hole] enter [strokes] and [putts]"\n• "Number [hole] is [strokes] and [putts]"\n\nExamples:\n• "Number 5 enter 4 and 2"\n• "Number 5 is 4 and 2"`;
+
+      if (Platform.OS === "web") {
+        window.alert(msg);
+      } else {
+        Alert.alert("Voice Command Not Recognized", msg);
+      }
     }
   };
 
@@ -735,58 +880,93 @@ const ScorecardSpark: React.FC<SparkProps> = ({
               </>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <View
                 style={{
                   backgroundColor: colors.card,
-                  padding: 16,
                   borderRadius: 12,
                   marginBottom: 12,
                   marginHorizontal: 16,
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                   borderWidth: 1,
                   borderColor: colors.border,
-                }}
-                onPress={() => {
-                  setRoundId(item.id);
-                  setScreen("scorecard");
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingRight: 12,
                 }}
               >
-                <View>
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      color: colors.text,
-                      fontSize: 16,
-                    }}
-                  >
-                    {item.course_name}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.textSecondary,
-                      fontSize: 13,
-                      marginTop: 4,
-                    }}
-                  >
-                    {item.createdAt
-                      ? new Date(item.createdAt).toLocaleString([], {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : ""}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    padding: 16,
+                  }}
+                  onPress={() => {
+                    setRoundId(item.id);
+                    setScreen("scorecard");
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={{
+                        fontWeight: "bold",
+                        color: colors.text,
+                        fontSize: 16,
+                      }}
+                    >
+                      {item.course_name}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                        marginTop: 4,
+                      }}
+                    >
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleString([], {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : ""}
+                    </Text>
+                    {roundSummaries[item.id] && (
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 14,
+                          marginTop: 6,
+                          fontWeight: "600",
+                        }}
+                      >
+                        Score: {roundSummaries[item.id].strokes} • Putts:{" "}
+                        {roundSummaries[item.id].putts}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleDeleteRound(item.id)}
+                  style={{ padding: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#FF5252" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setRoundId(item.id);
+                    setScreen("scorecard");
+                  }}
+                  style={{ padding: 8 }}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             )}
             ListEmptyComponent={
               <Text
@@ -849,6 +1029,25 @@ const ScorecardSpark: React.FC<SparkProps> = ({
               />
             </TouchableOpacity>
           </View>
+          {errorMsg && (
+            <View
+              style={{
+                backgroundColor: "#FF5252",
+                padding: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                marginHorizontal: 16,
+                marginTop: 8,
+                borderRadius: 8,
+              }}
+            >
+              <Text
+                style={{ color: "white", fontWeight: "bold", fontSize: 14 }}
+              >
+                {errorMsg}
+              </Text>
+            </View>
+          )}
           {isLoading ? (
             <View
               style={{
@@ -1108,6 +1307,12 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                       size={22}
                       color={colors.primary}
                     />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleDeleteCourse(item.id)}
+                  >
+                    <Ionicons name="trash-outline" size={22} color="#FF5252" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
