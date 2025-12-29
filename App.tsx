@@ -1,46 +1,53 @@
-import React, { useEffect } from 'react';
-import 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
-import * as SplashScreen from 'expo-splash-screen';
-import { AppNavigator } from './src/navigation/AppNavigator';
-import { ThemeProvider } from './src/contexts/ThemeContext';
-import { useAppStore } from './src/store';
-import { useAuthStore } from './src/store/authStore';
-import { NotificationService } from './src/utils/notifications';
-import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
-import { ServiceFactory } from './src/services/ServiceFactory';
-import AuthService from './src/services/AuthService';
-
+import React, { useEffect } from "react";
+import { useSparkStore } from "./src/store";
+import "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import * as Notifications from "expo-notifications";
+import * as SplashScreen from "expo-splash-screen";
+import { AppNavigator } from "./src/navigation/AppNavigator";
+import { ThemeProvider } from "./src/contexts/ThemeContext";
+import { useAppStore } from "./src/store";
+import { useAuthStore } from "./src/store/authStore";
+import { NotificationService } from "./src/utils/notifications";
+import { FeedbackNotificationService } from "./src/services/FeedbackNotificationService";
+import { ServiceFactory } from "./src/services/ServiceFactory";
+import AuthService from "./src/services/AuthService";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might trigger some race conditions, ignore them */
 });
 
-console.log('🚀 [App.tsx] JS Bundle executing...');
+console.log("🚀 [App.tsx] JS Bundle executing...");
 
 // Initialize Firebase
 try {
   // Use native Firebase if available, otherwise fallback to web/mock
   let firebase;
   try {
-    firebase = require('@react-native-firebase/app').default;
+    firebase = require("@react-native-firebase/app").default;
   } catch (e) {
     // If native firebase is not available, we'll let ServiceFactory handle it
-    console.log('ℹ️ Native Firebase not available, relying on web SDK fallback');
+    console.log(
+      "ℹ️ Native Firebase not available, relying on web SDK fallback"
+    );
   }
 
   if (firebase && !firebase.apps.length) {
     firebase.initializeApp();
-    console.log('✅ Native Firebase initialized');
+    console.log("✅ Native Firebase initialized");
   }
 } catch (error) {
-  console.log('⚠️ Firebase initialization status:', (error as Error).message);
+  console.log("⚠️ Firebase initialization status:", (error as Error).message);
 }
 
 export default function App() {
+  // Ensure 'scorecard' spark is in user collection for debugging
+  const addSparkToUser = useSparkStore((s) => s.addSparkToUser);
+  useEffect(() => {
+    addSparkToUser("scorecard");
+  }, [addSparkToUser]);
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -58,12 +65,15 @@ function AppContent() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('🚀 App: Initializing AuthService...');
+        console.log("🚀 App: Initializing AuthService...");
         await AuthService.initialize();
 
         // Set up auth state listener
         const unsubscribe = AuthService.onAuthStateChanged(async (user) => {
-          console.log('🔐 App: Auth state changed', user ? user.email : 'signed out');
+          console.log(
+            "🔐 App: Auth state changed",
+            user ? user.email : "signed out"
+          );
           setUser(user);
 
           if (user) {
@@ -73,27 +83,30 @@ function AppContent() {
               const sparkAdminRoles = await AuthService.getSparkAdminRoles();
               setRole(role);
               setSparkAdminRoles(sparkAdminRoles);
-              console.log('✅ App: User roles loaded', { role, sparkAdminRoles });
+              console.log("✅ App: User roles loaded", {
+                role,
+                sparkAdminRoles,
+              });
             } catch (error) {
-              console.error('❌ App: Error loading user roles', error);
+              console.error("❌ App: Error loading user roles", error);
             }
           } else {
             // Clear roles when signed out
-            setRole('standard');
+            setRole("standard");
             setSparkAdminRoles([]);
           }
         });
 
         return unsubscribe;
       } catch (error) {
-        console.error('❌ App: Failed to initialize AuthService', error);
+        console.error("❌ App: Failed to initialize AuthService", error);
       }
     };
 
     const unsubscribePromise = initializeAuth();
 
     return () => {
-      unsubscribePromise.then(unsubscribe => {
+      unsubscribePromise.then((unsubscribe) => {
         if (unsubscribe) unsubscribe();
       });
     };
@@ -103,16 +116,16 @@ function AppContent() {
   useEffect(() => {
     const initializeAnalytics = async () => {
       try {
-        console.log('🚀 App: Initializing Analytics...');
+        console.log("🚀 App: Initializing Analytics...");
         await ServiceFactory.ensureAnalyticsInitialized();
-        console.log('✅ App: Analytics initialized');
+        console.log("✅ App: Analytics initialized");
 
         // Track app launch
         const AnalyticsService = ServiceFactory.getAnalyticsService();
         await AnalyticsService.trackAppLaunch();
-        console.log('📊 App: Launch tracked');
+        console.log("📊 App: Launch tracked");
       } catch (error) {
-        console.error('❌ App: Failed to initialize Analytics', error);
+        console.error("❌ App: Failed to initialize Analytics", error);
       }
     };
 
@@ -123,11 +136,11 @@ function AppContent() {
   useEffect(() => {
     const hideSplash = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 500)); // Short delay to ensure render
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Short delay to ensure render
         await SplashScreen.hideAsync();
-        console.log('✅ [App.tsx] Splash screen hidden');
+        console.log("✅ [App.tsx] Splash screen hidden");
       } catch (e) {
-        console.warn('⚠️ [App.tsx] Error hiding splash screen:', e);
+        console.warn("⚠️ [App.tsx] Error hiding splash screen:", e);
       }
     };
     hideSplash();
@@ -147,41 +160,48 @@ function AppContent() {
 
       // Update app icon badge with aggregated unread counts
       await FeedbackNotificationService.updateAppIconBadge();
-
     };
 
     initializeNotifications();
 
     // Listen for notification responses (when user taps notification)
-    const subscription = NotificationService.addNotificationResponseListener((response) => {
-      const data = response.notification.request.content.data;
+    const subscription = NotificationService.addNotificationResponseListener(
+      (response) => {
+        const data = response.notification.request.content.data;
 
-      // Import navigation ref dynamically to avoid circular dependencies
-      import('./src/navigation/AppNavigator').then(({ navigationRef }) => {
-        if (navigationRef.isReady()) {
-          if (data?.type === 'spark-notification' && data?.sparkId) {
-            // Navigate to the specific spark
-            // First navigate to MySparks stack, then to the Spark screen
-            (navigationRef as any).navigate('MySparks', {
-              screen: 'Spark',
-              params: { sparkId: data.sparkId },
-            });
-            console.log(`✅ Navigated to spark ${data.sparkId} from notification`);
-          } else if (data?.type === 'activity-start' && data?.sparkId) {
-            // Legacy activity notifications - navigate to spark
-            (navigationRef as any).navigate('MySparks', {
-              screen: 'Spark',
-              params: { sparkId: data.sparkId },
-            });
-            console.log(`✅ Navigated to spark ${data.sparkId} from activity notification`);
-          }
-        } else {
-          console.log('⚠️ Navigation not ready yet, cannot navigate');
-        }
-      }).catch((error) => {
-        console.error('Error navigating from notification:', error);
-      });
-    });
+        // Import navigation ref dynamically to avoid circular dependencies
+        import("./src/navigation/AppNavigator")
+          .then(({ navigationRef }) => {
+            if (navigationRef.isReady()) {
+              if (data?.type === "spark-notification" && data?.sparkId) {
+                // Navigate to the specific spark
+                // First navigate to MySparks stack, then to the Spark screen
+                (navigationRef as any).navigate("MySparks", {
+                  screen: "Spark",
+                  params: { sparkId: data.sparkId },
+                });
+                console.log(
+                  `✅ Navigated to spark ${data.sparkId} from notification`
+                );
+              } else if (data?.type === "activity-start" && data?.sparkId) {
+                // Legacy activity notifications - navigate to spark
+                (navigationRef as any).navigate("MySparks", {
+                  screen: "Spark",
+                  params: { sparkId: data.sparkId },
+                });
+                console.log(
+                  `✅ Navigated to spark ${data.sparkId} from activity notification`
+                );
+              }
+            } else {
+              console.log("⚠️ Navigation not ready yet, cannot navigate");
+            }
+          })
+          .catch((error) => {
+            console.error("Error navigating from notification:", error);
+          });
+      }
+    );
 
     // Start listening for new feedback responses in real-time
     let feedbackListenerCleanup: (() => void) | null = null;
@@ -189,12 +209,17 @@ function AppContent() {
       try {
         const AnalyticsService = ServiceFactory.getAnalyticsService();
         const sessionInfo = AnalyticsService.getSessionInfo();
-        const deviceId = sessionInfo.userId || sessionInfo.sessionId || 'anonymous';
+        const deviceId =
+          sessionInfo.userId || sessionInfo.sessionId || "anonymous";
 
-        console.log('👂 Starting feedback response listener for device:', deviceId);
-        feedbackListenerCleanup = FeedbackNotificationService.startListeningForNewResponses(deviceId);
+        console.log(
+          "👂 Starting feedback response listener for device:",
+          deviceId
+        );
+        feedbackListenerCleanup =
+          FeedbackNotificationService.startListeningForNewResponses(deviceId);
       } catch (error) {
-        console.error('❌ Error starting feedback listener:', error);
+        console.error("❌ Error starting feedback listener:", error);
       }
     };
 
@@ -207,7 +232,7 @@ function AppContent() {
       try {
         await FeedbackNotificationService.updateAppIconBadge();
       } catch (error) {
-        console.error('Error updating app icon badge:', error);
+        console.error("Error updating app icon badge:", error);
       }
     }, 30000); // Update every 30 seconds
 
@@ -224,7 +249,7 @@ function AppContent() {
   return (
     <>
       <AppNavigator />
-      <StatusBar style={preferences.theme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={preferences.theme === "dark" ? "light" : "dark"} />
     </>
   );
 }

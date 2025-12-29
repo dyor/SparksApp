@@ -19,6 +19,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../contexts/ThemeContext";
 import {
+  createCourse,
+  createRoundForCourse,
+  getCourses,
   getHoles,
   getRounds,
   getScores,
@@ -26,6 +29,7 @@ import {
   initDB,
   Round,
   saveScore,
+  updateCourse,
 } from "../dbService";
 
 const HoleRow = React.forwardRef<
@@ -42,6 +46,10 @@ const HoleRow = React.forwardRef<
   const [localStrokes, setLocalStrokes] = useState(score.strokes);
   const [localPutts, setLocalPutts] = useState(score.putts);
 
+  // Refs to hold latest values for onBlur (avoiding stale state closures)
+  const localStrokesRef = useRef(score.strokes);
+  const localPuttsRef = useRef(score.putts);
+
   const strokesInputRef = useRef<TextInput>(null);
   const puttsInputRef = useRef<TextInput>(null);
 
@@ -52,16 +60,18 @@ const HoleRow = React.forwardRef<
 
   useEffect(() => {
     setLocalStrokes(score.strokes);
+    localStrokesRef.current = score.strokes;
     setLocalPutts(score.putts);
+    localPuttsRef.current = score.putts;
   }, [score.strokes, score.putts]);
 
   const handleBlur = () => {
-    onSave(hole.hole_number, localStrokes, localPutts);
+    onSave(hole.hole_number, localStrokesRef.current, localPuttsRef.current);
   };
 
-  const strokesValue = parseInt(localStrokes) || 0;
-  const netValue = strokesValue > 0 ? strokesValue - hole.par : 0;
-  const isUnderPar = netValue < 0;
+  const strokesValue = parseInt(localStrokes);
+  const netValue = !isNaN(strokesValue) ? strokesValue - hole.par : 0;
+  const isUnderPar = !isNaN(strokesValue) && netValue < 0;
 
   return (
     <View style={styles.tableRow}>
@@ -78,6 +88,7 @@ const HoleRow = React.forwardRef<
           value={localStrokes}
           onChangeText={(val) => {
             setLocalStrokes(val);
+            localStrokesRef.current = val;
             if (val.length === 1 && /^\d+$/.test(val)) {
               puttsInputRef.current?.focus();
             }
@@ -85,7 +96,7 @@ const HoleRow = React.forwardRef<
           onBlur={handleBlur}
           keyboardType="numeric"
           placeholder=""
-          placeholderTextColor={colors.placeholder}
+          placeholderTextColor={colors.textSecondary}
         />
       </View>
       <View style={styles.inputCol}>
@@ -95,6 +106,7 @@ const HoleRow = React.forwardRef<
           value={localPutts}
           onChangeText={(val) => {
             setLocalPutts(val);
+            localPuttsRef.current = val;
             if (val.length === 1 && /^\d+$/.test(val)) {
               onAutoAdvance?.();
             }
@@ -102,16 +114,14 @@ const HoleRow = React.forwardRef<
           onBlur={handleBlur}
           keyboardType="numeric"
           placeholder=""
-          placeholderTextColor={colors.placeholder}
+          placeholderTextColor={colors.textSecondary}
         />
       </View>
       <View style={styles.netCol}>
         <Text style={[styles.netText, isUnderPar && { color: "#2E7D32" }]}>
-          {strokesValue > 0
-            ? isUnderPar
-              ? `${netValue}`
-              : netValue === 0
-              ? "0"
+          {!isNaN(strokesValue)
+            ? netValue > 0
+              ? `+${netValue}`
               : netValue
             : ""}
         </Text>
@@ -261,7 +271,157 @@ const getStyles = (colors: any) =>
       color: colors.text,
       textAlign: "center",
     },
+    newRoundButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 24,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    newRoundButtonText: {
+      color: "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "bold",
+      letterSpacing: 1,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.text,
+      marginHorizontal: 16,
+      marginBottom: 12,
+    },
+    courseItem: {
+      backgroundColor: colors.card,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 12,
+      marginHorizontal: 16,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    courseInfo: {
+      flex: 1,
+    },
+    courseName: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.text,
+    },
+    courseDetails: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    editButton: {
+      padding: 8,
+    },
+    formContainer: {
+      padding: 16,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 8,
+    },
+    textInput: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 16,
+    },
+    holeConfigRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    parSelector: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    parButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+      marginHorizontal: 4,
+    },
+    parButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    parButtonText: {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: colors.text,
+    },
+    parButtonTextActive: {
+      color: "#FFFFFF",
+    },
+    saveButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: "center",
+      marginTop: 24,
+      marginBottom: 40,
+    },
+    saveButtonText: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "bold",
+    },
   });
+
+const ScorecardFooter = ({ totals, styles }: { totals: any; styles: any }) => (
+  <View style={styles.tableFooter}>
+    <View style={styles.holeCol}>
+      <Text style={styles.footerLabel}>Total</Text>
+    </View>
+    <View style={styles.parCol}>
+      <Text style={styles.footerValue}>{totals.par}</Text>
+    </View>
+    <View style={styles.inputCol}>
+      <Text style={styles.footerValue}>{totals.strokes}</Text>
+    </View>
+    <View style={styles.inputCol}>
+      <Text style={styles.footerValue}>{totals.putts}</Text>
+    </View>
+    <View style={styles.netCol}>
+      <Text
+        style={[styles.footerValue, totals.net < 0 && { color: "#2E7D32" }]}
+      >
+        {totals.strokes > 0
+          ? totals.net > 0
+            ? `+${totals.net}`
+            : totals.net
+          : ""}
+      </Text>
+    </View>
+  </View>
+);
 
 const ScorecardSpark: React.FC<SparkProps> = ({
   showSettings = false,
@@ -288,6 +448,12 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   // For focusing next input in scorecard
   const holeRefs = useRef<Record<number, any>>({});
+
+  // Course editing state
+  const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [courseName, setCourseName] = useState("");
+  const [numHoles, setNumHoles] = useState(18);
+  const [holePars, setHolePars] = useState<Record<number, number>>({});
 
   // Load all rounds for Recent Rounds screen
   useEffect(() => {
@@ -328,8 +494,8 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       const scoreMap: Record<number, { strokes: string; putts: string }> = {};
       savedScores.forEach((s) => {
         scoreMap[s.hole_number] = {
-          strokes: s.strokes === 0 ? "" : s.strokes.toString(),
-          putts: s.putts === 0 ? "" : s.putts.toString(),
+          strokes: s.strokes === null ? "" : s.strokes.toString(),
+          putts: s.putts === null ? "" : s.putts.toString(),
         };
       });
       setScores(scoreMap);
@@ -343,7 +509,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     const fetchCourses = async () => {
       setIsLoading(true);
       await initDB();
-      const allCourses = await (await import("../dbService")).getCourses();
+      const allCourses = await getCourses();
       setCourses(allCourses);
       setIsLoading(false);
     };
@@ -362,19 +528,22 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         return;
       }
 
+      // Optimistic update
+      setScores((prev) => ({
+        ...prev,
+        [holeNumber]: { strokes, putts },
+      }));
+
       try {
         await saveScore(
           roundId,
           holeNumber,
-          isNaN(s) ? 0 : s,
-          isNaN(p) ? 0 : p
+          isNaN(s) ? null : s,
+          isNaN(p) ? null : p
         );
-        setScores((prev) => ({
-          ...prev,
-          [holeNumber]: { strokes, putts },
-        }));
       } catch (error) {
         console.error("Error saving score:", error);
+        // Revert could be implemented here if needed
       }
     },
     [roundId]
@@ -516,11 +685,14 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     holes.forEach((hole) => {
       const score = scores[hole.hole_number];
       if (score) {
-        const s = parseInt(score.strokes) || 0;
-        if (s > 0) {
+        const s = parseInt(score.strokes);
+        const p = parseInt(score.putts);
+        if (!isNaN(s)) {
           totalStrokes += s;
-          totalPutts += parseInt(score.putts) || 0;
           scoredPar += hole.par;
+        }
+        if (!isNaN(p)) {
+          totalPutts += p;
         }
       }
     });
@@ -538,7 +710,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={[styles.header, { justifyContent: "center" }]}>
-          <Text style={styles.headerTitle}>Recent Rounds</Text>
+          <Text style={styles.headerTitle}>Golf Scorecard</Text>
         </View>
         {isLoading ? (
           <View
@@ -550,17 +722,31 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           <FlatList
             data={rounds}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+            ListHeaderComponent={
+              <>
+                <TouchableOpacity
+                  style={styles.newRoundButton}
+                  onPress={() => setScreen("courses")}
+                >
+                  <Text style={styles.newRoundButtonText}>NEW ROUND</Text>
+                </TouchableOpacity>
+                <Text style={styles.sectionTitle}>Recent Rounds</Text>
+              </>
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={{
                   backgroundColor: colors.card,
                   padding: 16,
-                  borderRadius: 8,
+                  borderRadius: 12,
                   marginBottom: 12,
+                  marginHorizontal: 16,
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
                 onPress={() => {
                   setRoundId(item.id);
@@ -568,51 +754,53 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                 }}
               >
                 <View>
-                  <Text style={{ fontWeight: "bold", color: colors.text }}>
+                  <Text
+                    style={{
+                      fontWeight: "bold",
+                      color: colors.text,
+                      fontSize: 16,
+                    }}
+                  >
                     {item.course_name}
                   </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 13,
+                      marginTop: 4,
+                    }}
+                  >
                     {item.createdAt
-                      ? new Date(item.createdAt).toLocaleString()
+                      ? new Date(item.createdAt).toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : ""}
                   </Text>
                 </View>
                 <Ionicons
                   name="chevron-forward"
                   size={20}
-                  color={colors.text}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             )}
             ListEmptyComponent={
               <Text
-                style={{ textAlign: "center", color: colors.textSecondary }}
+                style={{
+                  textAlign: "center",
+                  color: colors.textSecondary,
+                  marginTop: 20,
+                }}
               >
                 No rounds found.
               </Text>
             }
           />
         )}
-        <TouchableOpacity
-          style={{
-            position: "absolute",
-            bottom: 32,
-            right: 32,
-            backgroundColor: colors.primary,
-            borderRadius: 32,
-            width: 64,
-            height: 64,
-            justifyContent: "center",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-          onPress={() => setScreen("courses")}
-        >
-          <Ionicons name="add" size={36} color="#fff" />
-        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -636,6 +824,15 @@ const ScorecardSpark: React.FC<SparkProps> = ({
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle} numberOfLines={1}>
                 {round?.course_name || "Scorecard"}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: colors.textSecondary,
+                  marginTop: 2,
+                }}
+              >
+                "Number # Enter # and #"
               </Text>
             </View>
             <TouchableOpacity
@@ -691,6 +888,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
               </View>
               <FlatList
                 data={holes}
+                extraData={scores}
                 renderItem={({ item }) => (
                   <HoleRow
                     ref={(el) => (holeRefs.current[item.hole_number] = el)}
@@ -712,34 +910,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                 contentContainerStyle={styles.listContent}
                 initialNumToRender={18}
                 ListFooterComponent={
-                  <View style={styles.tableFooter}>
-                    <View style={styles.holeCol}>
-                      <Text style={styles.footerLabel}>Total</Text>
-                    </View>
-                    <View style={styles.parCol}>
-                      <Text style={styles.footerValue}>{totals.par}</Text>
-                    </View>
-                    <View style={styles.inputCol}>
-                      <Text style={styles.footerValue}>{totals.strokes}</Text>
-                    </View>
-                    <View style={styles.inputCol}>
-                      <Text style={styles.footerValue}>{totals.putts}</Text>
-                    </View>
-                    <View style={styles.netCol}>
-                      <Text
-                        style={[
-                          styles.footerValue,
-                          totals.net < 0 && { color: "#2E7D32" },
-                        ]}
-                      >
-                        {totals.strokes > 0
-                          ? totals.net > 0
-                            ? `+${totals.net}`
-                            : totals.net
-                          : ""}
-                      </Text>
-                    </View>
-                  </View>
+                  <ScorecardFooter totals={totals} styles={styles} />
                 }
               />
             </>
@@ -751,76 +922,233 @@ const ScorecardSpark: React.FC<SparkProps> = ({
 
   // --- Screen 3: Courses ---
   if (screen === "courses") {
+    const handleCreateNewCourse = () => {
+      setEditingCourse({ id: null });
+      setCourseName("");
+      setNumHoles(18);
+      const initialPars: Record<number, number> = {};
+      for (let i = 1; i <= 18; i++) initialPars[i] = 4;
+      setHolePars(initialPars);
+    };
+
+    const handleEditCourse = (course: any) => {
+      setEditingCourse(course);
+      setCourseName(course.name);
+      setNumHoles(course.holes.length);
+      const initialPars: Record<number, number> = {};
+      course.holes.forEach((h: any) => {
+        initialPars[h.hole_number] = h.par;
+      });
+      setHolePars(initialPars);
+    };
+
+    const handleSaveCourse = async () => {
+      if (!courseName.trim()) {
+        Alert.alert("Error", "Please enter a course name.");
+        return;
+      }
+
+      const holesData = [];
+      for (let i = 1; i <= numHoles; i++) {
+        holesData.push({ hole_number: i, par: holePars[i] || 4 });
+      }
+
+      let savedCourse;
+      if (editingCourse.id) {
+        await updateCourse(editingCourse.id, courseName, holesData);
+        savedCourse = {
+          id: editingCourse.id,
+          name: courseName,
+          holes: holesData,
+        };
+      } else {
+        savedCourse = await createCourse(courseName, holesData);
+      }
+
+      // After saving, start a new round with this course
+      const newRound = await createRoundForCourse(savedCourse.id);
+      setRoundId(newRound.id);
+      setEditingCourse(null);
+      setScreen("scorecard");
+    };
+
     return (
       <SafeAreaView style={styles.container}>
-        <View style={[styles.header, { justifyContent: "center" }]}>
+        <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => setScreen("recent-rounds")}
+            onPress={() => {
+              if (editingCourse) setEditingCourse(null);
+              else setScreen("recent-rounds");
+            }}
             style={styles.backButton}
           >
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Courses</Text>
+            <Text style={styles.headerTitle}>
+              {editingCourse
+                ? editingCourse.id
+                  ? "Edit Course"
+                  : "New Course"
+                : "Select Course"}
+            </Text>
           </View>
           <View style={styles.backButton} />
         </View>
-        {isLoading ? (
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-          >
-            <Text>Loading...</Text>
-          </View>
+
+        {editingCourse ? (
+          <FlatList
+            data={Array.from({ length: numHoles }, (_, i) => i + 1)}
+            keyExtractor={(item) => String(item)}
+            contentContainerStyle={styles.formContainer}
+            ListHeaderComponent={
+              <>
+                <Text style={styles.inputLabel}>Course Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={courseName}
+                  onChangeText={setCourseName}
+                  placeholder="Enter course name"
+                  placeholderTextColor={colors.textSecondary}
+                />
+
+                <Text style={styles.inputLabel}>Number of Holes</Text>
+                <View style={[styles.parSelector, { marginBottom: 24 }]}>
+                  {[9, 18].map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={[
+                        styles.parButton,
+                        numHoles === n && styles.parButtonActive,
+                        { flex: 1, height: 44 },
+                      ]}
+                      onPress={() => setNumHoles(n)}
+                    >
+                      <Text
+                        style={[
+                          styles.parButtonText,
+                          numHoles === n && styles.parButtonTextActive,
+                        ]}
+                      >
+                        {n} Holes
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.sectionTitle}>Hole Pars</Text>
+              </>
+            }
+            renderItem={({ item: holeNum }) => (
+              <View style={styles.holeConfigRow}>
+                <Text style={styles.parText}>Hole {holeNum}</Text>
+                <View style={styles.parSelector}>
+                  {[3, 4, 5, 6].map((p) => (
+                    <TouchableOpacity
+                      key={p}
+                      style={[
+                        styles.parButton,
+                        holePars[holeNum] === p && styles.parButtonActive,
+                      ]}
+                      onPress={() =>
+                        setHolePars((prev) => ({ ...prev, [holeNum]: p }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.parButtonText,
+                          holePars[holeNum] === p && styles.parButtonTextActive,
+                        ]}
+                      >
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            ListFooterComponent={
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveCourse}
+              >
+                <Text style={styles.saveButtonText}>SAVE & START ROUND</Text>
+              </TouchableOpacity>
+            }
+          />
         ) : (
           <FlatList
             data={courses}
             keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={{ flexGrow: 1, padding: 16 }}
-            renderItem={({ item }) => (
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+            ListHeaderComponent={
               <TouchableOpacity
-                style={{
-                  backgroundColor: colors.card,
-                  padding: 16,
-                  borderRadius: 8,
-                  marginBottom: 12,
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-                onPress={async () => {
-                  // Create new round for this course
-                  const { createRoundForCourse } = await import("../dbService");
-                  const newRound = await createRoundForCourse(item.id);
-                  setRoundId(newRound.id);
-                  setScreen("scorecard");
-                }}
+                style={styles.newRoundButton}
+                onPress={handleCreateNewCourse}
               >
-                <View>
-                  <Text style={{ fontWeight: "bold", color: colors.text }}>
-                    {item.name}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                    {item.holes.length} holes
+                <Text style={styles.newRoundButtonText}>CREATE NEW COURSE</Text>
+              </TouchableOpacity>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.courseItem}>
+                <View style={styles.courseInfo}>
+                  <Text style={styles.courseName}>{item.name}</Text>
+                  <Text style={styles.courseDetails}>
+                    {item.holes.length} holes • Par{" "}
+                    {item.holes.reduce((sum: number, h: any) => sum + h.par, 0)}
                   </Text>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleEditCourse(item)}
+                  >
+                    <Ionicons
+                      name="create-outline"
+                      size={22}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: colors.primary,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 20,
+                      marginLeft: 12,
+                    }}
+                    onPress={async () => {
+                      const newRound = await createRoundForCourse(item.id);
+                      setRoundId(newRound.id);
+                      setScreen("scorecard");
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontWeight: "bold",
+                        fontSize: 12,
+                      }}
+                    >
+                      START
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
             ListEmptyComponent={
               <Text
-                style={{ textAlign: "center", color: colors.textSecondary }}
+                style={{
+                  textAlign: "center",
+                  color: colors.textSecondary,
+                  marginTop: 20,
+                }}
               >
                 No courses found.
               </Text>
             }
           />
         )}
-
-        {/* Add course creation UI here if needed */}
       </SafeAreaView>
     );
   }
