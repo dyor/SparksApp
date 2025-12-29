@@ -1242,7 +1242,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
               <View style={styles.holeConfigRow}>
                 <Text style={styles.parText}>Hole {holeNum}</Text>
                 <View style={styles.parSelector}>
-                  {[3, 4, 5, 6].map((p) => (
+                  {[3, 4, 5].map((p) => (
                     <TouchableOpacity
                       key={p}
                       style={[
