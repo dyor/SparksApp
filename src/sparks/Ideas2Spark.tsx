@@ -479,6 +479,10 @@ export const Ideas2Spark: React.FC<{
   }, [expandedIds, isSettingsLoaded]);
 
   useEffect(() => {
+    if (!db) {
+      console.warn("Ideas2Spark: Firestore db is not available");
+      return;
+    }
     const q = query(collection(db, "ideas2"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ideasData: Idea[] = snapshot.docs.map((doc) => ({
@@ -492,15 +496,32 @@ export const Ideas2Spark: React.FC<{
   }, []);
 
   const addIdea = async () => {
-    if (text.trim().length === 0) return;
+    const ideaText = text.trim();
+    if (ideaText.length === 0) return;
+
+    if (!db) {
+      Alert.alert(
+        "Error",
+        "Database is not available. Please check your configuration."
+      );
+      return;
+    }
+
+    setText(""); // Clear immediately for better UX
+
     try {
       await addDoc(collection(db, "ideas2"), {
-        text: text.trim(),
+        text: ideaText,
         timestamp: Date.now(),
       });
-      setText("");
     } catch (error) {
       console.error("Error adding idea: ", error);
+      setText(ideaText); // Restore if failed
+      if (Platform.OS === "web") {
+        window.alert("Failed to add idea. Please check your connection.");
+      } else {
+        Alert.alert("Error", "Failed to add idea.");
+      }
     }
   };
 

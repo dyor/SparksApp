@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getFirestore, Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -11,5 +11,22 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+// Initialize Firebase
+let app: FirebaseApp | undefined;
+try {
+  if (getApps().length === 0) {
+    if (firebaseConfig.apiKey) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      console.warn(
+        "⚠️ Firebase API Key is missing in firebaseConfig.ts. Check your .env file."
+      );
+    }
+  } else {
+    app = getApp();
+  }
+} catch (error) {
+  console.error("❌ Error initializing Firebase in firebaseConfig.ts:", error);
+}
+
+export const db = app ? getFirestore(app) : (null as unknown as Firestore);
