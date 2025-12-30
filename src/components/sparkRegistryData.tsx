@@ -4,6 +4,7 @@ import { BaseSpark } from "../types/spark";
 import React from "react";
 import { BaseSpark as BaseSparkComponent } from "./BaseSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
+import { Ideas2Spark } from "../sparks/Ideas2Spark";
 import { SpinnerSpark } from "../sparks/SpinnerSpark";
 import { FlashcardsSpark } from "../sparks/FlashcardsSpark";
 import { PackingListSpark } from "../sparks/PackingListSpark";
@@ -73,6 +74,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: IdeasSpark,
+  },
+  ideas2: {
+    metadata: {
+      id: "ideas2",
+      title: "Ideas 2",
+      description: "Enhanced idea capture with formatting and search",
+      icon: "💡",
+      category: "productivity",
+      createdAt: new Date().toISOString(),
+      rating: 5.0,
+    },
+    component: Ideas2Spark,
   },
   spinner: {
     metadata: {
