@@ -1,15 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  updateDoc,
-} from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -24,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { db } from "../firebaseConfig";
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -36,6 +25,7 @@ const THEME_STORAGE_KEY = "@theme_mode_ideas2";
 const SORT_STORAGE_KEY = "@sort_by_ideas2";
 const VIEW_MODE_STORAGE_KEY = "@view_mode_ideas2";
 const EXPANDED_IDS_STORAGE_KEY = "@expanded_ids_ideas2";
+const IDEAS_STORAGE_KEY = "@ideas2_local_storage";
 
 // Types
 interface Idea {
@@ -479,46 +469,41 @@ export const Ideas2Spark: React.FC<{
   }, [expandedIds, isSettingsLoaded]);
 
   useEffect(() => {
-    if (!db) {
-      console.warn("Ideas2Spark: Firestore db is not available");
-      return;
-    }
-    const q = query(collection(db, "ideas2"), orderBy("timestamp", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ideasData: Idea[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        text: doc.data().text,
-        timestamp: doc.data().timestamp,
-      }));
-      setIdeas(ideasData);
-    });
-    return () => unsubscribe();
+    const loadIdeas = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(IDEAS_STORAGE_KEY);
+        if (stored) {
+          const ideasData: Idea[] = JSON.parse(stored);
+          setIdeas(ideasData);
+        }
+      } catch (error) {
+        console.error("Error loading ideas:", error);
+      }
+    };
+    loadIdeas();
   }, []);
 
   const addIdea = async () => {
     const ideaText = text.trim();
     if (ideaText.length === 0) return;
 
-    if (!db) {
-      Alert.alert(
-        "Error",
-        "Database is not available. Please check your configuration."
-      );
-      return;
-    }
-
     setText(""); // Clear immediately for better UX
 
     try {
-      await addDoc(collection(db, "ideas2"), {
+      const newIdea: Idea = {
+        id: Date.now().toString(),
         text: ideaText,
         timestamp: Date.now(),
-      });
+      };
+      
+      const updatedIdeas = [newIdea, ...ideas];
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      setIdeas(updatedIdeas);
     } catch (error) {
       console.error("Error adding idea: ", error);
       setText(ideaText); // Restore if failed
       if (Platform.OS === "web") {
-        window.alert("Failed to add idea. Please check your connection.");
+        window.alert("Failed to add idea. Please check your storage.");
       } else {
         Alert.alert("Error", "Failed to add idea.");
       }
@@ -527,7 +512,9 @@ export const Ideas2Spark: React.FC<{
 
   const deleteIdea = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "ideas2", id));
+      const updatedIdeas = ideas.filter(idea => idea.id !== id);
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      setIdeas(updatedIdeas);
     } catch (error) {
       console.error("Error deleting idea: ", error);
     }
@@ -547,7 +534,11 @@ export const Ideas2Spark: React.FC<{
   const saveEdit = async (id: string, newText: string) => {
     setEditingId(null);
     try {
-      await updateDoc(doc(db, "ideas2", id), { text: newText.trim() });
+      const updatedIdeas = ideas.map(idea =>
+        idea.id === id ? { ...idea, text: newText.trim() } : idea
+      );
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      setIdeas(updatedIdeas);
     } catch (error) {
       console.error("Error updating idea: ", error);
       Alert.alert("Error", "Failed to save changes.");
