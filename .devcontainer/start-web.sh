@@ -37,7 +37,6 @@ PORT=$(find_available_port 8081)
 echo "✅ Using port $PORT"
 
 # Set environment variables to disable all interactive prompts
-export EXPO_NO_DOTENV=1
 export EXPO_NO_GIT_STATUS=1
 export CI=true
 export EXPO_NO_TELEMETRY=1

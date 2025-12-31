@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
-import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
-import { ServiceFactory } from '../services/ServiceFactory';
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { useTheme } from "../contexts/ThemeContext";
+import { FeedbackNotificationService } from "../services/FeedbackNotificationService";
+import { ServiceFactory } from "../services/ServiceFactory";
 
 interface NotificationBadgeProps {
   sparkId?: string;
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
   showZero?: boolean;
 }
 
-export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ 
-  sparkId, 
-  size = 'medium',
-  showZero = false 
+export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
+  sparkId,
+  size = "medium",
+  showZero = false,
 }) => {
   const { colors } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -22,32 +22,46 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
     const loadUnreadCount = async () => {
       try {
         let count = 0;
-        
+
         // For golfWisdom spark, check GolfWisdomNotificationService
-        if (sparkId === 'golfWisdom') {
+        if (sparkId === "golfWisdom") {
           try {
-            const { GolfWisdomNotificationService } = await import('../services/GolfWisdomNotificationService');
+            const { GolfWisdomNotificationService } = await import(
+              "../services/GolfWisdomNotificationService"
+            );
             count = await GolfWisdomNotificationService.getUnreadCount();
           } catch (error) {
-            console.error('Error loading GolfWisdom notification count:', error);
+            console.error(
+              "Error loading GolfWisdom notification count:",
+              error
+            );
           }
-        } else if (sparkId === 'friend-spark') {
+        } else if (sparkId === "friend-spark") {
           // For friend-spark, check FriendInvitationNotificationService
           try {
-            const { FriendInvitationNotificationService } = await import('../services/FriendInvitationNotificationService');
+            const { FriendInvitationNotificationService } = await import(
+              "../services/FriendInvitationNotificationService"
+            );
             count = await FriendInvitationNotificationService.getUnreadCount();
           } catch (error) {
-            console.error('Error loading Friend invitation notification count:', error);
+            console.error(
+              "Error loading Friend invitation notification count:",
+              error
+            );
           }
         } else {
           // For other sparks, use FeedbackNotificationService
-          const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-          count = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
+          const deviceId =
+            await FeedbackNotificationService.getPersistentDeviceId();
+          count = await FeedbackNotificationService.getUnreadCount(
+            deviceId,
+            sparkId
+          );
         }
-        
+
         setUnreadCount(count);
       } catch (error) {
-        console.error('Error loading unread count:', error);
+        console.error("Error loading unread count:", error);
         setUnreadCount(0);
       }
     };
@@ -88,23 +102,28 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   const currentSize = sizeStyles[size];
 
   return (
-    <View style={[
-      styles.badge,
-      {
-        backgroundColor: colors.error || '#FF3B30',
-        minWidth: currentSize.minWidth,
-        height: currentSize.height,
-        borderRadius: currentSize.borderRadius,
-      }
-    ]}>
-      <Text style={[
-        styles.badgeText,
+    <View
+      pointerEvents="none"
+      style={[
+        styles.badge,
         {
-          color: colors.background,
-          fontSize: currentSize.fontSize,
-        }
-      ]}>
-        {unreadCount > 99 ? '99+' : unreadCount.toString()}
+          backgroundColor: colors.error || "#FF3B30",
+          minWidth: currentSize.minWidth,
+          height: currentSize.height,
+          borderRadius: currentSize.borderRadius,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.badgeText,
+          {
+            color: colors.background,
+            fontSize: currentSize.fontSize,
+          },
+        ]}
+      >
+        {unreadCount > 99 ? "99+" : unreadCount.toString()}
       </Text>
     </View>
   );
@@ -112,16 +131,16 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
 
 const styles = StyleSheet.create({
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 4,
     zIndex: 1,
   },
   badgeText: {
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
