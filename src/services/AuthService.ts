@@ -1,35 +1,58 @@
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 // @ts-ignore - getReactNativePersistence is available in React Native build but types might not resolve without specific config
-import { getAuth, signInWithCredential, signOut as firebaseSignOut, onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider, OAuthProvider, initializeAuth, getReactNativePersistence, updateProfile, signInWithPopup } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import {
+  getAuth,
+  signInWithCredential,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+  GoogleAuthProvider,
+  OAuthProvider,
+  initializeAuth,
+  getReactNativePersistence,
+  browserLocalPersistence,
+  updateProfile,
+  signInWithPopup,
+} from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
 
 // Gracefully handle GoogleSignin in Expo Go (where native modules aren't available)
 let GoogleSignin: any = null;
 let statusCodes: any = null;
 try {
-  const googleSigninModule = require('@react-native-google-signin/google-signin');
+  const googleSigninModule = require("@react-native-google-signin/google-signin");
   GoogleSignin = googleSigninModule.GoogleSignin;
   statusCodes = googleSigninModule.statusCodes;
 } catch (error) {
-  console.log('⚠️ Google Sign-In not available (running in Expo Go or module not installed)');
+  console.log(
+    "⚠️ Google Sign-In not available (running in Expo Go or module not installed)"
+  );
 }
 
 // Gracefully handle AppleAuthentication in Expo Go or non-iOS platforms
 let AppleAuthentication: any = null;
 let Crypto: any = null;
 try {
-  if (Platform.OS === 'ios') {
-    const appleAuthModule = require('expo-apple-authentication');
+  if (Platform.OS === "ios") {
+    const appleAuthModule = require("expo-apple-authentication");
     AppleAuthentication = appleAuthModule;
-    const cryptoModule = require('expo-crypto');
+    const cryptoModule = require("expo-crypto");
     Crypto = cryptoModule;
   }
 } catch (error) {
-  console.log('⚠️ Apple Authentication not available (not iOS or module not installed)');
+  console.log(
+    "⚠️ Apple Authentication not available (not iOS or module not installed)"
+  );
 }
 
-import { ServiceFactory } from './ServiceFactory';
+import { ServiceFactory } from "./ServiceFactory";
 
 export interface User {
   uid: string;
@@ -39,7 +62,7 @@ export interface User {
   isAnonymous: boolean;
 }
 
-export type UserRole = 'standard' | 'spark-admin' | 'app-admin';
+export type UserRole = "standard" | "spark-admin" | "app-admin";
 
 export interface UserProfile {
   uid: string;
@@ -60,23 +83,29 @@ class AuthService {
    */
   static async initialize(): Promise<void> {
     if (this._initialized) {
-      console.log('✅ AuthService already initialized');
+      console.log("✅ AuthService already initialized");
       return;
     }
 
     try {
-      console.log('🚀 AuthService: Initializing...');
+      console.log("🚀 AuthService: Initializing...");
 
       // Ensure Firebase is initialized
       await ServiceFactory.ensureFirebaseInitialized();
 
       // Configure Google Sign-In
       // Use EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID if set, otherwise fall back to EXPO_PUBLIC_FIREBASE_APP_ID
-      const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+      const webClientId =
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+        process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
 
       if (!webClientId) {
-        console.warn('⚠️ Neither EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID nor EXPO_PUBLIC_FIREBASE_APP_ID is set. Google Sign-In will not work.');
-        console.warn('⚠️ Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in your .env file or EAS secrets.');
+        console.warn(
+          "⚠️ Neither EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID nor EXPO_PUBLIC_FIREBASE_APP_ID is set. Google Sign-In will not work."
+        );
+        console.warn(
+          "⚠️ Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in your .env file or EAS secrets."
+        );
         // Don't configure Google Sign-In if webClientId is missing
         this._initialized = true;
         return;
@@ -84,21 +113,26 @@ class AuthService {
 
       // Check if GoogleSignin is available (not in Expo Go)
       if (!GoogleSignin) {
-        console.log('⚠️ Google Sign-In module not available. Skipping configuration (Expo Go).');
+        console.log(
+          "⚠️ Google Sign-In module not available. Skipping configuration (Expo Go)."
+        );
         this._initialized = true;
         return;
       }
 
-      console.log('✅ AuthService: Configuring Google Sign-In with webClientId:', webClientId.substring(0, 20) + '...');
+      console.log(
+        "✅ AuthService: Configuring Google Sign-In with webClientId:",
+        webClientId.substring(0, 20) + "..."
+      );
 
       GoogleSignin.configure({
         webClientId: webClientId, // Required for iOS and Android
         offlineAccess: true, // If you want to access Google API on behalf of the user
-        scopes: ['profile', 'email'],
+        scopes: ["profile", "email"],
       });
 
       // Set up auth state listener
-      const { initializeApp, getApps } = require('firebase/app');
+      const { initializeApp, getApps } = require("firebase/app");
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
         authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -118,8 +152,15 @@ class AuthService {
 
       let auth;
       try {
+        const persistence =
+          Platform.OS === "web"
+            ? browserLocalPersistence
+            : getReactNativePersistence
+            ? getReactNativePersistence(AsyncStorage)
+            : browserLocalPersistence;
+
         auth = initializeAuth(app, {
-          persistence: getReactNativePersistence(AsyncStorage)
+          persistence: persistence,
         });
       } catch (e) {
         // If already initialized, use getAuth
@@ -129,21 +170,26 @@ class AuthService {
       // Immediately check current auth state to restore session on app start
       const currentUser = auth.currentUser;
       if (currentUser) {
-        console.log('✅ AuthService: Found existing session for user:', currentUser.email);
+        console.log(
+          "✅ AuthService: Found existing session for user:",
+          currentUser.email
+        );
         const user = this.convertFirebaseUser(currentUser);
         this.notifyAuthStateListeners(user);
       }
 
       // Listen to auth state changes
       onAuthStateChanged(auth, async (firebaseUser) => {
-        const user = firebaseUser ? this.convertFirebaseUser(firebaseUser) : null;
+        const user = firebaseUser
+          ? this.convertFirebaseUser(firebaseUser)
+          : null;
         this.notifyAuthStateListeners(user);
       });
 
       this._initialized = true;
-      console.log('✅ AuthService initialized successfully');
+      console.log("✅ AuthService initialized successfully");
     } catch (error) {
-      console.error('❌ AuthService: Failed to initialize', error);
+      console.error("❌ AuthService: Failed to initialize", error);
       throw error;
     }
   }
@@ -153,31 +199,40 @@ class AuthService {
    */
   static async signInWithGoogle(): Promise<User | null> {
     if (!this._initialized) {
-      throw new Error('AuthService not initialized. Please call initialize() first.');
+      throw new Error(
+        "AuthService not initialized. Please call initialize() first."
+      );
     }
 
     // Check if GoogleSignin is available (not in Expo Go)
     if (!GoogleSignin) {
-      throw new Error('Google Sign-In is not available in Expo Go. Please use a development build or production app.');
+      throw new Error(
+        "Google Sign-In is not available in Expo Go. Please use a development build or production app."
+      );
     }
 
-    const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+    const webClientId =
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
     if (!webClientId) {
-      throw new Error('Google Sign-In not configured. Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID).');
+      throw new Error(
+        "Google Sign-In not configured. Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)."
+      );
     }
 
     try {
-      console.log('🔐 AuthService: Starting Google Sign-In...');
+      console.log("🔐 AuthService: Starting Google Sign-In...");
 
       // Web platform uses Firebase's signInWithPopup
-      if (Platform.OS === 'web') {
-        const { initializeApp, getApps } = require('firebase/app');
+      if (Platform.OS === "web") {
+        const { initializeApp, getApps } = require("firebase/app");
         const firebaseConfig = {
           apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
           authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
           projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
           storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          messagingSenderId:
+            process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
           appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
           measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
         };
@@ -193,8 +248,8 @@ class AuthService {
         const provider = new GoogleAuthProvider();
 
         // Add scopes if needed
-        provider.addScope('profile');
-        provider.addScope('email');
+        provider.addScope("profile");
+        provider.addScope("email");
 
         const result = await signInWithPopup(auth, provider);
         const firebaseUser = result.user;
@@ -203,13 +258,15 @@ class AuthService {
         await this.createOrUpdateUserProfile(firebaseUser);
 
         const user = this.convertFirebaseUser(firebaseUser);
-        console.log('✅ AuthService: Web Sign-in successful', user.email);
+        console.log("✅ AuthService: Web Sign-in successful", user.email);
         return user;
       }
 
       // Check if Google Play Services are available (Android)
-      if (Platform.OS === 'android') {
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      if (Platform.OS === "android") {
+        await GoogleSignin.hasPlayServices({
+          showPlayServicesUpdateDialog: true,
+        });
       }
 
       // Sign in with Google
@@ -219,14 +276,14 @@ class AuthService {
       const idToken = userInfo.data?.idToken;
 
       if (!idToken) {
-        throw new Error('Failed to get ID token from Google Sign-In');
+        throw new Error("Failed to get ID token from Google Sign-In");
       }
 
       // Create a Google credential with the token
       const googleCredential = GoogleAuthProvider.credential(idToken);
 
       // Sign in to Firebase with the Google credential
-      const { initializeApp, getApps } = require('firebase/app');
+      const { initializeApp, getApps } = require("firebase/app");
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
         authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -252,19 +309,19 @@ class AuthService {
       await this.createOrUpdateUserProfile(firebaseUser);
 
       const user = this.convertFirebaseUser(firebaseUser);
-      console.log('✅ AuthService: Sign-in successful', user.email);
+      console.log("✅ AuthService: Sign-in successful", user.email);
       return user;
     } catch (error: any) {
-      console.error('❌ AuthService: Sign-in failed', error);
+      console.error("❌ AuthService: Sign-in failed", error);
 
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        throw new Error('Sign-in was cancelled');
+        throw new Error("Sign-in was cancelled");
       } else if (error.code === statusCodes.IN_PROGRESS) {
-        throw new Error('Sign-in is already in progress');
+        throw new Error("Sign-in is already in progress");
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        throw new Error('Google Play Services not available');
+        throw new Error("Google Play Services not available");
       } else {
-        throw new Error(error.message || 'Sign-in failed');
+        throw new Error(error.message || "Sign-in failed");
       }
     }
   }
@@ -274,25 +331,31 @@ class AuthService {
    */
   static async signInWithApple(): Promise<User | null> {
     if (!this._initialized) {
-      throw new Error('AuthService not initialized. Please call initialize() first.');
+      throw new Error(
+        "AuthService not initialized. Please call initialize() first."
+      );
     }
 
     // Check if AppleAuthentication is available (iOS only)
-    if (!AppleAuthentication || Platform.OS !== 'ios') {
-      throw new Error('Apple Sign-In is only available on iOS devices.');
+    if (!AppleAuthentication || Platform.OS !== "ios") {
+      throw new Error("Apple Sign-In is only available on iOS devices.");
     }
 
     try {
-      console.log('🔐 AuthService: Starting Apple Sign-In...');
+      console.log("🔐 AuthService: Starting Apple Sign-In...");
 
       // Check if Apple Sign-In is available on this device
       const isAvailable = await AppleAuthentication.isAvailableAsync();
       if (!isAvailable) {
-        throw new Error('Apple Sign-In is not available. Please test on a physical iOS device (Sign in with Apple does not work in the iOS Simulator).');
+        throw new Error(
+          "Apple Sign-In is not available. Please test on a physical iOS device (Sign in with Apple does not work in the iOS Simulator)."
+        );
       }
 
       // Generate a random nonce and hash it
-      const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const nonce =
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15);
       const hashedNonce = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         nonce
@@ -311,18 +374,18 @@ class AuthService {
       const { identityToken } = credential;
 
       if (!identityToken) {
-        throw new Error('Failed to get identity token from Apple Sign-In');
+        throw new Error("Failed to get identity token from Apple Sign-In");
       }
 
       // Create a Firebase credential with Apple ID token and original nonce
-      const appleProvider = new OAuthProvider('apple.com');
+      const appleProvider = new OAuthProvider("apple.com");
       const appleCredential = appleProvider.credential({
         idToken: identityToken,
         rawNonce: nonce,
       });
 
       // Sign in to Firebase with the Apple credential
-      const { initializeApp, getApps } = require('firebase/app');
+      const { initializeApp, getApps } = require("firebase/app");
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
         authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -346,7 +409,11 @@ class AuthService {
 
       // If this is the first time signing in with Apple, update the user's display name
       // Apple only provides name on first sign-in
-      if (credential.fullName && credential.fullName.givenName && credential.fullName.familyName) {
+      if (
+        credential.fullName &&
+        credential.fullName.givenName &&
+        credential.fullName.familyName
+      ) {
         const displayName = `${credential.fullName.givenName} ${credential.fullName.familyName}`;
         if (firebaseUser.displayName !== displayName) {
           await updateProfile(firebaseUser, { displayName });
@@ -357,15 +424,15 @@ class AuthService {
       await this.createOrUpdateUserProfile(firebaseUser);
 
       const user = this.convertFirebaseUser(firebaseUser);
-      console.log('✅ AuthService: Apple Sign-in successful', user.email);
+      console.log("✅ AuthService: Apple Sign-in successful", user.email);
       return user;
     } catch (error: any) {
-      console.error('❌ AuthService: Apple Sign-in failed', error);
+      console.error("❌ AuthService: Apple Sign-in failed", error);
 
-      if (error.code === 'ERR_REQUEST_CANCELED') {
-        throw new Error('Sign-in was cancelled');
+      if (error.code === "ERR_REQUEST_CANCELED") {
+        throw new Error("Sign-in was cancelled");
       } else {
-        throw new Error(error.message || 'Apple Sign-in failed');
+        throw new Error(error.message || "Apple Sign-in failed");
       }
     }
   }
@@ -375,25 +442,33 @@ class AuthService {
    */
   static async signOut(): Promise<void> {
     try {
-      console.log('🔐 AuthService: Signing out...');
+      console.log("🔐 AuthService: Signing out...");
 
       // Sign out from Google (only if GoogleSignin is available and initialized)
       try {
-        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
-        if (webClientId && GoogleSignin && typeof GoogleSignin.isSignedIn === 'function') {
+        const webClientId =
+          process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+          process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+        if (
+          webClientId &&
+          GoogleSignin &&
+          typeof GoogleSignin.isSignedIn === "function"
+        ) {
           const isSignedIn = await GoogleSignin.isSignedIn();
-          if (isSignedIn && typeof GoogleSignin.signOut === 'function') {
+          if (isSignedIn && typeof GoogleSignin.signOut === "function") {
             await GoogleSignin.signOut();
-            console.log('✅ AuthService: Signed out from Google');
+            console.log("✅ AuthService: Signed out from Google");
           }
         }
       } catch (googleError) {
-        console.log('⚠️ AuthService: Google Sign-In not available or not signed in, skipping Google sign-out');
+        console.log(
+          "⚠️ AuthService: Google Sign-In not available or not signed in, skipping Google sign-out"
+        );
         // Continue with Firebase sign-out even if Google sign-out fails
       }
 
       // Sign out from Firebase
-      const { initializeApp, getApps } = require('firebase/app');
+      const { initializeApp, getApps } = require("firebase/app");
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
         authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -416,14 +491,14 @@ class AuthService {
       // Only sign out if there's a current user
       if (auth.currentUser) {
         await firebaseSignOut(auth);
-        console.log('✅ AuthService: Signed out from Firebase');
+        console.log("✅ AuthService: Signed out from Firebase");
       } else {
-        console.log('⚠️ AuthService: No Firebase user to sign out');
+        console.log("⚠️ AuthService: No Firebase user to sign out");
       }
 
-      console.log('✅ AuthService: Sign-out successful');
+      console.log("✅ AuthService: Sign-out successful");
     } catch (error) {
-      console.error('❌ AuthService: Sign-out failed', error);
+      console.error("❌ AuthService: Sign-out failed", error);
       throw error;
     }
   }
@@ -433,7 +508,7 @@ class AuthService {
    */
   static getCurrentUser(): User | null {
     try {
-      const { initializeApp, getApps } = require('firebase/app');
+      const { initializeApp, getApps } = require("firebase/app");
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
         authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -455,7 +530,7 @@ class AuthService {
       const firebaseUser = auth.currentUser;
       return firebaseUser ? this.convertFirebaseUser(firebaseUser) : null;
     } catch (error) {
-      console.error('❌ AuthService: Error getting current user', error);
+      console.error("❌ AuthService: Error getting current user", error);
       return null;
     }
   }
@@ -472,7 +547,9 @@ class AuthService {
 
     // Return unsubscribe function
     return () => {
-      this.authStateListeners = this.authStateListeners.filter(listener => listener !== callback);
+      this.authStateListeners = this.authStateListeners.filter(
+        (listener) => listener !== callback
+      );
     };
   }
 
@@ -482,15 +559,15 @@ class AuthService {
   static async getUserRole(): Promise<UserRole> {
     const user = this.getCurrentUser();
     if (!user) {
-      return 'standard';
+      return "standard";
     }
 
     try {
       const profile = await this.getUserProfile(user.uid);
-      return profile?.role || 'standard';
+      return profile?.role || "standard";
     } catch (error) {
-      console.error('❌ AuthService: Error getting user role', error);
-      return 'standard';
+      console.error("❌ AuthService: Error getting user role", error);
+      return "standard";
     }
   }
 
@@ -507,7 +584,7 @@ class AuthService {
       const profile = await this.getUserProfile(user.uid);
       return profile?.sparkAdminRoles || [];
     } catch (error) {
-      console.error('❌ AuthService: Error getting spark admin roles', error);
+      console.error("❌ AuthService: Error getting spark admin roles", error);
       return [];
     }
   }
@@ -517,7 +594,7 @@ class AuthService {
    */
   static async isAppAdmin(): Promise<boolean> {
     const role = await this.getUserRole();
-    return role === 'app-admin';
+    return role === "app-admin";
   }
 
   /**
@@ -536,10 +613,12 @@ class AuthService {
   /**
    * Get user profile from Firestore
    */
-  private static async getUserProfile(uid: string): Promise<UserProfile | null> {
+  private static async getUserProfile(
+    uid: string
+  ): Promise<UserProfile | null> {
     try {
-      const { initializeApp, getApps } = require('firebase/app');
-      const { getFirestore } = require('firebase/firestore');
+      const { initializeApp, getApps } = require("firebase/app");
+      const { getFirestore } = require("firebase/firestore");
 
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -559,7 +638,7 @@ class AuthService {
       }
 
       const db = getFirestore(app);
-      const userDoc = await getDoc(doc(db, 'users', uid));
+      const userDoc = await getDoc(doc(db, "users", uid));
 
       if (userDoc.exists()) {
         return userDoc.data() as UserProfile;
@@ -567,7 +646,7 @@ class AuthService {
 
       return null;
     } catch (error) {
-      console.error('❌ AuthService: Error getting user profile', error);
+      console.error("❌ AuthService: Error getting user profile", error);
       return null;
     }
   }
@@ -575,10 +654,12 @@ class AuthService {
   /**
    * Create or update user profile in Firestore
    */
-  private static async createOrUpdateUserProfile(firebaseUser: FirebaseUser): Promise<void> {
+  private static async createOrUpdateUserProfile(
+    firebaseUser: FirebaseUser
+  ): Promise<void> {
     try {
-      const { initializeApp, getApps } = require('firebase/app');
-      const { getFirestore } = require('firebase/firestore');
+      const { initializeApp, getApps } = require("firebase/app");
+      const { getFirestore } = require("firebase/firestore");
 
       const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -598,14 +679,14 @@ class AuthService {
       }
 
       const db = getFirestore(app);
-      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userRef = doc(db, "users", firebaseUser.uid);
       const userDoc = await getDoc(userRef);
 
       const now = Timestamp.now();
       const userData: Partial<UserProfile> = {
         uid: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        displayName: firebaseUser.displayName || '',
+        email: firebaseUser.email || "",
+        displayName: firebaseUser.displayName || "",
         lastLoginAt: now,
       };
 
@@ -613,18 +694,21 @@ class AuthService {
         // Create new user profile
         await setDoc(userRef, {
           ...userData,
-          role: 'standard' as UserRole,
+          role: "standard" as UserRole,
           sparkAdminRoles: [],
           createdAt: now,
         });
-        console.log('✅ AuthService: Created new user profile');
+        console.log("✅ AuthService: Created new user profile");
       } else {
         // Update existing user profile
         await setDoc(userRef, userData, { merge: true });
-        console.log('✅ AuthService: Updated user profile');
+        console.log("✅ AuthService: Updated user profile");
       }
     } catch (error) {
-      console.error('❌ AuthService: Error creating/updating user profile', error);
+      console.error(
+        "❌ AuthService: Error creating/updating user profile",
+        error
+      );
       // Don't throw - profile creation is not critical for sign-in
     }
   }
@@ -646,11 +730,11 @@ class AuthService {
    * Notify all auth state listeners
    */
   private static notifyAuthStateListeners(user: User | null): void {
-    this.authStateListeners.forEach(listener => {
+    this.authStateListeners.forEach((listener) => {
       try {
         listener(user);
       } catch (error) {
-        console.error('❌ AuthService: Error in auth state listener', error);
+        console.error("❌ AuthService: Error in auth state listener", error);
       }
     });
   }
