@@ -62,19 +62,19 @@ const IdeaItem = React.memo(function IdeaItem({
   onDelete: () => void;
   viewMode: "normal" | "compact";
 }) {
-  const [editText, setEditText] = useState(item.text);
+  const [editText, setEditText] = useState(item.text || "");
   const [isConfirmingSave, setIsConfirmingSave] = useState(false);
   const [editSelection, setEditSelection] = useState({ start: 0, end: 0 });
 
   // Sync editText if item changes while not editing
   useEffect(() => {
     if (!isEditing) {
-      setEditText(item.text);
+      setEditText(item.text || "");
       setIsConfirmingSave(false);
     }
   }, [item.text, isEditing]);
 
-  const date = new Date(item.timestamp).toLocaleDateString();
+  const date = new Date(item.timestamp || Date.now()).toLocaleDateString();
 
   const handleSave = async () => {
     if (editText.trim().length === 0) return;
@@ -133,15 +133,16 @@ const IdeaItem = React.memo(function IdeaItem({
   };
 
   const renderTextWithLinks = (
-    text: string,
+    text: string = "",
     isExpanded: boolean,
     id: string,
     searchQuery: string,
     numberOfLines?: number,
     datePrefix?: string
   ) => {
+    const safeText = text || "";
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
+    const parts = safeText.split(urlRegex);
 
     const highlightSearch = (content: string, keyPrefix: string) => {
       if (!searchQuery.trim()) return renderMarkdown(content, keyPrefix);
@@ -336,7 +337,7 @@ const IdeaItem = React.memo(function IdeaItem({
             </View>
           )}
           {renderTextWithLinks(
-            item.text,
+            item.text || "",
             isExpanded,
             item.id,
             searchText,
@@ -347,7 +348,7 @@ const IdeaItem = React.memo(function IdeaItem({
               : 4,
             viewMode === "compact" && !isExpanded
               ? (() => {
-                  const d = new Date(item.timestamp);
+                  const d = new Date(item.timestamp || Date.now());
                   const mm = String(d.getMonth() + 1).padStart(2, "0");
                   const dd = String(d.getDate()).padStart(2, "0");
                   const yy = String(d.getFullYear()).slice(-2);
@@ -390,348 +391,6 @@ const LightTheme = {
   highlight: "#FFEB3B",
   iconOnPrimary: "#FFFFFF",
   borderColor: "#E0E0E0",
-};
-
-export const Ideas2Spark: React.FC<{
-  showSettings?: boolean;
-  onCloseSettings?: () => void;
-}> = ({ showSettings, onCloseSettings }) => {
-  const [themeMode, setThemeMode] = useState<"light" | "dark">("light");
-  const theme = themeMode === "dark" ? DarkTheme : LightTheme;
-  const styles = React.useMemo(() => createStyles(theme), [theme]);
-
-  const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [text, setText] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [searchText, setSearchText] = useState("");
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  const [sortBy, setSortBy] = useState<"date" | "firstLine">("firstLine");
-  const [viewMode, setViewMode] = useState<"normal" | "compact">("normal");
-  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        const savedSort = await AsyncStorage.getItem(SORT_STORAGE_KEY);
-        const savedView = await AsyncStorage.getItem(VIEW_MODE_STORAGE_KEY);
-        const savedExpanded = await AsyncStorage.getItem(
-          EXPANDED_IDS_STORAGE_KEY
-        );
-        if (savedTheme === "light" || savedTheme === "dark")
-          setThemeMode(savedTheme);
-        if (savedSort === "date" || savedSort === "firstLine")
-          setSortBy(savedSort);
-        if (savedView === "normal" || savedView === "compact")
-          setViewMode(savedView);
-        if (savedExpanded) setExpandedIds(new Set(JSON.parse(savedExpanded)));
-      } catch (error) {
-        console.error("Error loading settings:", error);
-      } finally {
-        setIsSettingsLoaded(true);
-      }
-    };
-    loadSettings();
-  }, []);
-
-  useEffect(() => {
-    if (isSettingsLoaded) {
-      AsyncStorage.setItem(THEME_STORAGE_KEY, themeMode).catch((err) =>
-        console.error("Error saving theme:", err)
-      );
-    }
-  }, [themeMode, isSettingsLoaded]);
-
-  useEffect(() => {
-    if (isSettingsLoaded) {
-      AsyncStorage.setItem(SORT_STORAGE_KEY, sortBy).catch((err) =>
-        console.error("Error saving sort:", err)
-      );
-    }
-  }, [sortBy, isSettingsLoaded]);
-
-  useEffect(() => {
-    if (isSettingsLoaded) {
-      AsyncStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode).catch((err) =>
-        console.error("Error saving view mode:", err)
-      );
-    }
-  }, [viewMode, isSettingsLoaded]);
-
-  useEffect(() => {
-    if (isSettingsLoaded) {
-      AsyncStorage.setItem(
-        EXPANDED_IDS_STORAGE_KEY,
-        JSON.stringify(Array.from(expandedIds))
-      ).catch((err) => console.error("Error saving expanded ids:", err));
-    }
-  }, [expandedIds, isSettingsLoaded]);
-
-  useEffect(() => {
-    const loadIdeas = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(IDEAS_STORAGE_KEY);
-        if (stored) {
-          const ideasData: Idea[] = JSON.parse(stored);
-          setIdeas(ideasData);
-        }
-      } catch (error) {
-        console.error("Error loading ideas:", error);
-      }
-    };
-    loadIdeas();
-  }, []);
-
-  const addIdea = async () => {
-    const ideaText = text.trim();
-    if (ideaText.length === 0) return;
-
-    setText(""); // Clear immediately for better UX
-
-    try {
-      const newIdea: Idea = {
-        id: Date.now().toString(),
-        text: ideaText,
-        timestamp: Date.now(),
-      };
-      
-      const updatedIdeas = [newIdea, ...ideas];
-      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
-      setIdeas(updatedIdeas);
-    } catch (error) {
-      console.error("Error adding idea: ", error);
-      setText(ideaText); // Restore if failed
-      if (Platform.OS === "web") {
-        window.alert("Failed to add idea. Please check your storage.");
-      } else {
-        Alert.alert("Error", "Failed to add idea.");
-      }
-    }
-  };
-
-  const deleteIdea = async (id: string) => {
-    try {
-      const updatedIdeas = ideas.filter(idea => idea.id !== id);
-      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
-      setIdeas(updatedIdeas);
-    } catch (error) {
-      console.error("Error deleting idea: ", error);
-    }
-  };
-
-  const confirmDelete = (id: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure?")) deleteIdea(id);
-    } else {
-      Alert.alert("Delete Idea", "Are you sure?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", onPress: () => deleteIdea(id), style: "destructive" },
-      ]);
-    }
-  };
-
-  const saveEdit = async (id: string, newText: string) => {
-    setEditingId(null);
-    try {
-      const updatedIdeas = ideas.map(idea =>
-        idea.id === id ? { ...idea, text: newText.trim() } : idea
-      );
-      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
-      setIdeas(updatedIdeas);
-    } catch (error) {
-      console.error("Error updating idea: ", error);
-      Alert.alert("Error", "Failed to save changes.");
-    }
-  };
-
-  const toggleExpand = (id: string) => {
-    if (viewMode === "compact") {
-      setViewMode("normal");
-      setExpandedIds(new Set([id]));
-      return;
-    }
-    const newExpanded = new Set(expandedIds);
-    if (newExpanded.has(id)) newExpanded.delete(id);
-    else newExpanded.add(id);
-    setExpandedIds(newExpanded);
-  };
-
-  const renderItem = ({ item }: { item: Idea }) => (
-    <IdeaItem
-      item={item}
-      theme={theme}
-      styles={styles}
-      searchText={searchText}
-      isExpanded={expandedIds.has(item.id)}
-      onToggleExpand={toggleExpand}
-      isEditing={editingId === item.id}
-      onStartEdit={() => setEditingId(item.id)}
-      onCancelEdit={() => setEditingId(null)}
-      onSave={(t) => saveEdit(item.id, t)}
-      onDelete={() => confirmDelete(item.id)}
-      viewMode={viewMode}
-    />
-  );
-
-  const filteredIdeas = ideas
-    .filter((idea) =>
-      idea.text.toLowerCase().includes(searchText.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === "date") return b.timestamp - a.timestamp;
-      return a.text
-        .split("\n")[0]
-        .toLowerCase()
-        .localeCompare(b.text.split("\n")[0].toLowerCase());
-    });
-
-  if (showSettings) {
-    return (
-      <SettingsContainer>
-        <SettingsScrollView>
-          <SettingsHeader
-            title="Ideas 2 Settings"
-            subtitle="Manage your ideas 2 spark"
-            icon="💡"
-            sparkId="ideas2"
-          />
-          <SettingsFeedbackSection sparkName="Ideas 2" sparkId="ideas2" />
-          <TouchableOpacity
-            style={[
-              styles.toolbarButton,
-              { marginTop: 20, alignSelf: "center", paddingHorizontal: 20 },
-            ]}
-            onPress={() => onCloseSettings?.()}
-          >
-            <Text style={styles.toolbarText}>Close</Text>
-          </TouchableOpacity>
-        </SettingsScrollView>
-      </SettingsContainer>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <View>
-            <Text style={styles.title}>Ideas 2</Text>
-            <Text style={styles.subtitle}>Capture your thoughts</Text>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
-            <TouchableOpacity
-              onPress={() =>
-                setViewMode((prev) =>
-                  prev === "normal" ? "compact" : "normal"
-                )
-              }
-            >
-              <Ionicons
-                name={viewMode === "compact" ? "list" : "grid-outline"}
-                size={26}
-                color={theme.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                setThemeMode((prev) => (prev === "dark" ? "light" : "dark"))
-              }
-            >
-              <Ionicons
-                name={themeMode === "dark" ? "sunny" : "moon"}
-                size={26}
-                color={theme.text}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={theme.textSecondary}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search ideas..."
-            placeholderTextColor={theme.textSecondary}
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText("")}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={theme.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() =>
-              setSortBy((prev) => (prev === "date" ? "firstLine" : "date"))
-            }
-          >
-            <Ionicons
-              name={sortBy === "date" ? "time-outline" : "text-outline"}
-              size={20}
-              color={theme.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <FlatList
-        data={filteredIdeas}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="bulb-outline"
-              size={64}
-              color={theme.textSecondary}
-            />
-            <Text style={styles.emptyText}>
-              {searchText
-                ? "No matching ideas found."
-                : "No ideas yet. Add one below!"}
-            </Text>
-          </View>
-        }
-      />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
-        style={styles.inputContainer}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="New Idea..."
-          placeholderTextColor={theme.textSecondary}
-          value={text}
-          onChangeText={setText}
-          multiline
-        />
-        <TouchableOpacity onPress={addIdea} style={styles.addButton}>
-          <Ionicons name="arrow-up" size={24} color={theme.iconOnPrimary} />
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
-    </View>
-  );
 };
 
 const createStyles = (theme: typeof DarkTheme) =>
@@ -917,5 +576,399 @@ const createStyles = (theme: typeof DarkTheme) =>
       fontSize: 16,
     },
   });
+
+export const Ideas2Spark: React.FC<{
+  showSettings?: boolean;
+  onCloseSettings?: () => void;
+}> = ({ showSettings, onCloseSettings }) => {
+  const [themeMode, setThemeMode] = useState<"light" | "dark">("light");
+  const theme = themeMode === "dark" ? DarkTheme : LightTheme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
+
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const [sortBy, setSortBy] = useState<"date" | "firstLine">("firstLine");
+  const [viewMode, setViewMode] = useState<"normal" | "compact">("normal");
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    console.log("Ideas2Spark mounted");
+  }, []);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        const savedSort = await AsyncStorage.getItem(SORT_STORAGE_KEY);
+        const savedView = await AsyncStorage.getItem(VIEW_MODE_STORAGE_KEY);
+        const savedExpanded = await AsyncStorage.getItem(
+          EXPANDED_IDS_STORAGE_KEY
+        );
+        if (savedTheme === "light" || savedTheme === "dark")
+          setThemeMode(savedTheme);
+        if (savedSort === "date" || savedSort === "firstLine")
+          setSortBy(savedSort);
+        if (savedView === "normal" || savedView === "compact")
+          setViewMode(savedView);
+        if (savedExpanded) {
+          try {
+            const parsed = JSON.parse(savedExpanded);
+            if (Array.isArray(parsed)) {
+              setExpandedIds(new Set(parsed));
+            }
+          } catch (e) {
+            console.error("Error parsing expanded ids:", e);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error);
+      } finally {
+        setIsSettingsLoaded(true);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    if (isSettingsLoaded) {
+      AsyncStorage.setItem(THEME_STORAGE_KEY, themeMode).catch((err) =>
+        console.error("Error saving theme:", err)
+      );
+    }
+  }, [themeMode, isSettingsLoaded]);
+
+  useEffect(() => {
+    if (isSettingsLoaded) {
+      AsyncStorage.setItem(SORT_STORAGE_KEY, sortBy).catch((err) =>
+        console.error("Error saving sort:", err)
+      );
+    }
+  }, [sortBy, isSettingsLoaded]);
+
+  useEffect(() => {
+    if (isSettingsLoaded) {
+      AsyncStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode).catch((err) =>
+        console.error("Error saving view mode:", err)
+      );
+    }
+  }, [viewMode, isSettingsLoaded]);
+
+  useEffect(() => {
+    if (isSettingsLoaded) {
+      AsyncStorage.setItem(
+        EXPANDED_IDS_STORAGE_KEY,
+        JSON.stringify(Array.from(expandedIds))
+      ).catch((err) => console.error("Error saving expanded ids:", err));
+    }
+  }, [expandedIds, isSettingsLoaded]);
+
+  useEffect(() => {
+    const loadIdeas = async () => {
+      console.log("loadIdeas starting");
+      try {
+        const stored = await AsyncStorage.getItem(IDEAS_STORAGE_KEY);
+        console.log("Stored data retrieved, length:", stored?.length || 0);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const ideasData = Array.isArray(parsed) ? parsed : [];
+          console.log("Parsed ideas count:", ideasData.length);
+          // Migration/Fallback for when we tried to share the database
+          const migratedData: Idea[] = ideasData.map((idea) => ({
+            id: idea?.id || Date.now().toString() + Math.random(),
+            text: idea?.text || idea?.content || "",
+            timestamp:
+              idea?.timestamp ||
+              (idea?.createdAt ? new Date(idea.createdAt).getTime() : Date.now()),
+          }));
+          console.log("Migrated ideas count:", migratedData.length);
+          setIdeas(migratedData);
+        } else {
+          console.log("No stored ideas found");
+        }
+      } catch (error) {
+        console.error("Error loading ideas:", error);
+      }
+    };
+    loadIdeas();
+  }, []);
+
+  const addIdea = async () => {
+    console.log("addIdea called, text:", text);
+    const ideaText = text.trim();
+    if (ideaText.length === 0) {
+      console.log("Empty text, returning");
+      return;
+    }
+
+    setText(""); // Clear immediately for better UX
+
+    try {
+      const newIdea: Idea = {
+        id: Date.now().toString() + Math.random().toString(),
+        text: ideaText,
+        timestamp: Date.now(),
+      };
+      
+      console.log("New idea created:", newIdea);
+      const currentIdeas = Array.isArray(ideas) ? ideas : [];
+      const updatedIdeas = [newIdea, ...currentIdeas];
+      console.log("Updating ideas state, count:", updatedIdeas.length);
+      setIdeas(updatedIdeas);
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      console.log("AsyncStorage updated");
+    } catch (error) {
+      console.error("Error adding idea: ", error);
+      setText(ideaText); // Restore if failed
+      if (Platform.OS === "web") {
+        window.alert("Failed to add idea. Please check your storage.");
+      } else {
+        Alert.alert("Error", "Failed to add idea.");
+      }
+    }
+  };
+
+  const deleteIdea = async (id: string) => {
+    try {
+      const updatedIdeas = ideas.filter(idea => idea.id !== id);
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      setIdeas(updatedIdeas);
+    } catch (error) {
+      console.error("Error deleting idea: ", error);
+    }
+  };
+
+  const confirmDelete = (id: string) => {
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure?")) deleteIdea(id);
+    } else {
+      Alert.alert("Delete Idea", "Are you sure?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", onPress: () => deleteIdea(id), style: "destructive" },
+      ]);
+    }
+  };
+
+  const saveEdit = async (id: string, newText: string) => {
+    setEditingId(null);
+    try {
+      const updatedIdeas = ideas.map(idea =>
+        idea.id === id ? { ...idea, text: newText.trim() } : idea
+      );
+      await AsyncStorage.setItem(IDEAS_STORAGE_KEY, JSON.stringify(updatedIdeas));
+      setIdeas(updatedIdeas);
+    } catch (error) {
+      console.error("Error updating idea: ", error);
+      Alert.alert("Error", "Failed to save changes.");
+    }
+  };
+
+  const toggleExpand = (id: string) => {
+    if (viewMode === "compact") {
+      setViewMode("normal");
+      setExpandedIds(new Set([id]));
+      return;
+    }
+    const newExpanded = new Set(expandedIds);
+    if (newExpanded.has(id)) newExpanded.delete(id);
+    else newExpanded.add(id);
+    setExpandedIds(newExpanded);
+  };
+
+  const renderItem = ({ item }: { item: Idea }) => {
+    try {
+      if (!item) return null;
+      return (
+        <IdeaItem
+          item={item}
+          theme={theme}
+          styles={styles}
+          searchText={searchText}
+          isExpanded={expandedIds.has(item.id)}
+          onToggleExpand={toggleExpand}
+          isEditing={editingId === item.id}
+          onStartEdit={() => setEditingId(item.id)}
+          onCancelEdit={() => setEditingId(null)}
+          onSave={(t) => saveEdit(item.id, t)}
+          onDelete={() => confirmDelete(item.id)}
+          viewMode={viewMode}
+        />
+      );
+    } catch (error) {
+      console.error("Error rendering IdeaItem:", error);
+      return null;
+    }
+  };
+
+  const filteredIdeas = (Array.isArray(ideas) ? ideas : [])
+    .filter((idea) => {
+      if (!idea) return false;
+      const text = idea.text || "";
+      return text.toLowerCase().includes(searchText.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (!a || !b) return 0;
+      if (sortBy === "date") return (b.timestamp || 0) - (a.timestamp || 0);
+      const textA = a.text || "";
+      const textB = b.text || "";
+      return textA
+        .split("\n")[0]
+        .toLowerCase()
+        .localeCompare(textB.split("\n")[0].toLowerCase());
+    });
+
+  if (showSettings) {
+    return (
+      <SettingsContainer>
+        <SettingsScrollView>
+          <SettingsHeader
+            title="Ideas 2 Settings"
+            subtitle="Manage your ideas 2 spark"
+            icon="💡"
+            sparkId="ideas2"
+          />
+          <SettingsFeedbackSection sparkName="Ideas 2" sparkId="ideas2" />
+          <TouchableOpacity
+            style={[
+              styles.toolbarButton,
+              { marginTop: 20, alignSelf: "center", paddingHorizontal: 20 },
+            ]}
+            onPress={() => onCloseSettings?.()}
+          >
+            <Text style={styles.toolbarText}>Close</Text>
+          </TouchableOpacity>
+        </SettingsScrollView>
+      </SettingsContainer>
+    );
+  }
+
+  console.log("Ideas2Spark rendering, ideas count:", ideas?.length);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={{ color: theme.text, fontSize: 10 }}>DEBUG: V3</Text>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <View>
+            <Text style={styles.title}>Ideas 2</Text>
+            <Text style={styles.subtitle}>Capture your thoughts</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
+            <TouchableOpacity
+              onPress={() =>
+                setViewMode((prev) =>
+                  prev === "normal" ? "compact" : "normal"
+                )
+              }
+            >
+              <Ionicons
+                name={viewMode === "compact" ? "list" : "grid-outline"}
+                size={26}
+                color={theme.text}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                setThemeMode((prev) => (prev === "dark" ? "light" : "dark"))
+              }
+            >
+              <Ionicons
+                name={themeMode === "dark" ? "sunny" : "moon"}
+                size={26}
+                color={theme.text}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color={theme.textSecondary}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search ideas..."
+            placeholderTextColor={theme.textSecondary}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() =>
+              setSortBy((prev) => (prev === "date" ? "firstLine" : "date"))
+            }
+          >
+            <Ionicons
+              name={sortBy === "date" ? "time-outline" : "text-outline"}
+              size={20}
+              color={theme.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <FlatList
+        data={filteredIdeas}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="bulb-outline"
+              size={64}
+              color={theme.textSecondary}
+            />
+            <Text style={styles.emptyText}>
+              {searchText
+                ? "No matching ideas found."
+                : "No ideas yet. Add one below!"}
+            </Text>
+          </View>
+        }
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+        style={styles.inputContainer}
+      >
+        <TextInput
+          style={styles.input}
+          placeholder="New Idea..."
+          placeholderTextColor={theme.textSecondary}
+          value={text}
+          onChangeText={setText}
+          multiline
+        />
+        <TouchableOpacity onPress={addIdea} style={styles.addButton}>
+          <Ionicons name="arrow-up" size={24} color={theme.iconOnPrimary} />
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </View>
+  );
+};
 
 export default Ideas2Spark;
