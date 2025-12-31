@@ -1,18 +1,19 @@
-import React, { useEffect } from "react";
+import React, { useEffect } from 'react';
 import { useSparkStore } from "./src/store";
-import "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import * as Notifications from "expo-notifications";
-import * as SplashScreen from "expo-splash-screen";
-import { AppNavigator } from "./src/navigation/AppNavigator";
-import { ThemeProvider } from "./src/contexts/ThemeContext";
-import { useAppStore } from "./src/store";
-import { useAuthStore } from "./src/store/authStore";
-import { NotificationService } from "./src/utils/notifications";
-import { FeedbackNotificationService } from "./src/services/FeedbackNotificationService";
-import { ServiceFactory } from "./src/services/ServiceFactory";
-import AuthService from "./src/services/AuthService";
+import 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { ThemeProvider } from './src/contexts/ThemeContext';
+import { useAppStore } from './src/store';
+import { useAuthStore } from './src/store/authStore';
+import { NotificationService } from './src/utils/notifications';
+import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
+import { ServiceFactory } from './src/services/ServiceFactory';
+import AuthService from './src/services/AuthService';
+
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
