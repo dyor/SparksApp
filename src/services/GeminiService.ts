@@ -1,9 +1,58 @@
-export const GeminiService = {
-    generateContent: async (prompt: string, images: string[] = []): Promise<string> => {
-        const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-        if (!apiKey) {
-            throw new Error('Missing EXPO_PUBLIC_GEMINI_API_KEY');
+import { RemoteConfigService } from './RemoteConfigService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
+
+/**
+ * Get the API key using the resolution hierarchy:
+ * 1. User custom key (if configured)
+ * 2. Firebase Remote Config key
+ * 3. Environment variable (fallback)
+ */
+async function getApiKey(): Promise<string> {
+    // 1. Check for user's custom key
+    try {
+        const customKey = await AsyncStorage.getItem(CUSTOM_API_KEY_STORAGE_KEY);
+        if (customKey && customKey.trim()) {
+            console.log('🔑 Using custom Gemini API key');
+            return customKey.trim();
         }
+    } catch (error) {
+        console.warn('⚠️ Failed to check custom API key:', error);
+    }
+
+    // 2. Check Firebase Remote Config
+    try {
+        await RemoteConfigService.ensureInitialized();
+        const remoteKey = RemoteConfigService.getGeminiApiKey();
+        if (remoteKey && remoteKey.trim()) {
+            console.log('🔑 Using Remote Config Gemini API key');
+            return remoteKey.trim();
+        }
+    } catch (error) {
+        console.warn('⚠️ Failed to get Remote Config key:', error);
+    }
+
+    // 3. Fallback to environment variable
+    const envKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    if (envKey && envKey.trim()) {
+        console.log('🔑 Using environment variable Gemini API key');
+        return envKey.trim();
+    }
+
+    throw new Error('No Gemini API key available. Please configure one in Settings or contact support.');
+}
+
+export const GeminiService = {
+    /**
+     * Get the current API key (for display/testing purposes)
+     */
+    getApiKey: async (): Promise<string> => {
+        return await getApiKey();
+    },
+
+    generateContent: async (prompt: string, images: string[] = []): Promise<string> => {
+        const apiKey = await getApiKey();
 
         // Using configuration from RecAIpeSpark which is confirmed working
         // Model: gemini-2.5-flash (as seen in working code)
@@ -129,10 +178,7 @@ Keep the tone warm, insightful, and encouraging. Avoid overly clinical or diagno
      * Uses file-based API: upload file first, then generate content
      */
     transcribeAudio: async (fileUri: string, mimeType: string = 'audio/m4a'): Promise<string> => {
-        const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-        if (!apiKey) {
-            throw new Error('Missing EXPO_PUBLIC_GEMINI_API_KEY');
-        }
+        const apiKey = await getApiKey();
 
         try {
             // For React Native, we'll use inline base64 approach instead of file upload

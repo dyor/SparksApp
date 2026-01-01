@@ -3,7 +3,7 @@
 # Test Gemini API with curl
 # Replace YOUR_API_KEY with your actual API key
 
-YOUR_API_KEY="YOUR_API_KEY"
+YOUR_API_KEY="AIzaSyB7ZpoJDL4ng3AmRyaMFw5NkdCf2n5zPP4"
 
 # Simple test prompt
 curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=$YOUR_API_KEY" \

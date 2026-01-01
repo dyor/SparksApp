@@ -73,7 +73,7 @@ Cool: Let the cookies cool on the baking sheets for 5 minutes before transferrin
     cookingChecked: [],
 };
 
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+import { GeminiService } from '../services/GeminiService';
 
 export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
     const { colors } = useTheme();
@@ -87,6 +87,14 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
     const [generatedRecipe, setGeneratedRecipe] = useState<Partial<Recipe> | null>(null);
     const [editText, setEditText] = useState('');
     const [refinePrompt, setRefinePrompt] = useState('');
+    const [apiKeyAvailable, setApiKeyAvailable] = useState<boolean | null>(null);
+
+    // Check API key availability
+    useEffect(() => {
+        GeminiService.getApiKey()
+            .then(() => setApiKeyAvailable(true))
+            .catch(() => setApiKeyAvailable(false));
+    }, []);
 
     // Load data and restore state
     useEffect(() => {
@@ -136,11 +144,6 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
 
     // AI Generation
     const generateRecipe = async (prompt: string, currentRecipe?: string) => {
-        if (!GEMINI_API_KEY) {
-            Alert.alert('Error', 'Gemini API key not configured. Please add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.');
-            return;
-        }
-
         setIsGenerating(true);
         try {
             const systemPrompt = currentRecipe
@@ -178,30 +181,7 @@ Cream Butter and Sugars: In a large bowl, cream together the unsalted butter, so
 
 Generate the recipe now:`;
 
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: systemPrompt }]
-                        }]
-                    })
-                }
-            );
-
-            const responseData = await response.json();
-
-            if (!response.ok) {
-                throw new Error(responseData.error?.message || 'API request failed');
-            }
-
-            const recipeText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!recipeText) {
-                throw new Error('No recipe generated');
-            }
+            const recipeText = await GeminiService.generateContent(systemPrompt);
 
             const parsed = parseRecipe(recipeText);
             setGeneratedRecipe(parsed);
@@ -516,7 +496,11 @@ Generate the recipe now:`;
                         </Text>
 
                         <Text style={{ fontSize: 14, color: colors.textSecondary }}>
-                            {GEMINI_API_KEY ? '✅ API key configured' : '❌ API key not configured'}
+                            {apiKeyAvailable === null 
+                                ? '⏳ Checking...' 
+                                : apiKeyAvailable 
+                                    ? '✅ API key configured' 
+                                    : '❌ API key not configured'}
                         </Text>
                     </View>
 

@@ -13,6 +13,7 @@ import { NotificationService } from './src/utils/notifications';
 import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
 import { ServiceFactory } from './src/services/ServiceFactory';
 import AuthService from './src/services/AuthService';
+import { RemoteConfigService } from './src/services/RemoteConfigService';
 
 
 // Keep the splash screen visible while we fetch resources
@@ -62,10 +63,16 @@ function AppContent() {
   const { preferences } = useAppStore();
   const { setUser, setRole, setSparkAdminRoles } = useAuthStore();
 
-  // Initialize authentication when app starts
+  // Initialize Remote Config and authentication when app starts
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initializeServices = async () => {
       try {
+        // Initialize Remote Config first (non-blocking)
+        console.log("🚀 App: Initializing Remote Config...");
+        RemoteConfigService.initialize().catch((error) => {
+          console.warn("⚠️ App: Remote Config initialization failed:", error);
+        });
+
         console.log("🚀 App: Initializing AuthService...");
         await AuthService.initialize();
 
@@ -104,7 +111,7 @@ function AppContent() {
       }
     };
 
-    const unsubscribePromise = initializeAuth();
+    const unsubscribePromise = initializeServices();
 
     return () => {
       unsubscribePromise.then((unsubscribe) => {

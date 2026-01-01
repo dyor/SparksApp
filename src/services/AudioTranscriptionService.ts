@@ -3,7 +3,7 @@ import { GeminiService } from './GeminiService';
 
 export interface TranscriptionProvider {
   transcribe(audioUri: string): Promise<string>;
-  isAvailable(): boolean;
+  isAvailable(): boolean | Promise<boolean>;
   getName(): string;
 }
 
@@ -37,17 +37,16 @@ class GeminiTranscriptionProvider implements TranscriptionProvider {
     return 'Gemini';
   }
 
-  isAvailable(): boolean {
-    const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    return !!apiKey;
+  async isAvailable(): Promise<boolean> {
+    try {
+      await GeminiService.getApiKey();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async transcribe(audioUri: string): Promise<string> {
-    const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('Gemini API key not configured');
-    }
-
     try {
       // Determine MIME type from file extension
       let mimeType = 'audio/mp4'; // Default for M4A files
@@ -106,20 +105,36 @@ class AudioTranscriptionServiceClass {
   /**
    * Get available providers
    */
-  getAvailableProviders(): TranscriptionProvider[] {
+  async getAvailableProviders(): Promise<TranscriptionProvider[]> {
     const providers: TranscriptionProvider[] = [
       new GeminiTranscriptionProvider(),
       new ManualTranscriptionProvider(),
     ];
 
-    return providers.filter(p => p.isAvailable());
+    const available: TranscriptionProvider[] = [];
+    for (const provider of providers) {
+      if (provider instanceof GeminiTranscriptionProvider) {
+        if (await provider.isAvailable()) {
+          available.push(provider);
+        }
+      } else {
+        if (provider.isAvailable()) {
+          available.push(provider);
+        }
+      }
+    }
+    return available;
   }
 
   /**
    * Transcribe audio file
    */
   async transcribe(audioUri: string): Promise<string> {
-    if (!this.provider.isAvailable()) {
+    const isAvailable = this.provider instanceof GeminiTranscriptionProvider
+      ? await this.provider.isAvailable()
+      : this.provider.isAvailable();
+    
+    if (!isAvailable) {
       throw new Error(`Transcription provider "${this.provider.getName()}" is not available`);
     }
 
@@ -143,9 +158,13 @@ export const AudioTranscriptionService = new AudioTranscriptionServiceClass();
 
 // Initialize with Gemini if available, otherwise placeholder
 const geminiProvider = new GeminiTranscriptionProvider();
-if (geminiProvider.isAvailable()) {
-  AudioTranscriptionService.setProvider(geminiProvider);
-} else {
+geminiProvider.isAvailable().then((available) => {
+  if (available) {
+    AudioTranscriptionService.setProvider(geminiProvider);
+  } else {
+    AudioTranscriptionService.setProvider(new PlaceholderTranscriptionProvider());
+  }
+}).catch(() => {
   AudioTranscriptionService.setProvider(new PlaceholderTranscriptionProvider());
-}
+});
 
