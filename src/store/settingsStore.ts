@@ -144,6 +144,11 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "sparks-settings-storage",
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.darkMode = false;
+        }
+      },
       partialize: (state) => {
         // Exclude darkMode from persistence so it always starts in light mode
         const { darkMode, ...rest } = state;

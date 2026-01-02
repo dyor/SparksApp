@@ -64,6 +64,11 @@ export const useAppStore = create<AppState>()(
     {
       name: "sparks-app-storage",
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.preferences.theme = "light";
+        }
+      },
       partialize: (state) => {
         const { theme, ...otherPreferences } = state.preferences;
         return {
