@@ -48,8 +48,7 @@
       "@react-native-firebase/app",
       "expo-speech-recognition",
       "expo-apple-authentication",
-      "@react-native-community/datetimepicker",
-      "expo-router"
+      "@react-native-community/datetimepicker"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -137,7 +136,7 @@
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png",
-      "output": "static"
+      "output": "single"
     }
   }
 }

@@ -38,14 +38,19 @@ Your web setup includes:
 
 ## Part 2: Pre-Migration Testing Strategy
 
-### Phase 1: Create Test Branch (1-2 hours)
+### Phase 1: Create Test Branch (CRITICAL - Do This First!)
+
+**⚠️ IMPORTANT: Always test SDK upgrades on a branch, never directly on main!**
 
 ```bash
 # Create a test branch for SDK 53
-git checkout -b test/expo-sdk-53-migration
+git checkout -b test/expo-sdk-53-web-test
 
-# Create a backup of current state
-git tag backup-sdk-52
+# Create a backup tag (optional but recommended)
+git tag backup-sdk-52-before-test
+
+# Verify you're on the test branch
+git branch
 ```
 
 ### Phase 2: Incremental Upgrade Test (2-4 hours)
@@ -53,10 +58,14 @@ git tag backup-sdk-52
 **Step 1: Test Web Build on SDK 52 First**
 ```bash
 # Ensure current web build works
+# Note: You use "npx expo start --web --tunnel" for dev, but for production build:
 npm run build:web
 npx serve dist
 # Test all critical features
 ```
+
+**Step 1.5: Fix expo-router Issue (If Present)**
+If you get "No routes found" error, remove `expo-router` from plugins in `app.json` if you're using React Navigation instead.
 
 **Step 2: Upgrade to SDK 53**
 ```bash
@@ -342,30 +351,43 @@ npm run build:web  # Verify web still works
 
 ## Part 9: Recommended Next Steps
 
-### Immediate Actions (Today)
+### Immediate Actions (Today) - CORRECTED
 
-1. **Create test branch**
+**⚠️ CRITICAL: Do this on a test branch, NOT on main!**
+
+1. **Create test branch FIRST** (Do this before anything else!)
    ```bash
    git checkout -b test/expo-sdk-53-web-test
+   git tag backup-sdk-52-before-test  # Optional backup
    ```
 
-2. **Upgrade to SDK 53**
+2. **Upgrade to SDK 53** (on test branch)
    ```bash
+   # Verify you're on test branch
+   git branch
+   
+   # Then upgrade
    npx expo install expo@^53.0.22 --fix
    npx expo install --fix
    ```
 
-3. **Test web immediately**
+3. **Test web immediately** (before committing)
    ```bash
    npm run web
    # In another terminal:
    npm run build:web
+   npx serve dist  # Test the build
    ```
 
 4. **Document results**
    - Does web dev server work?
    - Does web build work?
    - Any errors?
+   - What breaks (if anything)?
+
+5. **Decision:**
+   - **If web works**: Commit and proceed
+   - **If web breaks**: Investigate or abandon branch
 
 ### Decision Point (After Testing)
 
