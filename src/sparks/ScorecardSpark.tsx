@@ -9,7 +9,9 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -32,13 +34,47 @@ import {
   Round,
   saveScore,
   updateCourse,
+  updateRound,
 } from "../dbService";
+
+const formatMinutes = (totalMinutes: number) => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}:${minutes.toString().padStart(2, "0")}`;
+};
+
+const parseTimeToMinutes = (timeStr: string) => {
+  const parts = timeStr.split(":");
+  if (parts.length === 2) {
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    return hours * 60 + minutes;
+  }
+  const mins = parseInt(timeStr) || 0;
+  return mins;
+};
+
+const calculateExpectedElapsedTimeForHole = (
+  holeNumber: number,
+  holes: Hole[],
+  totalExpectedMinutes: number
+) => {
+  const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
+  if (totalPar === 0) return 0;
+  const minutesPerPar = totalExpectedMinutes / totalPar;
+
+  let elapsedMinutes = 0;
+  for (let i = 0; i < holeNumber; i++) {
+    elapsedMinutes += holes[i].par * minutesPerPar;
+  }
+  return elapsedMinutes;
+};
 
 const HoleRow = React.forwardRef<
   any,
   {
     hole: Hole;
-    score: { strokes: string; putts: string };
+    score: { strokes: string; putts: string; completed_at?: string };
     onSave: (
       holeNumber: number,
       strokes: string,
@@ -47,111 +83,158 @@ const HoleRow = React.forwardRef<
     colors: any;
     styles: any;
     onAutoAdvance?: () => void;
+    expectedElapsedTime: number;
+    startTime: string | null;
   }
->(({ hole, score, onSave, colors, styles, onAutoAdvance }, ref) => {
-  const [localStrokes, setLocalStrokes] = useState(score.strokes);
-  const [localPutts, setLocalPutts] = useState(score.putts);
+>(
+  (
+    {
+      hole,
+      score,
+      onSave,
+      colors,
+      styles,
+      onAutoAdvance,
+      expectedElapsedTime,
+      startTime,
+    },
+    ref
+  ) => {
+    const [localStrokes, setLocalStrokes] = useState(score.strokes);
+    const [localPutts, setLocalPutts] = useState(score.putts);
 
-  // Refs to hold latest values for onBlur (avoiding stale state closures)
-  const localStrokesRef = useRef(score.strokes);
-  const localPuttsRef = useRef(score.putts);
+    // Refs to hold latest values for onBlur (avoiding stale state closures)
+    const localStrokesRef = useRef(score.strokes);
+    const localPuttsRef = useRef(score.putts);
 
-  const strokesInputRef = useRef<TextInput>(null);
-  const puttsInputRef = useRef<TextInput>(null);
+    const strokesInputRef = useRef<TextInput>(null);
+    const puttsInputRef = useRef<TextInput>(null);
 
-  React.useImperativeHandle(ref, () => ({
-    focusStrokes: () => strokesInputRef.current?.focus(),
-    focusPutts: () => puttsInputRef.current?.focus(),
-  }));
+    React.useImperativeHandle(ref, () => ({
+      focusStrokes: () => strokesInputRef.current?.focus(),
+      focusPutts: () => puttsInputRef.current?.focus(),
+    }));
 
-  useEffect(() => {
-    setLocalStrokes(score.strokes);
-    localStrokesRef.current = score.strokes;
-    setLocalPutts(score.putts);
-    localPuttsRef.current = score.putts;
-  }, [score.strokes, score.putts]);
-
-  const handleBlur = async () => {
-    const success = await onSave(
-      hole.hole_number,
-      localStrokesRef.current,
-      localPuttsRef.current
-    );
-    if (!success) {
-      // Revert to props if save failed
+    useEffect(() => {
       setLocalStrokes(score.strokes);
       localStrokesRef.current = score.strokes;
       setLocalPutts(score.putts);
       localPuttsRef.current = score.putts;
+    }, [score.strokes, score.putts]);
+
+    const handleBlur = async () => {
+      const success = await onSave(
+        hole.hole_number,
+        localStrokesRef.current,
+        localPuttsRef.current
+      );
+      if (!success) {
+        // Revert to props if save failed
+        setLocalStrokes(score.strokes);
+        localStrokesRef.current = score.strokes;
+        setLocalPutts(score.putts);
+        localPuttsRef.current = score.putts;
+      }
+    };
+
+    const strokesValue = parseInt(localStrokes);
+    const netValue = !isNaN(strokesValue) ? strokesValue - hole.par : 0;
+    const isUnderPar = !isNaN(strokesValue) && netValue < 0;
+
+    let timeDiff: number | null = null;
+    if (score.completed_at && startTime) {
+      const actualElapsed =
+        (new Date(score.completed_at).getTime() -
+          new Date(startTime).getTime()) /
+        60000;
+
+      if (hole.hole_number === 1) {
+        // For Hole 1, show the actual elapsed time as the pace
+        timeDiff = Math.round(actualElapsed);
+      } else {
+        timeDiff = Math.round(expectedElapsedTime - actualElapsed);
+      }
     }
-  };
 
-  const strokesValue = parseInt(localStrokes);
-  const netValue = !isNaN(strokesValue) ? strokesValue - hole.par : 0;
-  const isUnderPar = !isNaN(strokesValue) && netValue < 0;
-
-  return (
-    <View style={styles.tableRow}>
-      <View style={styles.holeCol}>
-        <Text style={styles.holeNumber}>{hole.hole_number}</Text>
+    return (
+      <View style={styles.tableRow}>
+        <View style={styles.holeCol}>
+          <Text style={styles.holeNumber}># {hole.hole_number}</Text>
+        </View>
+        <View style={styles.parCol}>
+          <Text style={styles.parText}>{hole.par}</Text>
+        </View>
+        <View style={styles.inputCol}>
+          <TextInput
+            ref={strokesInputRef}
+            style={styles.tableInput}
+            value={localStrokes}
+            onChangeText={(val) => {
+              setLocalStrokes(val);
+              localStrokesRef.current = val;
+              if (val.length === 1 && /^\d+$/.test(val)) {
+                puttsInputRef.current?.focus();
+              }
+            }}
+            onBlur={handleBlur}
+            keyboardType="numeric"
+            placeholder=""
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+        <View style={styles.inputCol}>
+          <TextInput
+            ref={puttsInputRef}
+            style={styles.tableInput}
+            value={localPutts}
+            onChangeText={(val) => {
+              setLocalPutts(val);
+              localPuttsRef.current = val;
+              if (val.length === 1 && /^\d+$/.test(val)) {
+                onAutoAdvance?.();
+              }
+            }}
+            onBlur={handleBlur}
+            keyboardType="numeric"
+            placeholder=""
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+        <View style={styles.netCol}>
+          <Text style={[styles.netText, isUnderPar && { color: "#2E7D32" }]}>
+            {!isNaN(strokesValue)
+              ? netValue > 0
+                ? `+${netValue}`
+                : netValue
+              : ""}
+          </Text>
+        </View>
+        <View style={styles.timeDiffCol}>
+          <Text
+            style={[
+              styles.timeDiffText,
+              timeDiff !== null && timeDiff < 0 && { color: "#C62828" },
+              timeDiff !== null && timeDiff > 0 && { color: "#2E7D32" },
+              timeDiff !== null && timeDiff === 0 && { color: colors.text },
+            ]}
+          >
+            {timeDiff !== null
+              ? timeDiff > 0
+                ? `+${timeDiff}`
+                : timeDiff
+              : ""}
+          </Text>
+        </View>
       </View>
-      <View style={styles.parCol}>
-        <Text style={styles.parText}>{hole.par}</Text>
-      </View>
-      <View style={styles.inputCol}>
-        <TextInput
-          ref={strokesInputRef}
-          style={styles.tableInput}
-          value={localStrokes}
-          onChangeText={(val) => {
-            setLocalStrokes(val);
-            localStrokesRef.current = val;
-            if (val.length === 1 && /^\d+$/.test(val)) {
-              puttsInputRef.current?.focus();
-            }
-          }}
-          onBlur={handleBlur}
-          keyboardType="numeric"
-          placeholder=""
-          placeholderTextColor={colors.textSecondary}
-        />
-      </View>
-      <View style={styles.inputCol}>
-        <TextInput
-          ref={puttsInputRef}
-          style={styles.tableInput}
-          value={localPutts}
-          onChangeText={(val) => {
-            setLocalPutts(val);
-            localPuttsRef.current = val;
-            if (val.length === 1 && /^\d+$/.test(val)) {
-              onAutoAdvance?.();
-            }
-          }}
-          onBlur={handleBlur}
-          keyboardType="numeric"
-          placeholder=""
-          placeholderTextColor={colors.textSecondary}
-        />
-      </View>
-      <View style={styles.netCol}>
-        <Text style={[styles.netText, isUnderPar && { color: "#2E7D32" }]}>
-          {!isNaN(strokesValue)
-            ? netValue > 0
-              ? `+${netValue}`
-              : netValue
-            : ""}
-        </Text>
-      </View>
-    </View>
-  );
-});
+    );
+  }
+);
 HoleRow.displayName = "HoleRow";
 
 // getStyles must be declared before use in the component
 
 // getStyles must be declared before use in the component
-const getStyles = (colors: any) =>
+const getStyles = (colors: any, isDarkMode: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -185,17 +268,20 @@ const getStyles = (colors: any) =>
       textAlign: "center",
     },
     miniVoiceButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: colors.primary,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: colors.card,
+      backgroundColor: colors.primary,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
     },
     voiceButtonActive: {
-      backgroundColor: colors.primary,
+      backgroundColor: "#FF5252",
     },
     tableHeader: {
       flexDirection: "row",
@@ -240,7 +326,7 @@ const getStyles = (colors: any) =>
     parText: {
       fontSize: 14,
       fontWeight: "bold",
-      color: colors.text,
+      color: colors.textSecondary,
     },
     inputCol: {
       flex: 1,
@@ -248,6 +334,10 @@ const getStyles = (colors: any) =>
     },
     netCol: {
       width: 40,
+      alignItems: "center",
+    },
+    timeDiffCol: {
+      width: 50,
       alignItems: "center",
     },
     tableInput: {
@@ -266,6 +356,10 @@ const getStyles = (colors: any) =>
       fontSize: 15,
       fontWeight: "bold",
       color: colors.text,
+    },
+    timeDiffText: {
+      fontSize: 14,
+      fontWeight: "600",
     },
     tableFooter: {
       flexDirection: "row",
@@ -410,6 +504,56 @@ const getStyles = (colors: any) =>
       fontSize: 16,
       fontWeight: "bold",
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      width: "100%",
+      maxWidth: 400,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 10,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    helpSectionTitle: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    helpText: {
+      fontSize: 14,
+      color: colors.text,
+      lineHeight: 20,
+    },
+    closeButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: 8,
+      marginTop: 24,
+      alignItems: "center",
+    },
+    closeButtonText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 16,
+    },
   });
 
 const ScorecardFooter = ({ totals, styles }: { totals: any; styles: any }) => (
@@ -437,6 +581,7 @@ const ScorecardFooter = ({ totals, styles }: { totals: any; styles: any }) => (
           : ""}
       </Text>
     </View>
+    <View style={styles.timeDiffCol} />
   </View>
 );
 
@@ -444,8 +589,8 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   showSettings = false,
   onCloseSettings,
 }) => {
-  const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const { colors, isDarkMode, toggleTheme } = useTheme();
+  const styles = getStyles(colors, isDarkMode);
 
   // Always start on Recent Rounds screen
   const [screen, setScreen] = useState<
@@ -459,10 +604,11 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [round, setRound] = useState<any>(null);
   const [holes, setHoles] = useState<any[]>([]);
   const [scores, setScores] = useState<
-    Record<number, { strokes: string; putts: string }>
+    Record<number, { strokes: string; putts: string; completed_at?: string }>
   >({});
   const [courses, setCourses] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   // For focusing next input in scorecard
   const holeRefs = useRef<Record<number, any>>({});
 
@@ -470,6 +616,9 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [courseName, setCourseName] = useState("");
   const [numHoles, setNumHoles] = useState(18);
+  const [expectedRoundTime, setExpectedRoundTime] = useState<number>(240);
+  const [startTime, setStartTime] = useState<string | null>(null);
+  const [endTime, setEndTime] = useState<string | null>(null);
   const [holePars, setHolePars] = useState<Record<number, number>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [roundSummaries, setRoundSummaries] = useState<
@@ -523,14 +672,22 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         setIsLoading(false);
         return;
       }
+      setStartTime(currentRound.start_time || null);
+      setEndTime(currentRound.end_time || null);
+      setExpectedRoundTime(currentRound.expected_round_time || 240);
+
       const courseHoles = await getHoles(currentRound.course_id);
       setHoles(courseHoles);
       const savedScores = await getScores(currentRound.id);
-      const scoreMap: Record<number, { strokes: string; putts: string }> = {};
+      const scoreMap: Record<
+        number,
+        { strokes: string; putts: string; completed_at?: string }
+      > = {};
       savedScores.forEach((s) => {
         scoreMap[s.hole_number] = {
           strokes: s.strokes === null ? "" : s.strokes.toString(),
           putts: s.putts === null ? "" : s.putts.toString(),
+          completed_at: s.completed_at,
         };
       });
       setScores(scoreMap);
@@ -644,24 +801,23 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         console.log("[Scorecard] Validation FAILED: Putts >= Strokes");
         const errorMessage = "Putts must be less than strokes.";
         setErrorMsg(errorMessage);
-        setTimeout(() => setErrorMsg(null), 3000);
-
-        if (Platform.OS === "web") {
-          console.log("[Scorecard] Triggering window.alert");
-          window.alert(errorMessage);
-        } else {
-          console.log("[Scorecard] Triggering Alert.alert");
-          Alert.alert("Invalid Score", errorMessage);
-        }
+        setTimeout(
+          () => setErrorMsg((curr) => (curr === errorMessage ? null : curr)),
+          5000
+        );
         return false;
       }
 
       console.log("[Scorecard] Validation PASSED. Proceeding to save.");
 
+      const now = new Date().toISOString();
+      const existingScore = scores[holeNumber];
+      const completedAt = existingScore?.completed_at || now;
+
       // Optimistic update
       setScores((prev) => ({
         ...prev,
-        [holeNumber]: { strokes, putts },
+        [holeNumber]: { strokes, putts, completed_at: completedAt },
       }));
 
       try {
@@ -669,8 +825,41 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           roundId,
           holeNumber,
           isNaN(s) ? null : s,
-          isNaN(p) ? null : p
+          isNaN(p) ? null : p,
+          completedAt
         );
+
+        // If hole #1 is entered and start time is not set, back-calculate it
+        if (holeNumber === 1 && !startTime && !isNaN(s)) {
+          const expectedHole1Time = calculateExpectedElapsedTimeForHole(
+            1,
+            holes,
+            expectedRoundTime
+          );
+          const backCalculatedStartTime = new Date(
+            new Date(completedAt).getTime() - expectedHole1Time * 60000
+          ).toISOString();
+
+          const updatedRound = {
+            ...round,
+            start_time: backCalculatedStartTime,
+          };
+          await updateRound(updatedRound);
+          setRound(updatedRound);
+          setStartTime(backCalculatedStartTime);
+          console.log(
+            `[Scorecard] Back-calculated start time for Hole 1: ${backCalculatedStartTime}`
+          );
+        }
+
+        // If it's the last hole, set the end time
+        if (holeNumber === holes.length && !isNaN(s)) {
+          const updatedRound = { ...round, end_time: now };
+          await updateRound(updatedRound);
+          setRound(updatedRound);
+          setEndTime(now);
+        }
+
         return true;
       } catch (error) {
         console.error("Error saving score:", error);
@@ -678,22 +867,8 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         return false;
       }
     },
-    [roundId]
+    [roundId, round, holes, scores, startTime, expectedRoundTime, updateRound]
   );
-
-  // Speech Recognition Event Handling
-  useSpeechRecognitionEvent("start", () => setIsRecording(true));
-  useSpeechRecognitionEvent("end", () => setIsRecording(false));
-  useSpeechRecognitionEvent("result", (event) => {
-    const transcript = event.results[0]?.transcript;
-    if (transcript) {
-      parseVoiceScore(transcript);
-    }
-  });
-  useSpeechRecognitionEvent("error", (event) => {
-    console.error("Speech recognition error:", event.error, event.message);
-    setIsRecording(false);
-  });
 
   const wordToNumber = (word: string): string => {
     const numberMap: Record<string, string> = {
@@ -703,12 +878,15 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       to: "2",
       too: "2",
       three: "3",
+      tree: "3",
       four: "4",
       for: "4",
+      fore: "4",
       five: "5",
       six: "6",
       seven: "7",
       eight: "8",
+      ate: "8",
       nine: "9",
       ten: "10",
       eleven: "11",
@@ -725,89 +903,150 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     return numberMap[word.toLowerCase()] || word;
   };
 
-  const parseVoiceScore = (text: string) => {
-    console.log("Voice transcript received:", text);
+  const parseVoiceScore = useCallback(
+    async (text: string) => {
+      console.log("Voice transcript received:", text);
 
-    // Normalize common mishearings
-    let normalized = text
-      .toLowerCase()
-      .replace(/\bwhole\b/g, "hole")
-      .replace(/\bhas\b/g, "as")
-      .replace(/\bhass\b/g, "as");
+      // Normalize common mishearings
+      let normalized = text
+        .toLowerCase()
+        .trim()
+        .replace(/\bwhole\b/g, "hole")
+        .replace(/\bhas\b/g, "as")
+        .replace(/\bhass\b/g, "as");
 
-    console.log("Normalized:", normalized);
+      console.log("Normalized:", normalized);
 
-    // Try multiple regex patterns for flexibility
-    // Pattern 1: "add/update/input/enter [hole] [#] [number] [X] as/and [Y] and [Z]"
-    let regex =
-      /(?:add|update|input|enter)\s+(?:hole\s*)?(?:#\s*)?(?:number\s*)?(\w+)\s+(?:as|and)\s+(\w+)\s+and\s+(\w+)/i;
-    let match = normalized.match(regex);
+      // Try multiple regex patterns for flexibility
+      // Pattern 1: [Hole|Number|Whole] # [enter|as] # and #
+      let regex =
+        /(?:hole|number|whole)\s+(\w+)\s+(?:enter|as)\s+(\w+)\s+and\s+(\w+)/i;
+      let match = normalized.match(regex);
 
-    // Pattern 2: Try without command word - just "hole X as Y and Z"
-    if (!match) {
-      regex =
-        /(?:hole\s*)?(?:#\s*)?(?:number\s*)?(\w+)\s+(?:as|and)\s+(\w+)\s+and\s+(\w+)/i;
-      match = normalized.match(regex);
-    }
-
-    // Pattern 3: "number X enter/is Y and Z"
-    if (!match) {
-      regex = /number\s+(\w+)\s+(?:enter|is)\s+(\w+)\s+and\s+(\w+)/i;
-      match = normalized.match(regex);
-    }
-
-    if (match) {
-      const holeNum = parseInt(wordToNumber(match[1]));
-      const strokes = wordToNumber(match[2]);
-      const putts = wordToNumber(match[3]);
-
-      console.log(
-        `Parsed: hole=${holeNum}, strokes=${strokes}, putts=${putts}`
-      );
-
-      // Validate that we got valid numbers
-      if (
-        isNaN(holeNum) ||
-        isNaN(parseInt(strokes)) ||
-        isNaN(parseInt(putts))
-      ) {
-        const msg = "Could not parse numbers from voice command.";
-        if (Platform.OS === "web") {
-          window.alert(msg);
-        } else {
-          Alert.alert("Error", msg);
-        }
-        return;
+      // Pattern 2: [Hole|Number|Whole] # # and #
+      if (!match) {
+        regex = /(?:hole|number|whole)\s+(\w+)\s+(\w+)\s+and\s+(\w+)/i;
+        match = normalized.match(regex);
       }
 
-      // Check if hole exists
-      if (holes.some((h) => h.hole_number === holeNum)) {
-        handleSaveScore(holeNum, strokes, putts);
-        // Silent success - no alert
-      } else {
-        const msg = `Hole number ${holeNum} not found.`;
-        if (Platform.OS === "web") {
-          window.alert(msg);
+      // Fallback Pattern: "number X enter/is Y and Z" (existing)
+      if (!match) {
+        regex = /number\s+(\w+)\s+(?:enter|is)\s+(\w+)\s+and\s+(\w+)/i;
+        match = normalized.match(regex);
+      }
+
+      if (match) {
+        const holeNum = parseInt(wordToNumber(match[1]));
+        const strokes = wordToNumber(match[2]);
+        const putts = wordToNumber(match[3]);
+
+        console.log(
+          `Parsed: hole=${holeNum}, strokes=${strokes}, putts=${putts}`
+        );
+
+        // Validate that we got valid numbers
+        if (
+          isNaN(holeNum) ||
+          isNaN(parseInt(strokes)) ||
+          isNaN(parseInt(putts))
+        ) {
+          setErrorMsg("Could not parse numbers from voice command.");
+          setTimeout(
+            () =>
+              setErrorMsg((curr) =>
+                curr === "Could not parse numbers from voice command."
+                  ? null
+                  : curr
+              ),
+            5000
+          );
+          return;
+        }
+
+        // Check if hole exists
+        if (holes.some((h) => h.hole_number === holeNum)) {
+          const success = await handleSaveScore(holeNum, strokes, putts);
+          if (success) {
+            setErrorMsg(null);
+          }
         } else {
-          Alert.alert("Error", msg);
+          setErrorMsg(`Hole number ${holeNum} not found.`);
+          setTimeout(
+            () =>
+              setErrorMsg((curr) =>
+                curr === `Hole number ${holeNum} not found.` ? null : curr
+              ),
+            5000
+          );
+        }
+      } else {
+        console.log("No match found for voice command:", text);
+
+        // Check for partial match to give better feedback
+        const partialRegex = /(?:hole|number|whole)\s+(\w+)$/i;
+        const partialMatch = normalized.match(partialRegex);
+
+        if (partialMatch) {
+          const holeNum = wordToNumber(partialMatch[1]);
+          setErrorMsg(
+            `I heard Hole ${holeNum}, but please also say the score. Ex: "Number ${holeNum} 4 and 1"`
+          );
+        } else if (text.trim().length > 0) {
+          setErrorMsg(`Voice command not recognized: "${text}"`);
+        }
+
+        if (text.trim().length > 0) {
+          setTimeout(
+            () =>
+              setErrorMsg((curr) =>
+                curr?.includes("not recognized") ||
+                curr?.includes("I heard Hole")
+                  ? null
+                  : curr
+              ),
+            5000
+          );
+        }
+      }
+    },
+    [holes, handleSaveScore]
+  );
+
+  // Speech Recognition Event Handling
+  const parseVoiceScoreRef = useRef(parseVoiceScore);
+  useEffect(() => {
+    parseVoiceScoreRef.current = parseVoiceScore;
+  }, [parseVoiceScore]);
+
+  useSpeechRecognitionEvent("start", () => setIsRecording(true));
+  useSpeechRecognitionEvent("end", () => setIsRecording(false));
+  useSpeechRecognitionEvent("result", (event) => {
+    if (Platform.OS === "web") {
+      // On web, we only want the final result to avoid multiple parses
+      if (event.isFinal) {
+        const transcript = event.results[0]?.transcript;
+        if (transcript) {
+          parseVoiceScoreRef.current(transcript);
         }
       }
     } else {
-      console.log("No match found for voice command");
-      const msg = `Voice Command Not Recognized\n\nI heard: "${text}"\n\nAccepted formats:\n• "Number [hole] enter [strokes] and [putts]"\n• "Number [hole] is [strokes] and [putts]"\n\nExamples:\n• "Number 5 enter 4 and 2"\n• "Number 5 is 4 and 2"`;
-
-      if (Platform.OS === "web") {
-        window.alert(msg);
-      } else {
-        Alert.alert("Voice Command Not Recognized", msg);
+      // On native, we can use the same logic or adjust if needed
+      const transcript = event.results[0]?.transcript;
+      if (transcript && event.isFinal) {
+        parseVoiceScoreRef.current(transcript);
       }
     }
-  };
+  });
+  useSpeechRecognitionEvent("error", (event) => {
+    console.error("Speech recognition error:", event.error, event.message);
+    setIsRecording(false);
+  });
 
   const handleToggleRecording = async () => {
     if (isRecording) {
       ExpoSpeechRecognitionModule.stop();
     } else {
+      setErrorMsg(null);
       const result =
         await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!result.granted) {
@@ -925,10 +1164,20 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                             month: "short",
                             day: "numeric",
                             year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
                           })
                         : ""}
+                      {item.start_time &&
+                        ` • ${new Date(item.start_time).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}`}
+                      {item.end_time &&
+                        ` - ${new Date(item.end_time).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}`}
                     </Text>
                     {roundSummaries[item.id] && (
                       <Text
@@ -941,6 +1190,20 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                       >
                         Score: {roundSummaries[item.id].strokes} • Putts:{" "}
                         {roundSummaries[item.id].putts}
+                        {item.start_time && item.end_time && (
+                          <>
+                            {" • Pace: "}
+                            {(() => {
+                              const diffMs =
+                                new Date(item.end_time).getTime() -
+                                new Date(item.start_time).getTime();
+                              const diffMins = Math.floor(diffMs / 60000);
+                              const h = Math.floor(diffMins / 60);
+                              const m = diffMins % 60;
+                              return `${h}:${m.toString().padStart(2, "0")}`;
+                            })()}
+                          </>
+                        )}
                       </Text>
                     )}
                   </View>
@@ -1012,27 +1275,165 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                   marginTop: 2,
                 }}
               >
-                "Number # Enter # and #"
+                Ex: Number 6 4 and 1
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => setShowHelp(true)}
+                style={{ marginRight: 12 }}
+              >
+                <Ionicons
+                  name="help-circle-outline"
+                  size={24}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={toggleTheme}
+                style={{ marginRight: 12 }}
+              >
+                <Ionicons
+                  name={isDarkMode ? "sunny-outline" : "moon-outline"}
+                  size={22}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleToggleRecording}
+                style={[
+                  styles.miniVoiceButton,
+                  isRecording && styles.voiceButtonActive,
+                ]}
+              >
+                <Ionicons
+                  name={isRecording ? "mic" : "mic-outline"}
+                  size={20}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Time Info Bar */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-around",
+              paddingVertical: 8,
+              backgroundColor: colors.card,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                Exp Time
+              </Text>
+              <Text
+                style={{ fontSize: 14, fontWeight: "bold", color: colors.text }}
+              >
+                {formatMinutes(expectedRoundTime)}
               </Text>
             </View>
             <TouchableOpacity
-              onPress={handleToggleRecording}
-              style={[
-                styles.miniVoiceButton,
-                isRecording && styles.voiceButtonActive,
-              ]}
+              style={{ alignItems: "center" }}
+              onPress={async () => {
+                const isHole1Entered =
+                  scores[1]?.strokes !== "" && scores[1]?.strokes !== undefined;
+                if (startTime && isHole1Entered) return; // Locked
+                const now = new Date().toISOString();
+                setStartTime(now);
+                if (round) {
+                  const updatedRound = { ...round, start_time: now };
+                  await updateRound(updatedRound);
+                  setRound(updatedRound);
+                }
+              }}
             >
-              <Ionicons
-                name={isRecording ? "mic" : "mic-outline"}
-                size={16}
-                color={isRecording ? "#fff" : colors.primary}
-              />
+              <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                begin
+              </Text>
+              <Text
+                style={{ fontSize: 14, fontWeight: "bold", color: colors.text }}
+              >
+                {startTime
+                  ? new Date(startTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })
+                  : "Set"}
+              </Text>
             </TouchableOpacity>
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                end
+              </Text>
+              <Text
+                style={{ fontSize: 14, fontWeight: "bold", color: colors.text }}
+              >
+                {endTime
+                  ? new Date(endTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })
+                  : "--:--"}
+              </Text>
+            </View>
           </View>
+
+          <Modal
+            visible={showHelp}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowHelp(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Golf Scorecard Help</Text>
+                <ScrollView style={{ maxHeight: 400 }}>
+                  <Text style={styles.helpSectionTitle}>App Functions</Text>
+                  <Text style={styles.helpText}>
+                    • Track scores and putts for each hole.{"\n"}• Manage
+                    multiple golf courses.{"\n"}• View history of completed
+                    rounds.{"\n"}• Voice input for hands-free scoring.
+                  </Text>
+
+                  <Text style={styles.helpSectionTitle}>Time Algorithm</Text>
+                  <Text style={styles.helpText}>
+                    The expected time for each hole is distributed based on its
+                    par. Higher par holes are allocated more time. The "+/- min"
+                    column shows if you are ahead (positive/green) or behind
+                    (negative/red) the expected pace based on when you entered
+                    the score.
+                  </Text>
+
+                  <Text style={styles.helpSectionTitle}>Voice Commands</Text>
+                  <Text style={styles.helpText}>
+                    Use the microphone button and say:{"\n"}
+                    1. "Hole [number] enter [score] and [putts]"{"\n"}
+                    2. "Hole [number] [score] and [putts]"{"\n"}
+                    (You can also use "Number" instead of "Hole")
+                  </Text>
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowHelp(false)}
+                >
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
           {errorMsg && (
             <View
               style={{
-                backgroundColor: "#FF5252",
+                backgroundColor: errorMsg.includes("recognized")
+                  ? "#666"
+                  : "#FF5252",
                 padding: 12,
                 alignItems: "center",
                 justifyContent: "center",
@@ -1084,6 +1485,11 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                     Net
                   </Text>
                 </View>
+                <View style={styles.timeDiffCol}>
+                  <Text style={[styles.headerLabel, styles.centerText]}>
+                    +/- min
+                  </Text>
+                </View>
               </View>
               <FlatList
                 data={holes}
@@ -1103,6 +1509,12 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                         holeRefs.current[item.hole_number + 1]?.focusStrokes();
                       }
                     }}
+                    expectedElapsedTime={calculateExpectedElapsedTimeForHole(
+                      item.hole_number,
+                      holes,
+                      expectedRoundTime
+                    )}
+                    startTime={startTime}
                   />
                 )}
                 keyExtractor={(item) => item.hole_number.toString()}
@@ -1125,6 +1537,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       setEditingCourse({ id: null });
       setCourseName("");
       setNumHoles(18);
+      setExpectedRoundTime(240);
       const initialPars: Record<number, number> = {};
       for (let i = 1; i <= 18; i++) initialPars[i] = 4;
       setHolePars(initialPars);
@@ -1134,6 +1547,9 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       setEditingCourse(course);
       setCourseName(course.name);
       setNumHoles(course.holes.length);
+      setExpectedRoundTime(
+        course.expected_round_time || (course.holes.length === 9 ? 120 : 240)
+      );
       const initialPars: Record<number, number> = {};
       course.holes.forEach((h: any) => {
         initialPars[h.hole_number] = h.par;
@@ -1154,14 +1570,24 @@ const ScorecardSpark: React.FC<SparkProps> = ({
 
       let savedCourse;
       if (editingCourse.id) {
-        await updateCourse(editingCourse.id, courseName, holesData);
+        await updateCourse(
+          editingCourse.id,
+          courseName,
+          holesData,
+          expectedRoundTime
+        );
         savedCourse = {
           id: editingCourse.id,
           name: courseName,
           holes: holesData,
+          expected_round_time: expectedRoundTime,
         };
       } else {
-        savedCourse = await createCourse(courseName, holesData);
+        savedCourse = await createCourse(
+          courseName,
+          holesData,
+          expectedRoundTime
+        );
       }
 
       // After saving, start a new round with this course
@@ -1221,7 +1647,12 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                         numHoles === n && styles.parButtonActive,
                         { flex: 1, height: 44 },
                       ]}
-                      onPress={() => setNumHoles(n)}
+                      onPress={() => {
+                        setNumHoles(n);
+                        if (!editingCourse?.id) {
+                          setExpectedRoundTime(n === 9 ? 120 : 240);
+                        }
+                      }}
                     >
                       <Text
                         style={[
@@ -1234,6 +1665,26 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                <Text style={styles.inputLabel}>
+                  Expected Round Time (H:MM)
+                </Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={formatMinutes(expectedRoundTime)}
+                  onChangeText={(val) => {
+                    // Allow typing H:MM
+                    if (val.includes(":")) {
+                      setExpectedRoundTime(parseTimeToMinutes(val));
+                    } else {
+                      const mins = parseInt(val);
+                      if (!isNaN(mins)) setExpectedRoundTime(mins);
+                    }
+                  }}
+                  placeholder="4:00"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numbers-and-punctuation"
+                />
 
                 <Text style={styles.sectionTitle}>Hole Pars</Text>
               </>

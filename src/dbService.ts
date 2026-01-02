@@ -11,6 +11,9 @@ export interface Round {
   course_id: number;
   course_name: string;
   createdAt: string;
+  expected_round_time?: number; // in minutes
+  start_time?: string; // ISO string
+  end_time?: string; // ISO string
 }
 
 export interface ScoreRecord {
@@ -18,6 +21,14 @@ export interface ScoreRecord {
   hole_number: number;
   strokes: number | null;
   putts: number | null;
+  completed_at?: string; // ISO string
+}
+
+export interface Course {
+  id: number;
+  name: string;
+  holes: Array<{ hole_number: number; par: number }>;
+  expected_round_time?: number; // in minutes
 }
 
 const ROUNDS_KEY = "@sparks_rounds_v1";
@@ -87,11 +98,7 @@ export async function getHoles(courseId: number): Promise<Hole[]> {
   }));
 }
 
-export async function getScores(
-  roundId: number
-): Promise<
-  Array<{ hole_number: number; strokes: number | null; putts: number | null }>
-> {
+export async function getScores(roundId: number): Promise<ScoreRecord[]> {
   const key = SCORES_KEY_PREFIX + roundId;
   const raw = await AsyncStorage.getItem(key);
   if (!raw) return [];
@@ -106,12 +113,19 @@ export async function saveScore(
   roundId: number,
   holeNumber: number,
   strokes: number | null,
-  putts: number | null
+  putts: number | null,
+  completed_at?: string
 ): Promise<void> {
   const key = SCORES_KEY_PREFIX + roundId;
   const existing = await getScores(roundId);
   const idx = existing.findIndex((r) => r.hole_number === holeNumber);
-  const record = { hole_number: holeNumber, strokes, putts };
+  const record: ScoreRecord = {
+    round_id: roundId,
+    hole_number: holeNumber,
+    strokes,
+    putts,
+    completed_at,
+  };
   if (idx === -1) {
     existing.push(record);
   } else {
@@ -121,11 +135,6 @@ export async function saveScore(
 }
 
 // Courses management
-export interface Course {
-  id: number;
-  name: string;
-  holes: Array<{ hole_number: number; par: number }>;
-}
 
 export async function getCourses(): Promise<Course[]> {
   const raw = await AsyncStorage.getItem(COURSES_KEY);
@@ -139,11 +148,12 @@ export async function getCourses(): Promise<Course[]> {
 
 export async function createCourse(
   name: string,
-  holes: Array<{ hole_number: number; par: number }>
+  holes: Array<{ hole_number: number; par: number }>,
+  expected_round_time?: number
 ): Promise<Course> {
   const courses = await getCourses();
   const id = courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1;
-  const course = { id, name, holes };
+  const course: Course = { id, name, holes, expected_round_time };
   courses.push(course);
   await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
   return course;
@@ -152,12 +162,13 @@ export async function createCourse(
 export async function updateCourse(
   courseId: number,
   name: string,
-  holes: Array<{ hole_number: number; par: number }>
+  holes: Array<{ hole_number: number; par: number }>,
+  expected_round_time?: number
 ): Promise<void> {
   const courses = await getCourses();
   const idx = courses.findIndex((c) => c.id === courseId);
   if (idx !== -1) {
-    courses[idx] = { id: courseId, name, holes };
+    courses[idx] = { id: courseId, name, holes, expected_round_time };
     await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
   }
 }
@@ -189,10 +200,20 @@ export async function createRoundForCourse(courseId: number): Promise<Round> {
     course_id: courseId,
     course_name: course.name,
     createdAt: new Date().toISOString(),
+    expected_round_time: course.expected_round_time,
   };
   rounds.push(round);
   await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
   return round;
+}
+
+export async function updateRound(round: Round): Promise<void> {
+  const rounds = await getRounds();
+  const idx = rounds.findIndex((r) => r.id === round.id);
+  if (idx !== -1) {
+    rounds[idx] = round;
+    await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
+  }
 }
 
 export default {
