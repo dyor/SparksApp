@@ -43,7 +43,6 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="com.mattdyor.sparks"/>
         <data android:scheme="exp+sparks-app"/>
       </intent-filter>
     </activity>

@@ -25,7 +25,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.21</string>
+    <string>1.0.23</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -44,7 +44,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1.0.21</string>
+    <string>1.0.23</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -74,10 +74,6 @@
     <string>FoodCam accesses your photo library to save and select food photos for your diary.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Spanish Flashcards and Amigo sparks uses speech synthesis for language Spanish.</string>
-    <key>NSUserActivityTypes</key>
-    <array>
-      <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
-    </array>
     <key>NSUserNotificationsUsageDescription</key>
     <string>Sparks uses notifications to send you daily reminders and updates about your activities.</string>
     <key>UIBackgroundModes</key>
