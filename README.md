@@ -47,33 +47,29 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
 
 # [Create Codespace]([https://linkly.link/2TcvP](https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest))
 
-1.  **Create a Codespace:** Click [this link](https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest) to launch the environment.
-2.  **Edit with Agent:** Use the built-in Copilot/AI agent to help generate or modify the spark files.
-    - _Tip:_ You can tell the Agent to build a new spark based on an existing one but with the changes you want, and it will usually handle it with ease.
-    - **Sample Prompt**: Try this example to build a Hangman game:
-      ```
-      Build a Spark called Hangman. There are 1-4 players. The user will be asked how many
-      players when they visit the spark. If 1 player, jump into the game. If 2-4, then it
-      will say 'Hand the phone to Player 1 to enter the word' with an option to enter the
-      word and click Start. Once Player 1 clicks then jump into the game by identifying the
-      Player that is up, an ASCII art hangman structure, the number of letters presented as
-      _, and all of the letters of the alphabet in little pill boxes. As the player pushes
-      a letter, if it is present in the word draw it in, and if not draw the next piece of
-      the hangman. Start by reviewing instructions in the AGENT.md file in the top directory.
-      ```
-3.  **Preview Your Change:** Use the VS Code task **Start Expo Web** (recommended) to start the Expo web server and preview the app.
-
+1.  **Create a Codespace:** Head over to <a href="https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest" target="_blank" rel="noopener noreferrer">Codespace Generation</a> to launch the environment.
+2.  **Create a Branch:** Before making changes, create a new branch for your work (Codespaces start on `main` by default, and you don't have permission to push directly to main):
     ```bash
-    # If needed, you can still run the CLI manually from a terminal:
-    npx expo start --web -c
+    git checkout -b my-spark-name
     ```
+    Replace `my-spark-name` with a descriptive name for your spark (e.g., `hangman-game`, `new-todo-feature`).
+3.  **Edit with Agent:** Use the built-in Copilot/AI agent to help generate or modify the spark files.
+    - _Tip:_ You can tell the Agent to build a new spark based on an existing one but with the changes you want, and it will usually handle it with ease.
+    - **Sample Prompt**: Try this example to build a Hangman game (copy the entire line):
+      ```
+      Build a Spark called Hangman. There are 2-4 players. The user will be asked how many players when they visit the spark. Once number of players has been selected say 'Hand the phone to Player 1 to enter the word' with an option to enter the word and click Start. Once Player 1 clicks Start then jump into the game by identifying the Player that is up, an ASCII art hangman structure, the number of letters presented as _, and all of the letters of the alphabet in little pill boxes. As the player pushes a letter, if it is present in the word draw it in, and if not draw the next piece of the hangman. Start by reviewing instructions in the AGENT.md file in the top directory.
+      ```
+4.  **Preview Your Change:** Click the **🌐 Preview** button (or use the "Start Expo Web" command) to start the Expo web server and preview the app in your browser.
 
     This will provide a web-based preview of the app so you can verify your spark looks correct.
 
-4.  **Submit a PR:**
-    - Open the **Source Control** tab in the sidebar.
-    - Commit your changes.
-    - Click **"Create Pull Request"** to submit your changes to the main repository.
+5.  **Submit a PR:** Click the **🚀 Publish** button (or use the "Start Publish" command) to:
+    - Stage all your changes
+    - Commit them with a message
+    - Push to your current branch
+    - Create a Pull Request (PR) against the main repository
+
+    **Note:** The Publish button creates a PR - it does not push directly to main. A Sparks administrator will review your PR and either publish your changes (so that they get picked up in the next Android and iOS release - usually once a week) or ask you for some follow-up modifications if needed.
 
 **Note:** The Sparks Codespace has pre-configured controls at the bottom of the screen to help you preview changes (via a web page) and publish your changes (via a GitHub pull request or PR). 
 

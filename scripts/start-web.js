@@ -103,6 +103,8 @@ async function main() {
   console.log("");
 
   // Start Expo with the determined port
+  // Note: --no-open prevents Expo from automatically opening browser
+  // This prevents duplicate instances when Codespaces auto-forwards ports
   const expoProcess = spawn(
     "npx",
     [
@@ -113,6 +115,7 @@ async function main() {
       port.toString(),
       "--non-interactive",
       "--clear",
+      "--no-open",
     ],
     {
       stdio: "inherit",

@@ -51,8 +51,12 @@ When working in GitHub Codespaces, detect the environment using:
     *   ❌ GUI applications that require local installation
 *   **Allowed**: Web-based previews, CLI tools, npm packages, Expo web server
 
-### **2. Local Development**
-*   **Command**: `npx expo start`
+### **2. Local Development & Preview**
+*   **Preview Changes**: When suggesting to preview changes, ALWAYS use: **"Would you like to run Start Expo Web to preview your change in your web browser?"**
+    *   Do NOT suggest `npx expo start --web` or similar CLI commands
+    *   The "Start Expo Web" command is available via the Preview button (🌐 Preview) in VS Code
+    *   After Start Expo Web runs, suggest: **"Would you like to publish your changes with Start Publish?"**
+*   **Command**: `npx expo start` (only for local development, not Codespaces)
 *   **Simulator**: `npx expo run:ios` (requires Xcode - only suggest if NOT in Codespaces)
 
 ### **2. Production Builds**
@@ -71,14 +75,23 @@ When working in GitHub Codespaces, detect the environment using:
 
 ### **2. Common Tasks**
 *   **Adding a Spark** (CRITICAL - READ FIRST):
-    1.  **MUST READ**: `CONTEXT/GENERAL/SPARK_DEVELOPMENT_GUIDE.md` - Complete guide with templates and patterns
-    2.  Create `src/sparks/MySpark.tsx` following the standard structure from the guide
-    3.  Use `useSparkStore` for data persistence (never AsyncStorage directly)
-    4.  Follow `CONTEXT/GENERAL/SETTINGSDESIGN.md` for settings pages
-    5.  Add to `src/components/sparkRegistryData.tsx` (not SparkRegistry.tsx)
-    6.  **Initial Rating**: Set `rating: 4.5` in the metadata
-    7.  **Update Summary**: Add the new spark to `CONTEXT/GENERAL/SUMMARY.md` in the appropriate category
-    8.  **Keep code in single file** - Only split if exceeding ~2000 lines
+    1.  **CREATE BRANCH FIRST**: Before creating any files, check if user is on `main` branch:
+        ```bash
+        git rev-parse --abbrev-ref HEAD
+        ```
+        If on `main`, create a new branch: `git checkout -b spark-{spark-name}` 
+        - Extract spark name from user input (look for "called X", "named X", "spark X")
+        - Normalize: lowercase, replace spaces with hyphens
+        - Example: "Hangman" → `spark-hangman`, "Todo List" → `spark-todo-list`
+        - See "Create Branch Workflow" section in root `AGENT.md` for complete details and guided flow options
+    2.  **MUST READ**: `CONTEXT/GENERAL/SPARK_DEVELOPMENT_GUIDE.md` - Complete guide with templates and patterns
+    3.  Create `src/sparks/MySpark.tsx` following the standard structure from the guide
+    4.  Use `useSparkStore` for data persistence (never AsyncStorage directly)
+    5.  Follow `CONTEXT/GENERAL/SETTINGSDESIGN.md` for settings pages
+    6.  Add to `src/components/sparkRegistryData.tsx` (not SparkRegistry.tsx)
+    7.  **Initial Rating**: Set `rating: 4.5` in the metadata
+    8.  **Update Summary**: Add the new spark to `CONTEXT/GENERAL/SUMMARY.md` in the appropriate category
+    9.  **Keep code in single file** - Only split if exceeding ~2000 lines
 *   **Adding Assets**: Put images in `assets/` and run `npx expo install` if adding new native dependencies.
 
 ### **3. Context Management**

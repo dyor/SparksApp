@@ -41,5 +41,7 @@ echo "🚀 Starting Expo web server..."
 echo ""
 
 # Start Expo with web flag and clear cache
-npx expo start --web -c
+# --no-open prevents Expo from automatically opening browser
+# This prevents duplicate instances when Codespaces auto-forwards ports
+npx expo start --web -c --no-open
 
