@@ -29,6 +29,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -132,8 +133,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [showManageActivities, setShowManageActivities] = useState(false);
 
   // Photo state
-  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
-  const [photoCaptureMode, setPhotoCaptureMode] = useState<'camera' | 'library'>('camera');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
   // Custom picker state
@@ -152,11 +151,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
   const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
 
-  // Map View State
-  const [showMapView, setShowMapView] = useState(false);
-  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
-  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState(false);
 
   // Photo Detail State
   const [photoName, setPhotoName] = useState('');
@@ -352,6 +346,55 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       setTrips(newTrips);
     } catch (error) {
       console.error('Error saving trips:', error);
+    }
+  };
+
+  const recoverDataFromAsyncStorage = async (): Promise<{ recovered: boolean; tripsFound: number; message: string }> => {
+    try {
+      // Check AsyncStorage directly for the Zustand persisted data
+      const storageKey = 'sparks-data-storage';
+      const rawData = await AsyncStorage.getItem(storageKey);
+      
+      if (!rawData) {
+        return { recovered: false, tripsFound: 0, message: 'No data found in storage' };
+      }
+
+      let parsedData: any;
+      try {
+        parsedData = JSON.parse(rawData);
+      } catch (parseError) {
+        console.error('Error parsing storage data:', parseError);
+        return { recovered: false, tripsFound: 0, message: 'Data found but corrupted (parse error)' };
+      }
+
+      // Check for trip-story data in the parsed structure
+      const tripStoryData = parsedData?.state?.sparkData?.['trip-story'];
+      
+      if (!tripStoryData || !tripStoryData.trips || !Array.isArray(tripStoryData.trips) || tripStoryData.trips.length === 0) {
+        return { recovered: false, tripsFound: 0, message: 'No trip data found in storage' };
+      }
+
+      const tripsFound = tripStoryData.trips.length;
+      console.log(`🔍 Found ${tripsFound} trips in storage, attempting recovery...`);
+
+      // Restore the data using setSparkData
+      await setSparkData('trip-story', tripStoryData);
+      
+      // Reload trips to apply the recovered data
+      await loadTrips();
+
+      return { 
+        recovered: true, 
+        tripsFound, 
+        message: `Successfully recovered ${tripsFound} trip${tripsFound !== 1 ? 's' : ''}!` 
+      };
+    } catch (error) {
+      console.error('Error during recovery:', error);
+      return { 
+        recovered: false, 
+        tripsFound: 0, 
+        message: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
     }
   };
 
@@ -573,129 +616,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     HapticFeedback.success();
   };
 
-  const capturePhoto = async (activity?: Activity, date?: string) => {
-    try {
-      // Request camera permissions
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Camera Permission Required',
-          'Please allow camera access in your device settings to take photos.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => ImagePicker.requestCameraPermissionsAsync() }
-          ]
-        );
-        return;
-      }
-
-      // Check if camera is available
-      const cameraAvailable = await ImagePicker.getCameraPermissionsAsync();
-      if (!cameraAvailable.granted) {
-        Alert.alert('Camera Not Available', 'Camera access is not available on this device.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        exif: false,
-      });
-
-      if (result.canceled) {
-        setShowPhotoCapture(false);
-        return;
-      }
-
-      if (!result.assets || result.assets.length === 0) {
-        Alert.alert('Error', 'No photo was captured. Please try again.');
-        return;
-      }
-
-      if (result.assets[0]) {
-        const asset = result.assets[0];
-
-        // Get location
-        let location = null;
-        try {
-          const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-          if (locationStatus === 'granted') {
-            const locationData = await Location.getCurrentPositionAsync({});
-            location = {
-              latitude: locationData.coords.latitude,
-              longitude: locationData.coords.longitude,
-            };
-          }
-        } catch (error) {
-          console.log('Location not available:', error);
-        }
-
-        // ALWAYS use the passed date parameter if provided (from button click)
-        // This ensures photos are associated with the day of the button, not when they were taken
-        let dateToUse: string;
-        if (date) {
-          // Explicitly use the date from the button click
-          dateToUse = date;
-        } else if (activity?.startDate) {
-          dateToUse = activity.startDate;
-        } else if (selectedDate) {
-          dateToUse = selectedDate;
-        } else {
-          dateToUse = new Date().toISOString().split('T')[0];
-        }
-        // Create timestamp at noon UTC to ensure consistent date extraction regardless of timezone
-        const photoDate = new Date(dateToUse + 'T12:00:00Z').toISOString();
-        console.log('📸 capturePhoto - date parameter:', date, 'dateToUse:', dateToUse, 'photoDate (timestamp):', photoDate);
-
-        // Save photo permanently
-        const photoId = Date.now().toString();
-        const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
-
-        const newPhoto: TripPhoto = {
-          id: photoId,
-          tripId: currentTrip!.id,
-          activityId: (activity || selectedActivity)?.id,
-          uri: toRelativePath(permanentUri),
-          timestamp: photoDate,
-          location: location || undefined,
-          caption: '',
-          createdAt: new Date().toISOString(),
-        };
-
-        const updatedTrips = trips.map(trip =>
-          trip.id === currentTrip!.id
-            ? {
-              ...trip,
-              photos: [...trip.photos, newPhoto],
-              updatedAt: new Date().toISOString()
-            }
-            : trip
-        );
-
-        await saveTrips(updatedTrips);
-        const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
-        setCurrentTrip(updatedTrip);
-
-        setShowPhotoCapture(false);
-        setSelectedActivity(null);
-        setSelectedDate('');
-        HapticFeedback.success();
-      }
-    } catch (error) {
-      console.error('Error capturing photo:', error);
-      if (error instanceof Error && error.message && error.message.includes('simulator')) {
-        Alert.alert(
-          'Camera Not Available',
-          'Camera functionality is not available in emulators. Please test on a physical device or use "Add" to select from gallery.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Error', 'Failed to capture photo. Please try again.');
-      }
-    }
-  };
 
   // Load photos from media library filtered by date
   const loadPhotosByDate = async (targetDate: string): Promise<MediaLibrary.Asset[]> => {
@@ -810,7 +730,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       });
 
       if (result.canceled) {
-        setShowPhotoCapture(false);
         return;
       }
 
@@ -894,7 +813,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
       setCurrentTrip(updatedTrip);
 
-      setShowPhotoCapture(false);
       setSelectedActivity(null);
       setSelectedDate('');
       HapticFeedback.success();
@@ -1030,7 +948,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setSelectedPickerPhotos(new Set());
     setCustomPickerPhotos([]);
     setCustomPickerPhotoUris(new Map());
-    setShowPhotoCapture(false);
     setSelectedActivity(null);
     setSelectedDate('');
     HapticFeedback.success();
@@ -2353,74 +2270,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     </Modal>
   );
 
-  const renderPhotoCaptureModal = () => (
-    <Modal visible={showPhotoCapture} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-        <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Photo</Text>
-          <TouchableOpacity onPress={() => setShowPhotoCapture(false)}>
-            <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.modalContent}>
-          <Text style={[styles.inputLabel, { color: colors.text }]}>Select Activity (Optional)</Text>
-          <ScrollView style={styles.activityList}>
-            <TouchableOpacity
-              style={[
-                styles.activityOption,
-                {
-                  backgroundColor: selectedActivity === null ? colors.primary : colors.surface,
-                  borderColor: colors.border
-                }
-              ]}
-              onPress={() => setSelectedActivity(null)}
-            >
-              <Text style={[
-                styles.activityOptionText,
-                { color: selectedActivity === null ? colors.background : colors.text }
-              ]}>No Activity</Text>
-            </TouchableOpacity>
-            {currentTrip?.activities.map(activity => (
-              <TouchableOpacity
-                key={activity.id}
-                style={[
-                  styles.activityOption,
-                  {
-                    backgroundColor: selectedActivity?.id === activity.id ? colors.primary : colors.surface,
-                    borderColor: colors.border
-                  }
-                ]}
-                onPress={() => setSelectedActivity(activity)}
-              >
-                <Text style={[
-                  styles.activityOptionText,
-                  { color: selectedActivity?.id === activity.id ? colors.background : colors.text }
-                ]}>{activity.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.modalFooter}>
-          <View style={styles.photoButtonContainer}>
-            <TouchableOpacity
-              style={[styles.photoButton, { backgroundColor: colors.primary }]}
-              onPress={() => capturePhoto()}
-            >
-              <Text style={[styles.photoButtonText, { color: colors.background }]}>📸 Snap</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.photoButton, styles.addPhotoButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}
-              onPress={() => addFromGallery()}
-            >
-              <Text style={[styles.photoButtonText, { color: colors.primary }]}>Add 1</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   const renderPhotoDetailModal = () => {
     if (!selectedPhoto) return null;
@@ -3123,347 +2972,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     );
   };
 
-  const renderMapViewModal = () => {
-    if (!currentTrip) return null;
-
-    const tripDates = getTripDates();
-
-    // Helper function to get photo count for a specific day
-    const getPhotoCountForDay = (date: string): number => {
-      const dayPhotos = currentTrip.photos.filter(photo => {
-        if (!photo.timestamp) return false;
-        const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
-        return photoDate === date;
-      });
-      return dayPhotos.length;
-    };
-
-    // Get all photos with locations (both activity photos and standalone photos)
-    let photosWithLocations = currentTrip.photos
-      .filter(photo => photo.location?.latitude && photo.location?.longitude)
-      .map(photo => ({
-        photo,
-        activity: photo.activityId ? currentTrip.activities.find(a => a.id === photo.activityId) : null,
-        latitude: photo.location!.latitude,
-        longitude: photo.location!.longitude,
-      }));
-
-    // Filter by selected day if a day is selected
-    if (selectedMapDay) {
-      photosWithLocations = photosWithLocations.filter(p => {
-        if (!p.photo.timestamp) return false;
-        const photoDate = new Date(p.photo.timestamp).toISOString().split('T')[0];
-        return photoDate === selectedMapDay;
-      });
-    }
-
-    // Get activities with explicit locations (but no photos yet)
-    let activitiesWithExplicitLocations = currentTrip.activities
-      .filter(activity => {
-        // Only include if activity has explicit location AND no photos with locations
-        if (!activity.location?.latitude || !activity.location?.longitude) return false;
-        const hasPhotoWithLocation = photosWithLocations.some(p => p.photo.activityId === activity.id);
-        return !hasPhotoWithLocation;
-      })
-      .map(activity => ({
-        activity,
-        photo: null,
-        latitude: activity.location!.latitude,
-        longitude: activity.location!.longitude,
-      }));
-
-    // Filter activities by selected day if a day is selected
-    if (selectedMapDay) {
-      activitiesWithExplicitLocations = activitiesWithExplicitLocations.filter(a =>
-        a.activity.startDate === selectedMapDay
-      );
-    }
-
-    // Get total markers count (before filtering) for dropdown display
-    const allPhotosWithLocations = currentTrip.photos.filter(photo => photo.location?.latitude && photo.location?.longitude);
-    const allActivitiesWithLocations = currentTrip.activities.filter(activity =>
-      activity.location?.latitude && activity.location?.longitude
-    );
-    const totalMarkersCount = allPhotosWithLocations.length + allActivitiesWithLocations.length;
-
-    // Combine all markers: photos with locations + activities with explicit locations
-    const allMarkers = [
-      ...photosWithLocations.map(p => ({
-        type: 'photo' as const,
-        id: p.photo.id,
-        activity: p.activity,
-        photo: p.photo,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        label: p.activity?.name || 'Photo',
-      })),
-      ...activitiesWithExplicitLocations.map(a => ({
-        type: 'activity' as const,
-        id: a.activity.id,
-        activity: a.activity,
-        photo: null,
-        latitude: a.latitude,
-        longitude: a.longitude,
-        label: a.activity.name,
-      })),
-    ];
-
-    // Generate OpenStreetMap tile URL
-    const generateMapTileUrl = () => {
-      if (allMarkers.length === 0) return null;
-
-      // Calculate center point from all markers
-      const avgLat = allMarkers.reduce((sum, m) => sum + (m.latitude || 0), 0) / allMarkers.length;
-      const avgLng = allMarkers.reduce((sum, m) => sum + (m.longitude || 0), 0) / allMarkers.length;
-
-      // Calculate bounds to determine appropriate zoom
-      const lats = allMarkers.map(m => m.latitude || 0).filter(lat => lat !== 0);
-      const lngs = allMarkers.map(m => m.longitude || 0).filter(lng => lng !== 0);
-      if (lats.length === 0 || lngs.length === 0) return null;
-      const latSpan = Math.max(...lats) - Math.min(...lats);
-      const lngSpan = Math.max(...lngs) - Math.min(...lngs);
-      const maxSpan = Math.max(latSpan, lngSpan);
-
-      // Adjust zoom based on span (closer markers = higher zoom)
-      let zoom = 13;
-      if (maxSpan > 0.1) zoom = 10; // Very spread out
-      else if (maxSpan > 0.05) zoom = 11;
-      else if (maxSpan > 0.02) zoom = 12;
-      else if (maxSpan > 0.01) zoom = 13;
-      else zoom = 14; // Very close together
-
-      const tileX = Math.floor((avgLng + 180) / 360 * Math.pow(2, zoom));
-      const tileY = Math.floor((1 - Math.log(Math.tan(avgLat * Math.PI / 180) + 1 / Math.cos(avgLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
-
-      return `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
-    };
-
-    // Calculate marker position on the map with better accuracy
-    const calculateMarkerPosition = (lat: number, lng: number) => {
-      if (allMarkers.length === 0) return { x: 0, y: 0 };
-
-      // Calculate center point and bounds
-      const lats = allMarkers.map(m => m.latitude || 0).filter(l => l !== 0);
-      const lngs = allMarkers.map(m => m.longitude || 0).filter(l => l !== 0);
-      if (lats.length === 0 || lngs.length === 0) return { x: 200, y: 150 };
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-
-      const latSpan = maxLat - minLat || 0.01; // Avoid division by zero
-      const lngSpan = maxLng - minLng || 0.01;
-
-      // Map to screen coordinates (400x300 is our map size, with padding)
-      const padding = 20;
-      const mapWidth = 400 - (padding * 2);
-      const mapHeight = 300 - (padding * 2);
-
-      const x = padding + ((lng - minLng) / lngSpan) * mapWidth;
-      const y = padding + ((maxLat - lat) / latSpan) * mapHeight; // Inverted for screen coordinates
-
-      return {
-        x: Math.max(padding, Math.min(400 - padding, x)),
-        y: Math.max(padding, Math.min(300 - padding, y))
-      };
-    };
-
-    // Helper function to format day for dropdown
-    const formatDayForDropdown = (date: string, dayNumber: number, totalDays: number) => {
-      try {
-        const dateObj = new Date(date + 'T00:00:00');
-        if (isNaN(dateObj.getTime())) return date;
-        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-        const dateStr = dateObj.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        });
-        const photoCount = getPhotoCountForDay(date);
-        return `${dayName}, ${dateStr} (${dayNumber}/${totalDays}) - ${photoCount} photo${photoCount !== 1 ? 's' : ''}`;
-      } catch (error) {
-        return date;
-      }
-    };
-
-    return (
-      <Modal visible={showMapView} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Trip Map</Text>
-            <TouchableOpacity onPress={() => {
-              setShowMapView(false);
-              setSelectedMapDay(null);
-              setShowMapDayDropdown(false);
-            }}>
-              <Text style={[styles.modalClose, { color: colors.primary }]}>Close</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            {/* Day Filter Dropdown */}
-            <View style={[styles.mapDayFilterContainer, { borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[styles.mapDayFilterButton, { borderColor: colors.border }]}
-                onPress={() => setShowMapDayDropdown(!showMapDayDropdown)}
-              >
-                <Text style={[styles.mapDayFilterText, { color: colors.text }]}>
-                  {selectedMapDay
-                    ? formatDayForDropdown(selectedMapDay, tripDates.indexOf(selectedMapDay) + 1, tripDates.length)
-                    : `All Days (${totalMarkersCount} marker${totalMarkersCount !== 1 ? 's' : ''})`}
-                </Text>
-                <Text style={[styles.mapDayFilterArrow, { color: colors.text }]}>
-                  {showMapDayDropdown ? '▲' : '▼'}
-                </Text>
-              </TouchableOpacity>
-
-              {showMapDayDropdown && (
-                <ScrollView
-                  style={[styles.mapDayDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  nestedScrollEnabled={true}
-                >
-                  <TouchableOpacity
-                    style={[styles.mapDayDropdownItem, selectedMapDay === null && { backgroundColor: colors.primary + '20' }]}
-                    onPress={() => {
-                      setSelectedMapDay(null);
-                      setShowMapDayDropdown(false);
-                    }}
-                  >
-                    <Text style={[styles.mapDayDropdownText, { color: colors.text }]}>
-                      All Days ({totalMarkersCount} marker{totalMarkersCount !== 1 ? 's' : ''})
-                    </Text>
-                  </TouchableOpacity>
-                  {tripDates.map((date, index) => {
-                    const photoCount = getPhotoCountForDay(date);
-                    return (
-                      <TouchableOpacity
-                        key={date}
-                        style={[styles.mapDayDropdownItem, selectedMapDay === date && { backgroundColor: colors.primary + '20' }]}
-                        onPress={() => {
-                          setSelectedMapDay(date);
-                          setShowMapDayDropdown(false);
-                        }}
-                      >
-                        <Text style={[styles.mapDayDropdownText, { color: colors.text }]}>
-                          {formatDayForDropdown(date, index + 1, tripDates.length)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </View>
-
-            <View style={styles.mapContainer}>
-              {allMarkers.length === 0 ? (
-                <View style={[styles.mapImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                  <Text style={{ color: '#666', textAlign: 'center', fontSize: 16 }}>
-                    📍 No location data available{'\n'}
-                    Take photos with location enabled{'\n'}
-                    or add manual locations to activities
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.mapImageContainer}>
-                  {/* OpenStreetMap Background */}
-                  {generateMapTileUrl() && (
-                    <Image
-                      source={{ uri: generateMapTileUrl()! }}
-                      style={styles.mapBackground}
-                      resizeMode="cover"
-                    />
-                  )}
-
-                  {/* All Markers: Photos and Activities */}
-                  {allMarkers.map((marker, index) => {
-                    if (!marker.latitude || !marker.longitude) return null;
-                    const markerPosition = calculateMarkerPosition(marker.latitude, marker.longitude);
-
-                    return (
-                      <View
-                        key={`${marker.type}-${marker.id}`}
-                        style={[
-                          styles.mapMarker,
-                          {
-                            left: markerPosition.x - 25, // Center the marker
-                            top: markerPosition.y - 25
-                          }
-                        ]}
-                      >
-                        {marker.photo ? (
-                          <TouchableOpacity
-                            onPress={() => {
-                              // Close map view and open photo detail
-                              setShowMapView(false);
-                              handlePhotoPress(marker.photo);
-                            }}
-                          >
-                            <Image
-                              source={{ uri: toAbsoluteUri(marker.photo.uri) }}
-                              style={styles.markerPhoto}
-                            />
-                            <View style={styles.markerLabel}>
-                              <Text style={styles.markerText} numberOfLines={1}>
-                                {marker.activity?.name || 'x'}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.markerDot}
-                            onPress={() => {
-                              const url = `https://maps.apple.com/?q=${marker.latitude},${marker.longitude}`;
-                              Linking.openURL(url).catch(err => {
-                                console.error('Error opening maps:', err);
-                                Alert.alert('Error', 'Could not open maps application');
-                              });
-                            }}
-                          >
-                            <Text style={styles.markerDotText}>{index + 1}</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
-              <View style={styles.mapActivityList}>
-                <Text style={[styles.activityListTitle, { color: colors.text }]}>
-                  {selectedMapDay ? `Day ${tripDates.indexOf(selectedMapDay) + 1}/${tripDates.length}` : 'All Days'} ({allMarkers.length} markers):
-                </Text>
-                {allMarkers.map((marker, index) => (
-                  <View key={`${marker.type}-${marker.id}`} style={[styles.activityListItem, { borderColor: colors.border }]}>
-                    <View style={[styles.activityMarker, { backgroundColor: marker.photo ? '#FF3B30' : '#007AFF' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.mapActivityName, { color: colors.text }]}>
-                        {marker.activity?.name || 'Photo'}
-                      </Text>
-                      {marker.activity?.time && (
-                        <Text style={[styles.mapActivityTime, { color: colors.textSecondary }]}>
-                          {marker.activity.time}
-                        </Text>
-                      )}
-                      {marker.photo && (
-                        <Text style={[styles.mapActivityTime, { color: colors.textSecondary, fontSize: 11 }]}>
-                          📷 Photo location
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                ))}
-                {allMarkers.length === 0 && (
-                  <Text style={[styles.noActivitiesText, { color: colors.textSecondary }]}>
-                    No location data found. Add photos with location enabled or set activity locations manually.
-                  </Text>
-                )}
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-    );
-  };
 
   const scrollToDay = useCallback((date: string) => {
     const dayY = dayPositions.current.get(date);
@@ -4068,16 +3576,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                           {currentTrip.mode === 'record' && activeActivityId === activity.id && activeTripId === currentTrip.id && (
                             <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
                               <TouchableOpacity
-                                style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                                onPress={() => {
-                                  setSelectedActivity(activity);
-                                  setSelectedDate(activity.startDate);
-                                  capturePhoto(activity);
-                                }}
-                              >
-                                <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
                                 style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
                                 onPress={() => {
                                   setSelectedActivity(activity);
@@ -4141,16 +3639,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                           {activeActivityId === activity.id && activeTripId === currentTrip.id && (
                             <View style={styles.activityPhotoButtons}>
                               <TouchableOpacity
-                                style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                                onPress={() => {
-                                  setSelectedActivity(activity);
-                                  setSelectedDate(activity.startDate);
-                                  capturePhoto(activity);
-                                }}
-                              >
-                                <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
                                 style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
                                 onPress={() => {
                                   setSelectedActivity(activity);
@@ -4209,16 +3697,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       {dayPhotos.filter(photo => photo.activityId === activity.id).length === 0 && activeActivityId === activity.id && activeTripId === currentTrip.id && (
                         <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
                           <TouchableOpacity
-                            style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                            onPress={() => {
-                              setSelectedActivity(activity);
-                              setSelectedDate(activity.startDate);
-                              capturePhoto(activity);
-                            }}
-                          >
-                            <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
                             style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
                             onPress={() => {
                               setSelectedActivity(activity);
@@ -4269,26 +3747,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.bottomButton, { backgroundColor: colors.secondary }]}
-            onPress={() => {
-              setMapLoadError(false);
-              setShowMapView(true);
-            }}
-          >
-            <Text style={[styles.bottomButtonText, { color: colors.background }]}>
-              Map Story
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {renderCreateTripModal()}
         {renderAddActivityModal()}
         {renderManageActivitiesModal()}
-        {renderPhotoCaptureModal()}
         {renderPhotoDetailModal()}
         {renderCustomPhotoPickerModal()}
-        {renderMapViewModal()}
         {renderEditActivityModal()}
         {renderEditTripModal()}
       </View>
@@ -4307,6 +3772,34 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           />
 
           <SettingsFeedbackSection sparkName="TripStory" sparkId="trip-story" />
+
+          <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12 }]}>
+              Data Recovery
+            </Text>
+            <Text style={[styles.sectionDescription, { color: colors.textSecondary, marginBottom: 16 }]}>
+              If your trips have disappeared, try recovering them from storage.
+            </Text>
+            <TouchableOpacity
+              style={[styles.recoveryButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={async () => {
+                HapticFeedback.light();
+                const result = await recoverDataFromAsyncStorage();
+                Alert.alert(
+                  result.recovered ? '✅ Recovery Successful' : '❌ Recovery Failed',
+                  result.message,
+                  [{ text: 'OK' }]
+                );
+                if (result.recovered) {
+                  onCloseSettings?.();
+                }
+              }}
+            >
+              <Text style={[styles.recoveryButtonText, { color: colors.primary }]}>
+                🔄 Attempt Data Recovery
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: colors.primary }]}
@@ -4357,7 +3850,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       {renderCreateTripModal()}
       {renderAddActivityModal()}
-      {renderPhotoCaptureModal()}
     </View>
   );
 };
@@ -4668,6 +4160,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  sectionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  recoveryButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  recoveryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   closeButton: {
     margin: 20,

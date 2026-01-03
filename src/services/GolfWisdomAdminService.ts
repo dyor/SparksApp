@@ -1,19 +1,9 @@
 import { getFirestore, collection, getDocs, doc, updateDoc, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import AuthService from './AuthService';
 import { FirestoreWisdomPage } from './golfWisdomService';
+import { getFirebaseApp } from './firebaseConfig';
 
 const COLLECTION_NAME = 'golfWisdom';
-
-// Firebase Config
-const firebaseConfig = {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "sparkopedia-330f6.firebaseapp.com",
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "sparkopedia-330f6",
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "sparkopedia-330f6.firebasestorage.app",
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "229332029977",
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:229332029977:web:401c76f507f092c24a9088",
-    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-K5YN3D4VQ6"
-};
 
 export interface WisdomSuggestion extends FirestoreWisdomPage {
     id: string;
@@ -37,16 +27,13 @@ export class GolfWisdomAdminService {
      */
     static async getPendingSuggestions(): Promise<WisdomSuggestion[]> {
         try {
-            const { initializeApp, getApps } = require('firebase/app');
             const { getFirestore } = require('firebase/firestore');
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            let app;
-            if (getApps().length === 0) {
-                app = initializeApp(firebaseConfig);
-            } else {
-                app = getApps()[0];
+            const app = getFirebaseApp();
+            if (!app) {
+                throw new Error('Failed to initialize Firebase app');
             }
 
             const auth = getAuth(app);
@@ -88,16 +75,13 @@ export class GolfWisdomAdminService {
      */
     static async approveSuggestion(suggestionId: string): Promise<void> {
         try {
-            const { initializeApp, getApps } = require('firebase/app');
             const { getFirestore } = require('firebase/firestore');
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            let app;
-            if (getApps().length === 0) {
-                app = initializeApp(firebaseConfig);
-            } else {
-                app = getApps()[0];
+            const app = getFirebaseApp();
+            if (!app) {
+                throw new Error('Failed to initialize Firebase app');
             }
 
             const auth = getAuth(app);
@@ -125,16 +109,13 @@ export class GolfWisdomAdminService {
      */
     static async rejectSuggestion(suggestionId: string): Promise<void> {
         try {
-            const { initializeApp, getApps } = require('firebase/app');
             const { getFirestore } = require('firebase/firestore');
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            let app;
-            if (getApps().length === 0) {
-                app = initializeApp(firebaseConfig);
-            } else {
-                app = getApps()[0];
+            const app = getFirebaseApp();
+            if (!app) {
+                throw new Error('Failed to initialize Firebase app');
             }
 
             const auth = getAuth(app);

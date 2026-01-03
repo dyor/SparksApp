@@ -1,6 +1,7 @@
 import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, Timestamp, addDoc, limit } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WisdomQuote } from '../sparks/GolfWisdomSpark/wisdomData';
+import { getFirebaseApp } from './firebaseConfig';
 
 const COLLECTION_NAME = 'golfWisdom';
 const CACHE_KEY = 'golfWisdom_cachedPages';
@@ -18,35 +19,16 @@ export interface FirestoreWisdomPage {
 /**
  * Fetch all wisdom pages from Firestore
  */
-// Firebase Config with fallbacks
-const firebaseConfig = {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "sparkopedia-330f6.firebaseapp.com",
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "sparkopedia-330f6",
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "sparkopedia-330f6.firebasestorage.app",
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "229332029977",
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:229332029977:web:401c76f507f092c24a9088",
-    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-K5YN3D4VQ6"
-};
-
-/**
- * Fetch all wisdom pages from Firestore
- */
 export const fetchWisdomPages = async (): Promise<WisdomQuote[]> => {
     try {
         console.log('🔍 Starting fetchWisdomPages...');
-        const { initializeApp, getApps } = require('firebase/app');
         const { getFirestore } = require('firebase/firestore');
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        let app;
-        if (getApps().length === 0) {
-            console.log('🔥 Initializing Firebase app...');
-            app = initializeApp(firebaseConfig);
-        } else {
-            console.log('🔥 Using existing Firebase app');
-            app = getApps()[0];
+        const app = getFirebaseApp();
+        if (!app) {
+            throw new Error('Failed to initialize Firebase app');
         }
 
         // Sign in anonymously if not already signed in
@@ -107,16 +89,13 @@ export const checkForUpdates = async (): Promise<boolean> => {
             return true; // No cache, need to fetch
         }
 
-        const { initializeApp, getApps } = require('firebase/app');
         const { getFirestore } = require('firebase/firestore');
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        let app;
-        if (getApps().length === 0) {
-            app = initializeApp(firebaseConfig);
-        } else {
-            app = getApps()[0];
+        const app = getFirebaseApp();
+        if (!app) {
+            throw new Error('Failed to initialize Firebase app');
         }
 
         // Sign in anonymously if not already signed in
@@ -220,17 +199,13 @@ export const submitWisdomSuggestion = async (suggestion: {
 }): Promise<void> => {
     try {
         console.log('📝 Submitting wisdom suggestion...');
-        const { initializeApp, getApps } = require('firebase/app');
         const { getFirestore } = require('firebase/firestore');
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        let app;
-        if (getApps().length === 0) {
-            console.log('🔥 Initializing Firebase app for suggestion...');
-            app = initializeApp(firebaseConfig);
-        } else {
-            app = getApps()[0];
+        const app = getFirebaseApp();
+        if (!app) {
+            throw new Error('Failed to initialize Firebase app');
         }
 
         // Sign in anonymously if not already signed in

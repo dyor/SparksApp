@@ -1,11 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { initializeApp, getApps } from "firebase/app";
+import { getApps } from "firebase/app";
 import {
   getAuth,
   initializeAuth,
   browserLocalPersistence,
-  getReactNativePersistence,
   signInAnonymously,
   User,
 } from "firebase/auth";
@@ -37,24 +36,7 @@ import {
   AnalyticsData,
   SessionData,
 } from "../types/analytics";
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
-
-// Validate Firebase config
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.warn(
-    "⚠️ Firebase configuration is missing in WebFirebaseService.ts. Please set EXPO_PUBLIC_FIREBASE_* environment variables in your .env file."
-  );
-}
+import { getFirebaseApp } from "./firebaseConfig";
 
 export class WebFirebaseService {
   private static _initialized: boolean = false;
@@ -67,11 +49,9 @@ export class WebFirebaseService {
 
     try {
       // Initialize Firebase if not already initialized
-      let app;
-      if (getApps().length === 0) {
-        app = initializeApp(firebaseConfig);
-      } else {
-        app = getApps()[0];
+      const app = getFirebaseApp();
+      if (!app) {
+        throw new Error("Failed to initialize Firebase app");
       }
 
       // Initialize Firestore
@@ -81,12 +61,21 @@ export class WebFirebaseService {
       try {
         // Initialize Auth with appropriate persistence
         try {
-          const persistence =
-            Platform.OS === "web"
-              ? browserLocalPersistence
-              : getReactNativePersistence
-              ? getReactNativePersistence(AsyncStorage)
-              : browserLocalPersistence;
+          let persistence = browserLocalPersistence;
+          
+          // For React Native, try to use AsyncStorage persistence if available
+          if (Platform.OS !== "web") {
+            try {
+              // Dynamically import getReactNativePersistence if available
+              const { getReactNativePersistence } = require("firebase/auth");
+              if (getReactNativePersistence) {
+                persistence = getReactNativePersistence(AsyncStorage);
+              }
+            } catch (e) {
+              // Fallback to browser persistence if not available
+              persistence = browserLocalPersistence;
+            }
+          }
 
           this.auth = initializeAuth(app, {
             persistence: persistence,

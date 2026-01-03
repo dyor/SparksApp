@@ -191,3 +191,38 @@ interface TripPhoto {
 
 ## Ready for Implementation
 All specifications clarified - ready to build the TripStory spark!
+
+---
+
+## Removed Features (Archived Code)
+
+### Map View Functionality (Removed)
+The map view feature was removed because it did not work well. The code has been archived here for reference.
+
+**State Variables:**
+```typescript
+const [showMapView, setShowMapView] = useState(false);
+const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
+const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
+const [mapLoadError, setMapLoadError] = useState(false);
+```
+
+**Key Functionality:**
+- Displayed trip photos and activities on a map using OpenStreetMap tiles
+- Filtered markers by day
+- Showed photo thumbnails and activity markers
+- Calculated map bounds and zoom levels dynamically
+- Positioned markers on static map image
+
+**Removed Code Location:** Lines ~3176-3516 in TripStorySpark.tsx (renderMapViewModal function)
+
+### Direct Camera Capture (Removed)
+Direct camera capture was removed in favor of date-based photo search from the device library.
+
+**Removed Functionality:**
+- `ImagePicker.launchCameraAsync()` - Direct camera capture
+- `renderPhotoCaptureModal()` - Camera capture modal
+- `showPhotoCapture` state and related UI
+- Camera permission handling
+
+**Current Approach:** Users now add photos by searching their device library by date, which is more reliable and doesn't require camera permissions.

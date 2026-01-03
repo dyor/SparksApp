@@ -21,7 +21,7 @@ SparksApp is a mobile application featuring a collection of micro-experiences ("
 *   **Persistence**: Data saved locally via AsyncStorage.
 *   **Settings System**: Comprehensive settings for each spark with feedback integration.
 *   **Cross-platform**: iOS, Android, and Web support via Expo.
-> <img src="SparksSummary.png" width="200" alt="Sparks Marketplace">
+> <img src="assets/SparksSummary.png" width="200" alt="Sparks Marketplace">
 
 # Contributing New Sparks
 
@@ -39,7 +39,7 @@ The most user-friendly way to contribute is directly through the interface of th
 4.  **Submit:** Submit your spark for review directly through the app.
 
 > **Note:** The Spark Wizard allows you to share.
-<img src="SparkWizard.png" width="200" alt="Spark Wizard">
+<img src="assets/SparkWizard.png" width="200" alt="Spark Wizard">
 
 ## 2. Using GitHub Codespaces
 
@@ -78,7 +78,7 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
 
 **Note:** The Sparks Codespace has pre-configured controls at the bottom of the screen to help you preview changes (via a web page) and publish your changes (via a GitHub pull request or PR). 
 
-> <img src="CodespacesControls.png" width="400" alt="Codespaces Controls">
+> <img src="assets/CodespacesControls.png" width="400" alt="Codespaces Controls">
 
 ## 3. Forking the Repository
 

@@ -383,10 +383,10 @@ export const WeightTrackerSpark: React.FC<SparkProps> = ({
                     </SettingsSection>
 
                     <SaveCancelButtons
-                        onSave={onCloseSettings}
-                        onCancel={onCloseSettings}
-                        saveLabel="Done"
-                        cancelLabel="Close"
+                        onSave={onCloseSettings || (() => {})}
+                        onCancel={onCloseSettings || (() => {})}
+                        saveText="Done"
+                        cancelText="Close"
                     />
                 </SettingsScrollView>
             </SettingsContainer>
