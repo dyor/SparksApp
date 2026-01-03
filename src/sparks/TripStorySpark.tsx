@@ -151,8 +151,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [selectedTripForDetail, setSelectedTripForDetail] = useState<Trip | null>(null);
   const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
   const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
-  const [showZoomablePhoto, setShowZoomablePhoto] = useState(false);
-  const [zoomablePhotoUri, setZoomablePhotoUri] = useState<string | null>(null);
+  const [isPhotoZoomed, setIsPhotoZoomed] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -160,6 +159,18 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const lastTranslate = useRef({ x: 0, y: 0 });
   const baseScale = useRef(new Animated.Value(1)).current;
   const pinchScale = useRef(new Animated.Value(1)).current;
+
+  // Auto-reset pan position when zoom is reset
+  useEffect(() => {
+    if (!isPhotoZoomed && (lastTranslate.current.x !== 0 || lastTranslate.current.y !== 0)) {
+      // Reset pan position when zoom state changes to false
+      lastTranslate.current = { x: 0, y: 0 };
+      translateX.setValue(0);
+      translateY.setValue(0);
+      translateX.setOffset(0);
+      translateY.setOffset(0);
+    }
+  }, [isPhotoZoomed]);
 
 
   // Photo Detail State
@@ -983,6 +994,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setPhotoLat(photo.location?.latitude?.toString() || '');
     setPhotoLng(photo.location?.longitude?.toString() || '');
     setPhotoGeoStatus('idle');
+    // Reset zoom state when opening photo detail
+    lastScale.current = 1;
+    lastTranslate.current = { x: 0, y: 0 };
+    baseScale.setValue(1);
+    pinchScale.setValue(1);
+    translateX.setValue(0);
+    translateY.setValue(0);
+    translateX.setOffset(0);
+    translateY.setOffset(0);
+    setIsPhotoZoomed(false);
     setShowPhotoDetail(true);
   };
 
@@ -2294,17 +2315,67 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     const associatedActivity = currentTrip?.activities.find(a => a.id === selectedPhoto.activityId);
     const photoDate = new Date(selectedPhoto.timestamp).toISOString().split('T')[0];
 
+    const handleResetZoom = () => {
+      lastScale.current = 1;
+      lastTranslate.current = { x: 0, y: 0 };
+      baseScale.setValue(1);
+      pinchScale.setValue(1);
+      translateX.setValue(0);
+      translateY.setValue(0);
+      translateX.setOffset(0);
+      translateY.setOffset(0);
+      setIsPhotoZoomed(false);
+    };
+
     return (
       <Modal visible={showPhotoDetail} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Photo Details</Text>
-            <TouchableOpacity onPress={() => setShowPhotoDetail(false)}>
-              <Text style={[styles.modalClose, { color: colors.primary }]}>Done</Text>
-            </TouchableOpacity>
+            {isPhotoZoomed ? (
+              <TouchableOpacity
+                onPress={handleResetZoom}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                }}
+              >
+                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 16 }}>
+                  Reset Zoom
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Photo Details</Text>
+                <TouchableOpacity onPress={() => setShowPhotoDetail(false)}>
+                  <Text style={[styles.modalClose, { color: colors.primary }]}>Done</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          {/* Gray overlay when zoomed - dims the rest of the modal */}
+          {isPhotoZoomed && (
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 998,
+              pointerEvents: 'none',
+            }} />
+          )}
+
+          <ScrollView 
+            style={styles.modalContent}
+            scrollEnabled={!isPhotoZoomed}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+            bounces={!isPhotoZoomed}
+          >
             {/* Photo Preview */}
             <View style={styles.photoPreviewContainer}>
               {selectedPhoto?.uri ? (() => {
@@ -2313,32 +2384,154 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                   originalUri: selectedPhoto.uri,
                   absoluteUri: absoluteUri,
                   photoId: selectedPhoto.id,
+                  isPhotoZoomed,
                 });
+
+                const onPinchGestureEvent = Animated.event(
+                  [{ nativeEvent: { scale: pinchScale } }],
+                  { 
+                    useNativeDriver: true,
+                    listener: (event: any) => {
+                      console.log('📌 Pinch gesture event, scale:', event.nativeEvent.scale);
+                    }
+                  }
+                );
+
+                const onPinchHandlerStateChange = (event: any) => {
+                  console.log('📌 Pinch state change:', event.nativeEvent.state, event.nativeEvent.oldState);
+                  if (event.nativeEvent.oldState === State.ACTIVE) {
+                    const wasZoomed = isPhotoZoomed;
+                    lastScale.current *= event.nativeEvent.scale;
+                    console.log('📌 Pinch ended, new scale:', lastScale.current);
+                    if (lastScale.current < 1) {
+                      lastScale.current = 1;
+                      setIsPhotoZoomed(false);
+                      // Reset pan position when zooming out
+                      handleResetZoom();
+                    } else if (lastScale.current > 4) {
+                      lastScale.current = 4;
+                      setIsPhotoZoomed(true);
+                    } else {
+                      const nowZoomed = lastScale.current > 1;
+                      setIsPhotoZoomed(nowZoomed);
+                      // If zooming out from zoomed state, reset pan position
+                      if (wasZoomed && !nowZoomed) {
+                        handleResetZoom();
+                      }
+                    }
+                    baseScale.setValue(lastScale.current);
+                    pinchScale.setValue(1);
+                  }
+                };
+
+                const onPanGestureEvent = Animated.event(
+                  [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
+                  { 
+                    useNativeDriver: true,
+                    listener: (event: any) => {
+                      // Only process pan events when zoomed
+                      if (!isPhotoZoomed) {
+                        return;
+                      }
+                      console.log('📌 Pan gesture event:', event.nativeEvent.translationX, event.nativeEvent.translationY);
+                    }
+                  }
+                );
+
+                const onPanHandlerStateChange = (event: any) => {
+                  console.log('📌 Pan state change:', event.nativeEvent.state, 'isPhotoZoomed:', isPhotoZoomed);
+                  // Only allow panning when zoomed
+                  if (!isPhotoZoomed) {
+                    return;
+                  }
+                  if (event.nativeEvent.oldState === State.ACTIVE) {
+                    lastTranslate.current.x += event.nativeEvent.translationX;
+                    lastTranslate.current.y += event.nativeEvent.translationY;
+                    translateX.setValue(lastTranslate.current.x);
+                    translateY.setValue(lastTranslate.current.y);
+                    translateX.setOffset(lastTranslate.current.x);
+                    translateY.setOffset(lastTranslate.current.y);
+                    translateX.setValue(0);
+                    translateY.setValue(0);
+                  }
+                };
+
+                const animatedStyle = {
+                  transform: [
+                    { scale: Animated.multiply(baseScale, pinchScale) },
+                    { translateX: translateX },
+                    { translateY: translateY },
+                  ],
+                };
+
+                const handleResetZoom = () => {
+                  lastScale.current = 1;
+                  lastTranslate.current = { x: 0, y: 0 };
+                  baseScale.setValue(1);
+                  pinchScale.setValue(1);
+                  translateX.setValue(0);
+                  translateY.setValue(0);
+                  translateX.setOffset(0);
+                  translateY.setOffset(0);
+                  setIsPhotoZoomed(false);
+                };
+
                 return (
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={() => {
-                      setZoomablePhotoUri(absoluteUri);
-                      setShowZoomablePhoto(true);
-                    }}
-                    style={{ width: '100%' }}
-                  >
-                    <Image 
-                      source={{ uri: absoluteUri }} 
-                      style={styles.photoPreviewFullWidth}
-                      resizeMode="contain"
-                      onLoad={() => {
-                        console.log('✅ Photo loaded successfully in detail modal');
-                      }}
-                      onError={(error) => {
-                        console.error('❌ Error loading photo in detail modal:', {
-                          uri: selectedPhoto.uri,
-                          absoluteUri: absoluteUri,
-                          error: error.nativeEvent?.error || error,
-                        });
-                      }}
-                    />
-                  </TouchableOpacity>
+                  <View style={{ width: '100%', zIndex: 999 }}>
+                    <GestureHandlerRootView style={{ width: '100%' }}>
+                      <PinchGestureHandler
+                        onGestureEvent={onPinchGestureEvent}
+                        onHandlerStateChange={onPinchHandlerStateChange}
+                        simultaneousHandlers={[]}
+                      >
+                        <Animated.View style={{ width: '100%' }} collapsable={false}>
+                          <PanGestureHandler
+                            onGestureEvent={onPanGestureEvent}
+                            onHandlerStateChange={onPanHandlerStateChange}
+                            minPointers={1}
+                            maxPointers={1}
+                            enabled={isPhotoZoomed}
+                            simultaneousHandlers={[]}
+                            shouldCancelWhenOutside={false}
+                            avgTouches={true}
+                          >
+                            <Animated.View 
+                              collapsable={false} 
+                              style={{ width: '100%' }}
+                              onStartShouldSetResponder={() => true}
+                              onMoveShouldSetResponder={() => true}
+                            >
+                              <Animated.Image
+                                source={{ uri: absoluteUri }} 
+                                style={[styles.photoPreviewFullWidth, animatedStyle]}
+                                resizeMode="contain"
+                                onLoad={() => {
+                                  console.log('✅ Photo loaded successfully in detail modal');
+                                }}
+                                onError={(error) => {
+                                  console.error('❌ Error loading photo in detail modal:', {
+                                    uri: selectedPhoto.uri,
+                                    absoluteUri: absoluteUri,
+                                    error: error.nativeEvent?.error || error,
+                                  });
+                                }}
+                              />
+                            </Animated.View>
+                          </PanGestureHandler>
+                        </Animated.View>
+                      </PinchGestureHandler>
+                    </GestureHandlerRootView>
+                    {!isPhotoZoomed && (
+                      <Text style={{ 
+                        textAlign: 'center', 
+                        marginTop: 8, 
+                        color: colors.textSecondary,
+                        fontSize: 12 
+                      }}>
+                        Pinch to zoom
+                      </Text>
+                    )}
+                  </View>
                 );
               })() : (
                 <View style={[styles.photoPreviewFullWidth, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
@@ -2565,107 +2758,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     );
   };
 
-  const renderZoomablePhotoModal = () => {
-    if (!zoomablePhotoUri) return null;
-
-    const onPinchGestureEvent = Animated.event(
-      [{ nativeEvent: { scale: pinchScale } }],
-      { useNativeDriver: true }
-    );
-
-    const onPinchHandlerStateChange = (event: any) => {
-      if (event.nativeEvent.oldState === State.ACTIVE) {
-        lastScale.current *= event.nativeEvent.scale;
-        if (lastScale.current < 1) {
-          lastScale.current = 1;
-        } else if (lastScale.current > 4) {
-          lastScale.current = 4;
-        }
-        baseScale.setValue(lastScale.current);
-        pinchScale.setValue(1);
-      }
-    };
-
-    const onPanGestureEvent = Animated.event(
-      [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
-      { useNativeDriver: true }
-    );
-
-    const onPanHandlerStateChange = (event: any) => {
-      if (event.nativeEvent.oldState === State.ACTIVE) {
-        lastTranslate.current.x += event.nativeEvent.translationX;
-        lastTranslate.current.y += event.nativeEvent.translationY;
-        translateX.setValue(lastTranslate.current.x);
-        translateY.setValue(lastTranslate.current.y);
-        translateX.setOffset(lastTranslate.current.x);
-        translateY.setOffset(lastTranslate.current.y);
-        translateX.setValue(0);
-        translateY.setValue(0);
-      }
-    };
-
-    const animatedStyle = {
-      transform: [
-        { scale: Animated.multiply(baseScale, pinchScale) },
-        { translateX: translateX },
-        { translateY: translateY },
-      ],
-    };
-
-    const handleClose = () => {
-      setShowZoomablePhoto(false);
-      setZoomablePhotoUri(null);
-      // Reset zoom state
-      lastScale.current = 1;
-      lastTranslate.current = { x: 0, y: 0 };
-      baseScale.setValue(1);
-      pinchScale.setValue(1);
-      translateX.setValue(0);
-      translateY.setValue(0);
-      translateX.setOffset(0);
-      translateY.setOffset(0);
-    };
-
-    return (
-      <Modal
-        visible={showZoomablePhoto}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleClose}
-      >
-        <GestureHandlerRootView style={styles.zoomablePhotoContainer}>
-          <View style={styles.zoomablePhotoBackdrop}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={handleClose}
-            />
-            <PanGestureHandler
-              onGestureEvent={onPanGestureEvent}
-              onHandlerStateChange={onPanHandlerStateChange}
-              minPointers={1}
-              maxPointers={1}
-            >
-              <Animated.View style={styles.zoomablePhotoWrapper} collapsable={false}>
-                <PinchGestureHandler
-                  onGestureEvent={onPinchGestureEvent}
-                  onHandlerStateChange={onPinchHandlerStateChange}
-                >
-                  <Animated.View collapsable={false}>
-                    <Animated.Image
-                      source={{ uri: zoomablePhotoUri }}
-                      style={[styles.zoomablePhoto, animatedStyle]}
-                      resizeMode="contain"
-                    />
-                  </Animated.View>
-                </PinchGestureHandler>
-              </Animated.View>
-            </PanGestureHandler>
-          </View>
-        </GestureHandlerRootView>
-      </Modal>
-    );
-  };
 
   const renderActivitySelectorModal = () => {
     return (
@@ -4008,7 +4100,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       {renderCreateTripModal()}
       {renderAddActivityModal()}
-      {renderZoomablePhotoModal()}
     </View>
   );
 };
@@ -4971,13 +5062,15 @@ const styles = StyleSheet.create({
   },
   zoomablePhotoWrapper: {
     width: screenWidth,
-    height: screenWidth,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   zoomablePhoto: {
     width: screenWidth,
     height: screenWidth,
+    maxWidth: '100%',
+    maxHeight: '100%',
   },
 });
 
