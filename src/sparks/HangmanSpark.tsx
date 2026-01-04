@@ -90,7 +90,8 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
   const remainingToGuess = useMemo(() => {
     return secretWord
       .split("")
-      .filter((ch) => /^[A-Z]$/.test(ch) && !guessedLetters.includes(ch)).length;
+      .filter((ch) => /^[A-Z]$/.test(ch) && !guessedLetters.includes(ch))
+      .length;
   }, [secretWord, guessedLetters]);
 
   const resetForNewRound = (nextSetter: number) => {
@@ -140,18 +141,27 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
         {phase === "pickPlayers" && (
           <View>
             <Text style={[styles.header, { color: colors.text }]}>Hangman</Text>
-            <Text style={[styles.label, { color: colors.text }]}>How many players?</Text>
+            <Text style={[styles.label, { color: colors.text }]}>
+              How many players?
+            </Text>
             <View style={styles.row}>
               {[2, 3, 4].map((n) => (
                 <TouchableOpacity
                   key={n}
                   style={[
                     styles.pill,
-                    { backgroundColor: numPlayers === n ? colors.primary : colors.card },
+                    {
+                      backgroundColor:
+                        numPlayers === n ? colors.primary : colors.card,
+                    },
                   ]}
                   onPress={() => setNumPlayers(n)}
                 >
-                  <Text style={{ color: numPlayers === n ? "white" : colors.text }}>{n}</Text>
+                  <Text
+                    style={{ color: numPlayers === n ? "white" : colors.text }}
+                  >
+                    {n}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -170,13 +180,20 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
 
         {phase === "enterWord" && (
           <View>
-            <Text style={[styles.header, { color: colors.text }]}>Hand the phone to Player {wordSetter} to enter the word</Text>
-            <Text style={[styles.label, { color: colors.text }]}>Secret word (kept hidden):</Text>
+            <Text style={[styles.header, { color: colors.text }]}>
+              Hand the phone to Player {wordSetter} to enter the word
+            </Text>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Secret word (kept hidden):
+            </Text>
             <TextInput
               value={secretWordRaw}
               onChangeText={setSecretWordRaw}
               placeholder="Enter secret word"
-              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+              style={[
+                styles.input,
+                { borderColor: colors.border, color: colors.text },
+              ]}
               secureTextEntry={true}
               autoCapitalize="none"
             />
@@ -194,16 +211,22 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
 
         {phase === "playing" && (
           <View>
-            <Text style={[styles.header, { color: colors.text }]}>Player {currentPlayer}'s Turn</Text>
+            <Text style={[styles.header, { color: colors.text }]}>
+              Player {currentPlayer}'s Turn
+            </Text>
 
             <View style={styles.hangmanBox}>
-              <Text style={[styles.mono, { color: colors.text }]}>{HANGMAN_STATES[wrongCount]}</Text>
+              <Text style={[styles.mono, { color: colors.text }]}>
+                {HANGMAN_STATES[wrongCount]}
+              </Text>
             </View>
 
             <View style={styles.wordRow}>
               {visibleLetters.map((ch, idx) => (
                 <View key={idx} style={styles.letterSlot}>
-                  <Text style={[styles.letterText, { color: colors.text }]}>{ch}</Text>
+                  <Text style={[styles.letterText, { color: colors.text }]}>
+                    {ch}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -217,11 +240,17 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
                     onPress={() => onPressLetter(l)}
                     style={[
                       styles.letterPill,
-                      { backgroundColor: disabled ? colors.border : colors.card },
+                      {
+                        backgroundColor: disabled ? colors.border : colors.card,
+                      },
                     ]}
                     disabled={disabled}
                   >
-                    <Text style={{ color: disabled ? colors.text : colors.text }}>{l}</Text>
+                    <Text
+                      style={{ color: disabled ? colors.text : colors.text }}
+                    >
+                      {l}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -229,15 +258,20 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
 
             {result && (
               <View style={{ marginTop: 12 }}>
-                <Text style={{ color: colors.text, fontSize: 16, marginBottom: 8 }}>
+                <Text
+                  style={{ color: colors.text, fontSize: 16, marginBottom: 8 }}
+                >
                   {result === "win"
-                    ? `Player ${currentPlayer} wins!` 
+                    ? `Player ${currentPlayer} wins!`
                     : `Player ${currentPlayer} lost. The word was: ${secretWord}`}
                 </Text>
 
                 <View style={{ flexDirection: "row" }}>
                   <TouchableOpacity
-                    style={[styles.button, { backgroundColor: colors.primary, marginRight: 8 }]}
+                    style={[
+                      styles.button,
+                      { backgroundColor: colors.primary, marginRight: 8 },
+                    ]}
                     onPress={() => {
                       // same setter continues
                       const nextSetter = (wordSetter % (numPlayers || 2)) + 1;
@@ -248,7 +282,10 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.buttonOutline, { borderColor: colors.border }]}
+                    style={[
+                      styles.buttonOutline,
+                      { borderColor: colors.border },
+                    ]}
                     onPress={() => {
                       // restart entire game
                       setNumPlayers(null);

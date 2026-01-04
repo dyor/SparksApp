@@ -40,8 +40,8 @@ echo ""
 echo "🚀 Starting Expo web server..."
 echo ""
 
-# Start Expo with web flag and clear cache
-# --no-open prevents Expo from automatically opening browser
-# This prevents duplicate instances when Codespaces auto-forwards ports
-npx expo start --web -c --no-open
+# Start Expo using the project's robust start script which handles ports
+# Run in CI mode to avoid interactive flags in Codespaces
+export CI=true
+node scripts/start-web.js --port=$PORT
 

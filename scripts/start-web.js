@@ -103,25 +103,25 @@ async function main() {
   console.log("");
 
   // Start Expo with the determined port
-  // Note: --no-open prevents Expo from automatically opening browser
-  // This prevents duplicate instances when Codespaces auto-forwards ports
-  const expoProcess = spawn(
-    "npx",
-    [
-      "expo",
-      "start",
-      "--web",
-      "--port",
-      port.toString(),
-      "--non-interactive",
-      "--clear",
-      "--no-open",
-    ],
-    {
-      stdio: "inherit",
-      env: process.env,
-    }
-  );
+  // Avoid passing flags that some Expo versions reject in Codespaces
+  const expoArgs = [
+    "expo",
+    "start",
+    "--web",
+    "--port",
+    port.toString(),
+    "--clear",
+  ];
+
+  // If not running in CI, keep --no-open to avoid opening a browser locally
+  if (!process.env.CI) {
+    expoArgs.push("--no-open");
+  }
+
+  const expoProcess = spawn("npx", expoArgs, {
+    stdio: "inherit",
+    env: process.env,
+  });
 
   // Handle process termination
   process.on("SIGINT", () => {

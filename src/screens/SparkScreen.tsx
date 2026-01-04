@@ -33,12 +33,11 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   // Debug: log sparkId and SparkComponent at render
   // This will help confirm which spark is being rendered
   const spark = getSparkById(sparkId);
-  const SparkComponent = spark?.component;
   console.log(
     "[SparkScreen] Render: sparkId =",
     sparkId,
     "SparkComponent =",
-    SparkComponent?.name || SparkComponent
+    spark?.component?.name || spark?.component
   );
 
   const { updateSparkProgress, isUserSpark, addSparkToUser } = useSparkStore();
@@ -151,6 +150,34 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       color: sparkDarkMode ? "#666666" : colors.primary,
     },
   });
+
+  // Basic Error Boundary to catch render errors from Sparks
+  class SparkErrorBoundary extends React.Component<any, { hasError: boolean; error?: any }> {
+    constructor(props: any) {
+      super(props);
+      this.state = { hasError: false, error: undefined };
+    }
+
+    static getDerivedStateFromError(error: any) {
+      return { hasError: true, error };
+    }
+
+    componentDidCatch(error: any, info: any) {
+      console.error('SparkErrorBoundary caught error:', error, info);
+    }
+
+    render() {
+      if (this.state.hasError) {
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>An error occurred while rendering this Spark.</Text>
+            <Text style={styles.errorDetail}>{String(this.state.error)}</Text>
+          </View>
+        );
+      }
+      return this.props.children;
+    }
+  }
 
   // Detect if we're in the marketplace or my sparks
   const isFromMarketplace =
@@ -277,37 +304,42 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
+  // At this point we know `spark` is defined
+  const SparkComponent = spark.component as React.ComponentType<any>;
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={{ flex: 1 }}>
-        <SparkComponent
-          {...({
-            ...otherParams, // Pass forwarded params (e.g., autoRecord from SpeakSpark quick launch)
-            showSettings: showSparkSettings,
-            settingsInitialTab: settingsFocus,
-            openCourseSelectionSignal: openCourseSelectionSignal,
-            onCloseSettings: () => {
-              setShowSparkSettings(false);
-              setSettingsFocus(undefined);
-            },
-            onStateChange: (state: any) => {
-              // Handle spark state changes
-              console.log("Spark state changed:", state);
-              // Handle dark mode for final-clock spark
-              if (sparkId === "final-clock" && state.darkMode !== undefined) {
-                setSparkDarkMode(state.darkMode);
-              }
-            },
-            onComplete: (result: any) => {
-              // Handle spark completion
-              console.log("Spark completed:", result);
-              updateSparkProgress(sparkId, {
-                completionPercentage: 100,
-                customData: result,
-              });
-            },
-          } as any)}
-        />
+        <SparkErrorBoundary>
+          <SparkComponent
+            {...({
+              ...otherParams, // Pass forwarded params (e.g., autoRecord from SpeakSpark quick launch)
+              showSettings: showSparkSettings,
+              settingsInitialTab: settingsFocus,
+              openCourseSelectionSignal: openCourseSelectionSignal,
+              onCloseSettings: () => {
+                setShowSparkSettings(false);
+                setSettingsFocus(undefined);
+              },
+              onStateChange: (state: any) => {
+                // Handle spark state changes
+                console.log("Spark state changed:", state);
+                // Handle dark mode for final-clock spark
+                if (sparkId === "final-clock" && state.darkMode !== undefined) {
+                  setSparkDarkMode(state.darkMode);
+                }
+              },
+              onComplete: (result: any) => {
+                // Handle spark completion
+                console.log("Spark completed:", result);
+                updateSparkProgress(sparkId, {
+                  completionPercentage: 100,
+                  customData: result,
+                });
+              },
+            } as any)}
+          />
+        </SparkErrorBoundary>
       </View>
 
       {!showSparkSettings && (

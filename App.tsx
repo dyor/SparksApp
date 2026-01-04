@@ -49,6 +49,8 @@ export default function App() {
   const addSparkToUser = useSparkStore((s) => s.addSparkToUser);
   useEffect(() => {
     addSparkToUser("scorecard");
+    // Add Hangman for easy testing
+    addSparkToUser("hangman");
   }, [addSparkToUser]);
   return (
     <SafeAreaProvider>
@@ -252,6 +254,24 @@ function AppContent() {
       clearTimeout(listenerTimeout);
       clearInterval(badgeUpdateInterval);
     };
+  }, []);
+
+  // Global error handlers - surface uncaught exceptions in web dev
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const onError = (event: any) => {
+        console.error('Global error captured:', event?.error || event?.message || event);
+      };
+      const onRejection = (event: any) => {
+        console.error('Unhandled promise rejection:', event?.reason || event);
+      };
+      window.addEventListener('error', onError);
+      window.addEventListener('unhandledrejection', onRejection);
+      return () => {
+        window.removeEventListener('error', onError);
+        window.removeEventListener('unhandledrejection', onRejection);
+      };
+    }
   }, []);
 
   return (

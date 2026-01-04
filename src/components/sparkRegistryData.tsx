@@ -314,7 +314,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: BuzzyBingoSpark as React.ComponentType<any>,
   },
-  "hangman": {
+  hangman: {
     metadata: {
       id: "hangman",
       title: "Hangman",
