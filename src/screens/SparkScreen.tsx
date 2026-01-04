@@ -152,7 +152,10 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   });
 
   // Basic Error Boundary to catch render errors from Sparks
-  class SparkErrorBoundary extends React.Component<any, { hasError: boolean; error?: any }> {
+  class SparkErrorBoundary extends React.Component<
+    any,
+    { hasError: boolean; error?: any }
+  > {
     constructor(props: any) {
       super(props);
       this.state = { hasError: false, error: undefined };
@@ -163,14 +166,16 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     }
 
     componentDidCatch(error: any, info: any) {
-      console.error('SparkErrorBoundary caught error:', error, info);
+      console.error("SparkErrorBoundary caught error:", error, info);
     }
 
     render() {
       if (this.state.hasError) {
         return (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>An error occurred while rendering this Spark.</Text>
+            <Text style={styles.errorText}>
+              An error occurred while rendering this Spark.
+            </Text>
             <Text style={styles.errorDetail}>{String(this.state.error)}</Text>
           </View>
         );

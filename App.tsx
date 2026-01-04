@@ -1,20 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import { useSparkStore } from "./src/store";
-import 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
-import * as SplashScreen from 'expo-splash-screen';
-import { AppNavigator } from './src/navigation/AppNavigator';
-import { ThemeProvider } from './src/contexts/ThemeContext';
-import { useAppStore } from './src/store';
-import { useAuthStore } from './src/store/authStore';
-import { NotificationService } from './src/utils/notifications';
-import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
-import { ServiceFactory } from './src/services/ServiceFactory';
-import AuthService from './src/services/AuthService';
-import { RemoteConfigService } from './src/services/RemoteConfigService';
-
+import "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import * as Notifications from "expo-notifications";
+import * as SplashScreen from "expo-splash-screen";
+import { AppNavigator } from "./src/navigation/AppNavigator";
+import { ThemeProvider } from "./src/contexts/ThemeContext";
+import { useAppStore } from "./src/store";
+import { useAuthStore } from "./src/store/authStore";
+import { NotificationService } from "./src/utils/notifications";
+import { FeedbackNotificationService } from "./src/services/FeedbackNotificationService";
+import { ServiceFactory } from "./src/services/ServiceFactory";
+import AuthService from "./src/services/AuthService";
+import { RemoteConfigService } from "./src/services/RemoteConfigService";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -258,18 +257,21 @@ function AppContent() {
 
   // Global error handlers - surface uncaught exceptions in web dev
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const onError = (event: any) => {
-        console.error('Global error captured:', event?.error || event?.message || event);
+        console.error(
+          "Global error captured:",
+          event?.error || event?.message || event
+        );
       };
       const onRejection = (event: any) => {
-        console.error('Unhandled promise rejection:', event?.reason || event);
+        console.error("Unhandled promise rejection:", event?.reason || event);
       };
-      window.addEventListener('error', onError);
-      window.addEventListener('unhandledrejection', onRejection);
+      window.addEventListener("error", onError);
+      window.addEventListener("unhandledrejection", onRejection);
       return () => {
-        window.removeEventListener('error', onError);
-        window.removeEventListener('unhandledrejection', onRejection);
+        window.removeEventListener("error", onError);
+        window.removeEventListener("unhandledrejection", onRejection);
       };
     }
   }, []);
