@@ -40,8 +40,14 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     spark?.component?.name || spark?.component
   );
 
-  const { updateSparkProgress, isUserSpark, addSparkToUser } = useSparkStore();
-  const { setCurrentSparkId, recentSparks, addRecentSpark } = useAppStore();
+  const updateSparkProgress = useSparkStore(state => state.updateSparkProgress);
+  const isUserSpark = useSparkStore(state => state.isUserSpark);
+  const addSparkToUser = useSparkStore(state => state.addSparkToUser);
+
+  const setCurrentSparkId = useAppStore(state => state.setCurrentSparkId);
+  const recentSparks = useAppStore(state => state.recentSparks);
+  const addRecentSpark = useAppStore(state => state.addRecentSpark);
+
   const { colors } = useTheme();
 
   const [showSparkSettings, setShowSparkSettings] = useState(false);
@@ -363,7 +369,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={[styles.buttonIcon, styles.recentSparkIcon]}>
                 {recentSparks.find((id) => id !== sparkId)
                   ? getSparkById(recentSparks.find((id) => id !== sparkId)!)
-                      ?.metadata.icon || "⚡️"
+                    ?.metadata.icon || "⚡️"
                   : "⚡️"}
               </Text>
               <Text style={[styles.buttonLabel, styles.recentSparkLabel]}>

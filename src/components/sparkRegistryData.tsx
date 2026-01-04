@@ -3,8 +3,6 @@ import { BaseSpark } from "../types/spark";
 // Import actual spark components
 import React from "react";
 import { BaseSpark as BaseSparkComponent } from "./BaseSpark";
-import { IdeasSpark } from "../sparks/IdeasSpark";
-import { Ideas2Spark } from "../sparks/Ideas2Spark";
 import { SpinnerSpark } from "../sparks/SpinnerSpark";
 import { FlashcardsSpark } from "../sparks/FlashcardsSpark";
 import { PackingListSpark } from "../sparks/PackingListSpark";
@@ -39,7 +37,6 @@ import FriendSpark from "../sparks/FriendSpark";
 import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
 import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
-import ScorecardSpark from "../sparks/ScorecardSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import styled from "styled-components/native";
 
@@ -65,30 +62,6 @@ const PlaceholderSpark: React.FC = () => (
 
 // Registry of all available sparks
 export const sparkRegistry: Record<string, BaseSpark> = {
-  ideas: {
-    metadata: {
-      id: "ideas",
-      title: "Ideas",
-      description: "Capture and organize your brilliant ideas",
-      icon: "💡",
-      category: "productivity",
-      createdAt: "2025-12-10T00:00:00.000Z",
-      rating: 4.5,
-    },
-    component: IdeasSpark,
-  },
-  ideas2: {
-    metadata: {
-      id: "ideas2",
-      title: "Ideas 2",
-      description: "Enhanced idea capture with formatting and search",
-      icon: "💡",
-      category: "productivity",
-      createdAt: "2025-12-10T00:00:00.000Z",
-      rating: 4.3,
-    },
-    component: Ideas2Spark,
-  },
   spinner: {
     metadata: {
       id: "spinner",
@@ -336,18 +309,6 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.0,
     },
     component: CardScoreSpark,
-  },
-  scorecard: {
-    metadata: {
-      id: "scorecard",
-      title: "Scorecard",
-      description: "Hole-by-hole round scoring with voice entry",
-      icon: "⛳",
-      category: "golf",
-      createdAt: "2025-12-27T00:00:00.000Z",
-      rating: 4.5,
-    },
-    component: ScorecardSpark,
   },
   golfWisdom: {
     metadata: {

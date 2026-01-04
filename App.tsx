@@ -44,11 +44,6 @@ try {
 }
 
 export default function App() {
-  // Ensure 'scorecard' spark is in user collection for debugging
-  const addSparkToUser = useSparkStore((s) => s.addSparkToUser);
-  useEffect(() => {
-    addSparkToUser("todo-list");
-  }, [addSparkToUser]);
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -59,8 +54,10 @@ export default function App() {
 }
 
 function AppContent() {
-  const { preferences } = useAppStore();
-  const { setUser, setRole, setSparkAdminRoles } = useAuthStore();
+  const preferences = useAppStore(state => state.preferences);
+  const setUser = useAuthStore(state => state.setUser);
+  const setRole = useAuthStore(state => state.setRole);
+  const setSparkAdminRoles = useAuthStore(state => state.setSparkAdminRoles);
 
   // Initialize Remote Config and authentication when app starts
   useEffect(() => {
@@ -255,7 +252,10 @@ function AppContent() {
 
   // Global error handlers - surface uncaught exceptions in web dev
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.addEventListener === "function"
+    ) {
       const onError = (event: any) => {
         console.error(
           "Global error captured:",

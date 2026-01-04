@@ -54,12 +54,16 @@ const getFocusedRouteNameFromRoute = (route: any) => {
   return focusedRoute.name;
 };
 
-const MySparksStackNavigator = ({
-  setTabBarVisible,
-}: {
-  setTabBarVisible?: (visible: boolean) => void;
-}) => {
+// Context for controlling TabBar visibility from nested stacks
+const TabBarVisibilityContext = React.createContext<{
+  setTabBarVisible: (visible: boolean) => void;
+}>({
+  setTabBarVisible: () => { },
+});
+
+const MySparksStackNavigator = () => {
   const { colors } = useTheme();
+  const { setTabBarVisible } = React.useContext(TabBarVisibilityContext);
 
   return (
     <MySparksStack.Navigator
@@ -103,12 +107,9 @@ const MySparksStackNavigator = ({
   );
 };
 
-const MarketplaceStackNavigator = ({
-  setTabBarVisible,
-}: {
-  setTabBarVisible?: (visible: boolean) => void;
-}) => {
+const MarketplaceStackNavigator = () => {
   const { colors } = useTheme();
+  const { setTabBarVisible } = React.useContext(TabBarVisibilityContext);
 
   return (
     <MarketplaceStack.Navigator
@@ -157,7 +158,7 @@ const CustomTabBar: React.FC<
   BottomTabBarProps & { tabBarVisible: boolean }
 > = ({ state, descriptors, navigation, tabBarVisible }) => {
   const { colors } = useTheme();
-  const { recentSparks } = useAppStore();
+  const recentSparks = useAppStore(state => state.recentSparks);
   const [showQuickSwitch, setShowQuickSwitch] = React.useState(false);
   const [adminUnreadCount, setAdminUnreadCount] = React.useState(0);
   const isNavigatingRef = React.useRef(false);
@@ -740,71 +741,69 @@ export const AppNavigator: React.FC = () => {
   const [tabBarVisible, setTabBarVisible] = React.useState(true);
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Tab.Navigator
-        initialRouteName="MySparks"
-        screenOptions={{
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.textSecondary,
-          tabBarStyle: { display: "none" }, // Hide default tab bar, we use custom
-        }}
-        tabBar={(props) => (
-          <CustomTabBar {...props} tabBarVisible={tabBarVisible} />
-        )}
-      >
-        <Tab.Screen
-          name="MySparks"
-          options={{
-            tabBarLabel: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
-                🏠
-              </Text>
-            ),
-            headerShown: false,
+    <TabBarVisibilityContext.Provider value={{ setTabBarVisible }}>
+      <NavigationContainer ref={navigationRef}>
+        <Tab.Navigator
+          initialRouteName="MySparks"
+          screenOptions={{
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.textSecondary,
+            tabBarStyle: { display: "none" }, // Hide default tab bar, we use custom
           }}
-          listeners={{
-            tabPress: () => setTabBarVisible(true),
-          }}
-        >
-          {() => <MySparksStackNavigator setTabBarVisible={setTabBarVisible} />}
-        </Tab.Screen>
-        <Tab.Screen
-          name="Marketplace"
-          options={{
-            tabBarLabel: "Discover",
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
-                🔎
-              </Text>
-            ),
-            headerShown: false,
-          }}
-          listeners={{
-            tabPress: () => setTabBarVisible(true),
-          }}
-        >
-          {() => (
-            <MarketplaceStackNavigator setTabBarVisible={setTabBarVisible} />
+          tabBar={(props) => (
+            <CustomTabBar {...props} tabBarVisible={tabBarVisible} />
           )}
-        </Tab.Screen>
-        <Tab.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{
-            tabBarLabel: "Settings",
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
-                ⚙️
-              </Text>
-            ),
-            headerShown: false,
-          }}
-          listeners={{
-            tabPress: () => setTabBarVisible(true),
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+        >
+          <Tab.Screen
+            name="MySparks"
+            component={MySparksStackNavigator}
+            options={{
+              tabBarLabel: "Home",
+              tabBarIcon: ({ color, size }) => (
+                <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
+                  🏠
+                </Text>
+              ),
+              headerShown: false,
+            }}
+            listeners={{
+              tabPress: () => setTabBarVisible(true),
+            }}
+          />
+          <Tab.Screen
+            name="Marketplace"
+            component={MarketplaceStackNavigator}
+            options={{
+              tabBarLabel: "Discover",
+              tabBarIcon: ({ color, size }) => (
+                <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
+                  🔎
+                </Text>
+              ),
+              headerShown: false,
+            }}
+            listeners={{
+              tabPress: () => setTabBarVisible(true),
+            }}
+          />
+          <Tab.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              tabBarLabel: "Settings",
+              tabBarIcon: ({ color, size }) => (
+                <Text style={{ fontSize: size - 2, color, fontWeight: "bold" }}>
+                  ⚙️
+                </Text>
+              ),
+              headerShown: false,
+            }}
+            listeners={{
+              tabPress: () => setTabBarVisible(true),
+            }}
+          />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </TabBarVisibilityContext.Provider>
   );
 };

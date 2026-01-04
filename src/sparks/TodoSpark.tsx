@@ -76,7 +76,8 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   onStateChange,
   onComplete
 }) => {
-  const { getSparkData, setSparkData } = useSparkStore();
+  const getSparkData = useSparkStore(state => state.getSparkData);
+  const setSparkData = useSparkStore(state => state.setSparkData);
   const { colors } = useTheme();
 
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -90,6 +91,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showFutureTodos, setShowFutureTodos] = useState(false);
   const [showOlderDoneTodos, setShowOlderDoneTodos] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const taskInputRef = useRef<TextInput>(null);
 
   // Feedback system state
@@ -126,6 +128,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     if (savedData.selectedCategory !== undefined) {
       setSelectedCategory(savedData.selectedCategory);
     }
+    setDataLoaded(true);
   }, [getSparkData]);
 
   // Initialize session tracking
@@ -147,22 +150,25 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
 
   // Save data whenever todos change
   useEffect(() => {
-    const savedData = getSparkData('todo');
-    setSparkData('todo', {
-      ...savedData,
-      todos,
-      lastUpdated: new Date().toISOString(),
-    });
-  }, [todos, getSparkData, setSparkData]);
+    if (dataLoaded) {
+      const savedData = getSparkData('todo');
+      setSparkData('todo', {
+        ...savedData,
+        todos,
+      });
+    }
+  }, [todos, dataLoaded, setSparkData, getSparkData]);
 
   // Save selected category whenever it changes
   useEffect(() => {
-    const savedData = getSparkData('todo');
-    setSparkData('todo', {
-      ...savedData,
-      selectedCategory,
-    });
-  }, [selectedCategory, getSparkData, setSparkData]);
+    if (dataLoaded) {
+      const savedData = getSparkData('todo');
+      setSparkData('todo', {
+        ...savedData,
+        selectedCategory,
+      });
+    }
+  }, [selectedCategory, dataLoaded, setSparkData, getSparkData]);
 
   // Pre-fill input with category prefix when category is selected (only if input is empty)
   useEffect(() => {

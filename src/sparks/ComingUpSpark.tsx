@@ -24,7 +24,7 @@ interface Event {
     title: string;
     date: string; // ISO date string (YYYY-MM-DD)
     type: 'annual' | 'one-time';
-    category: 'birthday' | 'anniversary' | 'trip' | 'work' | 'party' | 'sports' | 'other';
+    category: 'birthday' | 'anniversary' | 'trip' | 'work' | 'party' | 'sports' | 'dinner' | 'other';
 }
 
 interface ComingUpSparkProps {
@@ -34,11 +34,13 @@ interface ComingUpSparkProps {
 
 const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSettings }) => {
     const { colors } = useTheme();
-    const { getSparkData, setSparkData } = useSparkStore();
+    const getSparkData = useSparkStore(state => state.getSparkData);
+    const setSparkData = useSparkStore(state => state.setSparkData);
     const [events, setEvents] = useState<Event[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
     const [showPastEvents, setShowPastEvents] = useState(false);
+    const [dataLoaded, setDataLoaded] = useState(false);
 
     // Form state
     const [title, setTitle] = useState('');
@@ -47,42 +49,111 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
     const [category, setCategory] = useState<Event['category']>('other');
     const [showDatePicker, setShowDatePicker] = useState(false);
 
-    const isInitializing = useRef(true);
+    // Helper to schedule notifications for an event
+    const scheduleEventNotifications = (event: Event) => {
+        // Schedule notifications (day before and day of) at 8:00 AM
+        const eventDateObj = new Date(event.date + 'T08:00:00');
+        const dayBefore = new Date(eventDateObj);
+        dayBefore.setDate(dayBefore.getDate() - 1);
 
-    // Load data
+        // Only schedule if the date is in the future
+        const now = new Date();
+
+        if (dayBefore > now) {
+            NotificationService.scheduleActivityNotification(
+                `${event.title} tomorrow`,
+                dayBefore,
+                `event-${event.id}-before`,
+                `Upcoming ${event.category}`,
+                'coming-up',
+                getCategoryEmoji(event.category)
+            );
+        }
+
+        if (eventDateObj > now) {
+            NotificationService.scheduleActivityNotification(
+                event.title,
+                eventDateObj,
+                `event-${event.id}-day`,
+                event.category.charAt(0).toUpperCase() + event.category.slice(1),
+                'coming-up',
+                getCategoryEmoji(event.category)
+            );
+        }
+    };
+
+    // Load data and handle rollover
     useEffect(() => {
         const data = getSparkData('coming-up');
         if (data?.events) {
-            setEvents(data.events);
-        }
-        setTimeout(() => {
-            isInitializing.current = false;
-        }, 100);
-    }, []);
+            const storedEvents: Event[] = data.events;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-    // Save data
+            let hasChanges = false;
+            const updatedEvents = [...storedEvents];
+
+            // Rollover logic for annual events
+            storedEvents.forEach((event, idx) => {
+                if (event.type === 'annual') {
+                    const [year, month, day] = event.date.split('-').map(Number);
+                    const eventDate = new Date(year, month - 1, day);
+                    eventDate.setHours(0, 0, 0, 0);
+
+                    if (eventDate < today) {
+                        // 1. Mark current as one-time (it has passed)
+                        updatedEvents[idx] = { ...event, type: 'one-time' };
+
+                        // 2. Create new annual event for next year
+                        const nextYearDate = `${year + 1}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const newEvent: Event = {
+                            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            title: event.title,
+                            date: nextYearDate,
+                            type: 'annual',
+                            category: event.category,
+                        };
+                        updatedEvents.push(newEvent);
+
+                        // 3. Schedule notifications for the new event
+                        scheduleEventNotifications(newEvent);
+                        hasChanges = true;
+                        console.log(`📡 Rollover: ${event.title} moved from ${event.date} to ${nextYearDate}`);
+                    }
+                }
+            });
+
+            if (hasChanges) {
+                setEvents(updatedEvents);
+                setSparkData('coming-up', { events: updatedEvents });
+            } else {
+                setEvents(storedEvents);
+            }
+        }
+        setDataLoaded(true);
+    }, [getSparkData, setSparkData]);
+
+    // Save data only after initial load and when events change
     useEffect(() => {
-        if (!isInitializing.current) {
+        if (dataLoaded) {
             setSparkData('coming-up', { events });
         }
-    }, [events, setSparkData]);
+    }, [events, dataLoaded, setSparkData]);
 
     const getNextOccurrence = (event: Event): Date => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const eventDate = new Date(event.date);
         // Fix timezone offset issue by treating the date string as local time
-        // YYYY-MM-DD split ensures we work with local components
         const [year, month, day] = event.date.split('-').map(Number);
-        eventDate.setFullYear(year, month - 1, day);
+        const eventDate = new Date(year, month - 1, day);
         eventDate.setHours(0, 0, 0, 0);
 
         if (event.type === 'one-time') {
             return eventDate;
         }
 
-        // For annual events
+        // For annual events (legacy support or if rollover hasn't triggered yet)
         const currentYear = today.getFullYear();
         const nextDate = new Date(currentYear, month - 1, day);
         nextDate.setHours(0, 0, 0, 0);
@@ -137,12 +208,10 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         const eventDate = `${year}-${month}-${day}`;
 
         if (editingEvent) {
-            const updatedEvents = events.map(e =>
-                e.id === editingEvent.id
-                    ? { ...e, title: title.trim(), date: eventDate, type: isAnnual ? 'annual' : 'one-time', category } as Event
-                    : e
-            );
+            const updatedEvent: Event = { ...editingEvent, title: title.trim(), date: eventDate, type: isAnnual ? 'annual' : 'one-time', category };
+            const updatedEvents = events.map(e => e.id === editingEvent.id ? updatedEvent : e);
             setEvents(updatedEvents);
+            scheduleEventNotifications(updatedEvent);
         } else {
             const newEvent: Event = {
                 id: Date.now().toString(),
@@ -152,57 +221,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                 category,
             };
             setEvents([...events, newEvent]);
-            // Schedule notifications (day before and day of)
-            const eventDateObj = new Date(newEvent.date + 'T08:00:00');
-            const dayBefore = new Date(eventDateObj);
-            dayBefore.setDate(dayBefore.getDate() - 1);
-
-            // Schedule day-before notification
-            NotificationService.scheduleActivityNotification(
-                `${newEvent.title} tomorrow`,
-                dayBefore,
-                `event-${newEvent.id}-before`,
-                `Upcoming ${newEvent.category}`,
-                'coming-up',
-                getCategoryEmoji(newEvent.category)
-            );
-
-            // Schedule day-of notification
-            NotificationService.scheduleActivityNotification(
-                newEvent.title,
-                eventDateObj,
-                `event-${newEvent.id}-day`,
-                newEvent.category.charAt(0).toUpperCase() + newEvent.category.slice(1),
-                'coming-up',
-                getCategoryEmoji(newEvent.category)
-            );
-        }
-
-        if (editingEvent) {
-            // Reschedule notifications for edited event
-            const eventDateObj = new Date(eventDate + 'T08:00:00');
-            const dayBeforeEdit = new Date(eventDateObj);
-            dayBeforeEdit.setDate(dayBeforeEdit.getDate() - 1);
-
-            // Cancel old notifications first (using identifier pattern)
-            // Then schedule new ones
-            NotificationService.scheduleActivityNotification(
-                `${title.trim()} tomorrow`,
-                dayBeforeEdit,
-                `event-${editingEvent.id}-before`,
-                `Upcoming ${category}`,
-                'coming-up',
-                getCategoryEmoji(category)
-            );
-
-            NotificationService.scheduleActivityNotification(
-                title.trim(),
-                eventDateObj,
-                `event-${editingEvent.id}-day`,
-                category.charAt(0).toUpperCase() + category.slice(1),
-                'coming-up',
-                getCategoryEmoji(category)
-            );
+            scheduleEventNotifications(newEvent);
         }
 
         handleCloseModal();
@@ -219,14 +238,13 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                 style: 'destructive',
                 onPress: async () => {
                     setEvents(events.filter(e => e.id !== editingEvent.id));
-                    // Note: Notifications will auto-expire if time has passed
-                    // No cancel method needed since we use activity identifiers
                     handleCloseModal();
                     HapticFeedback.medium();
                 }
             }
         ]);
     };
+
 
     const handleCloseModal = () => {
         setShowAddModal(false);
@@ -261,8 +279,8 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         HapticFeedback.light();
     };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayDay = new Date();
+    todayDay.setHours(0, 0, 0, 0);
 
     const filteredEvents = events.filter(event => {
         const nextDate = getNextOccurrence(event);
@@ -272,10 +290,10 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             const [year, month, day] = event.date.split('-').map(Number);
             const eventDate = new Date(year, month - 1, day);
             eventDate.setHours(0, 0, 0, 0);
-            return eventDate < today;
+            return eventDate < todayDay;
         } else {
             // Upcoming occurrences (including today)
-            return nextDate >= today;
+            return nextDate >= todayDay;
         }
     });
 
@@ -301,6 +319,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
+            paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 20,
         },
         title: {
             fontSize: 28,
@@ -308,17 +327,23 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             color: colors.text,
         },
         addButton: {
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             backgroundColor: colors.primary,
             justifyContent: 'center',
             alignItems: 'center',
+            shadowColor: colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
         },
         addButtonText: {
-            fontSize: 24,
+            fontSize: 28,
             color: '#fff',
             fontWeight: 'bold',
+            marginTop: -2,
         },
         listContent: {
             padding: 20,
@@ -363,12 +388,30 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             color: colors.text,
             marginBottom: 4,
         },
+        badgeRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
         proximityBadge: {
             alignSelf: 'flex-start',
             paddingHorizontal: 8,
             paddingVertical: 2,
             borderRadius: 12,
             backgroundColor: colors.background,
+        },
+        annualBadge: {
+            alignSelf: 'flex-start',
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 12,
+            backgroundColor: colors.primary + '15',
+        },
+        annualBadgeText: {
+            fontSize: 10,
+            fontWeight: '700',
+            color: colors.primary,
+            textTransform: 'uppercase',
         },
         proximityText: {
             fontSize: 12,
@@ -422,7 +465,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             fontSize: 16,
             fontWeight: '600',
             color: colors.text,
-            marginBottom: 8,
+            marginBottom: 12,
         },
         input: {
             backgroundColor: colors.surface,
@@ -430,6 +473,8 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             padding: 16,
             fontSize: 16,
             color: colors.text,
+            borderWidth: 1,
+            borderColor: colors.border,
         },
         dateButton: {
             backgroundColor: colors.surface,
@@ -460,11 +505,29 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         },
         switchContainer: {
             flexDirection: 'row',
-            justifyContent: 'space-between',
             alignItems: 'center',
             backgroundColor: colors.surface,
             borderRadius: 12,
-            padding: 16,
+            padding: 4,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        switchOption: {
+            flex: 1,
+            paddingVertical: 12,
+            alignItems: 'center',
+            borderRadius: 8,
+        },
+        switchOptionActive: {
+            backgroundColor: colors.primary,
+        },
+        switchOptionText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.textSecondary,
+        },
+        switchOptionTextActive: {
+            color: '#fff',
         },
         categoryContainer: {
             flexDirection: 'row',
@@ -481,26 +544,33 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             backgroundColor: colors.surface,
             borderWidth: 2,
             borderColor: 'transparent',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
         },
         categorySelected: {
             borderColor: colors.primary,
-            backgroundColor: colors.primary + '20',
+            backgroundColor: colors.primary + '10',
         },
         categoryEmoji: {
             fontSize: 24,
             marginBottom: 4,
         },
         categoryLabel: {
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '600',
             color: colors.textSecondary,
+            textAlign: 'center',
         },
         deleteButton: {
             marginTop: 20,
             padding: 16,
             borderRadius: 12,
-            backgroundColor: colors.error + '20',
+            backgroundColor: colors.error + '10',
             alignItems: 'center',
+            marginBottom: 40,
         },
         deleteButtonText: {
             color: colors.error,
@@ -588,6 +658,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             case 'work': return '💻';
             case 'party': return '🥳';
             case 'sports': return '⚽️';
+            case 'dinner': return '🍽️';
             default: return '📅';
         }
     };
@@ -605,7 +676,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                 {sortedEvents.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyEmoji}>🗓️</Text>
-                        <Text style={styles.emptyText}>No upcoming events</Text>
+                        <Text style={styles.emptyText}>No {showPastEvents ? 'past' : 'upcoming'} events</Text>
                         <Text style={styles.emptySubtext}>Add birthdays, trips, or other big days to track them here.</Text>
                     </View>
                 ) : (
@@ -630,10 +701,17 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
 
                                 <View style={styles.eventInfo}>
                                     <Text style={styles.eventTitle}>{event.title}</Text>
-                                    <View style={styles.proximityBadge}>
-                                        <Text style={[styles.proximityText, { color: proximityColor }]}>
-                                            {proximityText}
-                                        </Text>
+                                    <View style={styles.badgeRow}>
+                                        <View style={styles.proximityBadge}>
+                                            <Text style={[styles.proximityText, { color: proximityColor }]}>
+                                                {proximityText}
+                                            </Text>
+                                        </View>
+                                        {event.type === 'annual' && (
+                                            <View style={styles.annualBadge}>
+                                                <Text style={styles.annualBadgeText}>Annual</Text>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
 
@@ -725,21 +803,27 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Type</Text>
+                            <Text style={styles.label}>Repeat Type</Text>
                             <View style={styles.switchContainer}>
-                                <Text style={styles.dateText}>Annual Event</Text>
-                                <Switch
-                                    value={isAnnual}
-                                    onValueChange={setIsAnnual}
-                                    trackColor={{ false: colors.border, true: colors.primary }}
-                                />
+                                <TouchableOpacity
+                                    style={[styles.switchOption, !isAnnual && styles.switchOptionActive]}
+                                    onPress={() => { setIsAnnual(false); HapticFeedback.light(); }}
+                                >
+                                    <Text style={[styles.switchOptionText, !isAnnual && styles.switchOptionTextActive]}>One-time</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.switchOption, isAnnual && styles.switchOptionActive]}
+                                    onPress={() => { setIsAnnual(true); HapticFeedback.light(); }}
+                                >
+                                    <Text style={[styles.switchOptionText, isAnnual && styles.switchOptionTextActive]}>Annual</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Category</Text>
                             <View style={styles.categoryContainer}>
-                                {(['birthday', 'anniversary', 'trip', 'work', 'party', 'sports', 'other'] as const).map(cat => (
+                                {(['birthday', 'anniversary', 'trip', 'work', 'party', 'sports', 'dinner', 'other'] as const).map(cat => (
                                     <TouchableOpacity
                                         key={cat}
                                         style={[
