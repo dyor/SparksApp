@@ -40,13 +40,13 @@ export class FriendInvitationNotificationService {
 
             // Get all pending invitations
             const invitations = await service.getPendingInvitations();
-            
+
             // Get viewed invitation IDs from AsyncStorage
             const viewedIds = await this.getViewedInvitationIds();
-            
+
             // Count unread (invitations not in viewed list)
-            const unreadCount = invitations.filter(inv => !viewedIds.includes(inv.id)).length;
-            
+            const unreadCount = invitations.filter((inv: any) => !viewedIds.includes(inv.id)).length;
+
             return unreadCount;
         } catch (error: any) {
             // Handle authentication errors gracefully

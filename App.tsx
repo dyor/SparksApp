@@ -47,9 +47,7 @@ export default function App() {
   // Ensure 'scorecard' spark is in user collection for debugging
   const addSparkToUser = useSparkStore((s) => s.addSparkToUser);
   useEffect(() => {
-    addSparkToUser("scorecard");
-    // Add Hangman for easy testing
-    addSparkToUser("hangman");
+    addSparkToUser("todo-list");
   }, [addSparkToUser]);
   return (
     <SafeAreaProvider>

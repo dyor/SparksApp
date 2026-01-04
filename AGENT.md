@@ -27,9 +27,13 @@ Before making any changes, ensure you are not on the `main` branch.
 *“Build a Spark called Hangman. There are 2-4 players. The user will be asked how many players... [rest of detailed prompt] ... Start by reviewing instructions in the AGENT.md file in the top directory.”*
 
 ### 3. Registration
-- Add your spark to the `sparkRegistry` in `src/components/sparkRegistryData.tsx`.
-- Set an initial `rating: 4.5` in the metadata.
-- Categorize correctly (Productivity, Spanish, Media, etc.).
+To make your spark visible in the app, you **MUST** register it in `src/components/sparkRegistryData.tsx`:
+- **Step A: Import** - Add the import statement at the top with other sparks (e.g., `import { MySpark } from "../sparks/MySpark";`).
+- **Step B: Registry Entry** - Add a new entry to the `sparkRegistry` object:
+    - **Metadata**: Include `id`, `title`, `description`, `icon`, `category`, and `createdAt` (ISO string).
+    - **Initial Rating**: Set `rating: 4.5`.
+    - **Component**: Reference your imported component.
+- **Update Summary**: After registration, add your new spark to the appropriate category in `CONTEXT/GENERAL/SUMMARY.md`.
 
 ### 4. Preview Your Change
 Always offer to preview the work using the standardized command:

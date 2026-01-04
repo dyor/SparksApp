@@ -103,20 +103,6 @@ export class AnalyticsService {
 
     await this.queueEvent(event);
 
-    // Also send to Firebase Analytics
-    if (firebaseAnalytics) {
-      try {
-        await firebaseAnalytics.logEvent('spark_completed', {
-          spark_id: sparkId,
-          spark_name: sparkName,
-          duration,
-          action_count: actions.length,
-        });
-        console.log('✅ Spark completed event sent to Firebase Analytics');
-      } catch (error) {
-        console.log('⚠️ Error sending spark_completed to Firebase Analytics:', (error as any).message);
-      }
-    }
   }
 
   static async trackError(error: Error, context: string): Promise<void> {

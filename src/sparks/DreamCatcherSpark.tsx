@@ -33,26 +33,26 @@ type RecordingState = 'idle' | 'recording' | 'recorded' | 'transcribing' | 'tran
 
 export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
   const { colors } = useTheme();
-  
+
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedDuration, setRecordedDuration] = useState(0);
-  
+
   // Dream data
   const [transcription, setTranscription] = useState('');
   const [geminiInterpretation, setGeminiInterpretation] = useState<string | null>(null);
   const [currentDream, setCurrentDream] = useState<DreamEntry | null>(null);
-  
+
   // History
   const [dreamHistory, setDreamHistory] = useState<DreamEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  
+
   // Playback
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -136,7 +136,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
       durationTimerRef.current = setInterval(async () => {
         const status = await DreamRecordingService.getStatus();
         setRecordingDuration(status.duration);
-        
+
         if (status.duration >= 30) {
           stopRecording();
         }
@@ -263,7 +263,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
 
       setCurrentDream(dream);
       await loadDreamHistory();
-      
+
       Alert.alert('Saved!', 'Your dream has been saved to your journal.', [
         { text: 'OK', onPress: resetState }
       ]);
@@ -351,7 +351,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
           <View style={{ padding: 20 }}>
             <SettingsButton
               title="Close"
-              onPress={onCloseSettings}
+              onPress={onCloseSettings || (() => { })}
               variant="secondary"
             />
           </View>

@@ -4,6 +4,7 @@ import { ThemeColors } from '../../contexts/ThemeContext';
 // Mock theme colors for testing
 const mockColors: ThemeColors = {
     primary: '#007AFF',
+    secondary: '#007AFF',
     background: '#FFFFFF',
     surface: '#F5F5F5',
     text: '#000000',
@@ -12,6 +13,8 @@ const mockColors: ThemeColors = {
     success: '#4CAF50',
     warning: '#FF9800',
     error: '#F44336',
+    info: '#17A2B8',
+    card: '#FFFFFF',
 };
 
 describe('createCommonStyles', () => {
