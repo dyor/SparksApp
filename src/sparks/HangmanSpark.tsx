@@ -7,6 +7,7 @@ import {
   TextInput,
   ScrollView,
 } from "react-native";
+import { SaveCancelButtons } from "../components/SettingsComponents";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface HangmanSparkProps {
@@ -19,46 +20,46 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const HANGMAN_STATES = [
   `
    +---+
-       |
-       |
-       |
-      ===`,
+     |
+     |
+     |
+    ===`,
   `
    +---+
    O   |
-       |
-       |
-      ===`,
+     |
+     |
+    ===`,
   `
    +---+
    O   |
    |   |
-       |
-      ===`,
+     |
+    ===`,
   `
    +---+
    O   |
   /|   |
-       |
-      ===`,
+     |
+    ===`,
   `
    +---+
    O   |
-  /|\  |
-       |
-      ===`,
+  /|\\  |
+     |
+    ===`,
   `
    +---+
    O   |
-  /|\  |
+  /|\\  |
   /    |
-      ===`,
+    ===`,
   `
    +---+
    O   |
-  /|\  |
-  / \  |
-      ===`,
+  /|\\  |
+  / \\  |
+    ===`,
 ];
 
 export const HangmanSpark: React.FC<HangmanSparkProps> = ({ }) => {
@@ -124,6 +125,11 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({ }) => {
     setGuessedLetters((g) => [...g, letter]);
     if (!isPresent) {
       setWrongCount((w) => Math.min(w + 1, HANGMAN_STATES.length - 1));
+    }
+
+    // Advance to the next player after each guess
+    if (numPlayers) {
+      setCurrentPlayer((prev) => (prev % numPlayers) + 1);
     }
   };
 
@@ -266,39 +272,24 @@ export const HangmanSpark: React.FC<HangmanSparkProps> = ({ }) => {
                     : `Player ${currentPlayer} lost. The word was: ${secretWord}`}
                 </Text>
 
-                <View style={{ flexDirection: "row" }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.button,
-                      { backgroundColor: colors.primary, marginRight: 8 },
-                    ]}
-                    onPress={() => {
-                      // same setter continues
-                      const nextSetter = (wordSetter % (numPlayers || 2)) + 1;
-                      resetForNewRound(nextSetter);
-                    }}
-                  >
-                    <Text style={styles.buttonText}>Next Round</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.buttonOutline,
-                      { borderColor: colors.border },
-                    ]}
-                    onPress={() => {
-                      // restart entire game
-                      setNumPlayers(null);
-                      setPhase("pickPlayers");
-                      setSecretWordRaw("");
-                      setSecretWord("");
-                      setGuessedLetters([]);
-                      setWrongCount(0);
-                    }}
-                  >
-                    <Text style={{ color: colors.text }}>New Game</Text>
-                  </TouchableOpacity>
-                </View>
+                <SaveCancelButtons
+                  onSave={() => {
+                    // same setter continues
+                    const nextSetter = (wordSetter % (numPlayers || 2)) + 1;
+                    resetForNewRound(nextSetter);
+                  }}
+                  onCancel={() => {
+                    // restart entire game
+                    setNumPlayers(null);
+                    setPhase("pickPlayers");
+                    setSecretWordRaw("");
+                    setSecretWord("");
+                    setGuessedLetters([]);
+                    setWrongCount(0);
+                  }}
+                  saveText="Next Round"
+                  cancelText="New Game"
+                />
               </View>
             )}
           </View>
