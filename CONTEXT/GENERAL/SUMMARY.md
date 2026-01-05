@@ -70,6 +70,9 @@ Run your own virtual company with strategic decisions. Build your empire and tes
 ### 🎯 Buzzy Bingo
 Buzzword bingo game - mark squares as you hear tech terms. Perfect for meetings and conferences.
 
+### 🎯 Hangman
+Classic word guessing game for 2-4 players. Take turns guessing letters to reveal the hidden word before the hangman is complete.
+
 ## 🎵 Media
 
 ### 👁️ Toview
