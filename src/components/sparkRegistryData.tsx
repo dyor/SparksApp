@@ -38,6 +38,7 @@ import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
 import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
+import { HangmanSpark } from "../sparks/HangmanSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -497,6 +498,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: GoalTrackerSpark,
+  },
+  hangman: {
+    metadata: {
+      id: "hangman",
+      title: "Hangman",
+      description: "Classic word guessing game for 2-4 players",
+      icon: "🪢",
+      category: "game",
+      createdAt: "2026-01-05T00:00:00.000Z",
+      rating: 4.5,
+    },
+    component: HangmanSpark,
   },
 };
 

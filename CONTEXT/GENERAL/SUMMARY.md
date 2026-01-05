@@ -64,6 +64,9 @@ Inspirational golf wisdom from Tam O'Shanter. Beautiful book-style interface wit
 
 ## 🎮 Games
 
+### 🎯 Hangman
+Classic word guessing game for 2-4 players. Player 1 enters a secret word, then players take turns guessing letters to build the hangman.
+
 ### 💼 Business Simulator
 Run your own virtual company with strategic decisions. Build your empire and test your business acumen.
 
@@ -108,6 +111,6 @@ Submit your own Spark idea and become a product manager. Help shape the future o
 
 ---
 
-**Total Sparks:** 28 unique mini-apps  
+**Total Sparks:** 29 unique mini-apps  
 **Categories:** Productivity, Travel, Food, Health, Education, Golf, Games, Media, Utilities, Community  
 **All Sparks:** Available now and ready to make your life...just a little bit better⚡️
