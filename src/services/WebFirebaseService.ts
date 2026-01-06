@@ -25,6 +25,7 @@ import {
   deleteDoc,
   onSnapshot,
   writeBatch,
+  serverTimestamp,
 } from "firebase/firestore";
 import {
   User as AnalyticsUser,
@@ -62,7 +63,7 @@ export class WebFirebaseService {
         // Initialize Auth with appropriate persistence
         try {
           let persistence = browserLocalPersistence;
-          
+
           // For React Native, try to use AsyncStorage persistence if available
           if (Platform.OS !== "web") {
             try {
@@ -81,8 +82,7 @@ export class WebFirebaseService {
             persistence: persistence,
           });
           console.log(
-            `✅ Initialized Auth with ${
-              Platform.OS === "web" ? "browser" : "AsyncStorage"
+            `✅ Initialized Auth with ${Platform.OS === "web" ? "browser" : "AsyncStorage"
             } persistence`
           );
         } catch (initError: any) {
@@ -355,10 +355,10 @@ export class WebFirebaseService {
     try {
       const eventData = {
         ...event,
-        timestamp: Timestamp.now(),
+        timestamp: serverTimestamp(), // Changed from Timestamp.now() to serverTimestamp()
       };
 
-      await addDoc(collection(this.db, "analytics_events"), eventData);
+      await addDoc(collection(this.db, "analytics"), eventData);
       console.log("✅ Analytics event logged:", event.eventName);
     } catch (error) {
       console.error("❌ Error logging analytics event:", error);
@@ -448,7 +448,7 @@ export class WebFirebaseService {
 
     try {
       const q = query(
-        collection(this.db, "analytics_events"),
+        collection(this.db, "analytics"),
         where("sparkId", "==", sparkId),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
         where("timestamp", "<=", Timestamp.fromDate(endDate)),
@@ -659,7 +659,7 @@ export class WebFirebaseService {
 
     try {
       const q = query(
-        collection(this.db, "analytics_events"),
+        collection(this.db, "analytics"),
         where("userId", "==", userId),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
         where("timestamp", "<=", Timestamp.fromDate(endDate)),
@@ -1005,13 +1005,48 @@ export class WebFirebaseService {
   }
 
   static async batchLogEvents(events: any[]): Promise<void> {
-    // This is a placeholder - analytics events are handled by Firebase Analytics
-    console.log(`📊 Batch log events (placeholder):`, events.length, "events");
+    if (!this._initialized || !this.db) {
+      console.warn("WebFirebaseService not initialized, skipping batch log");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(this.db);
+      const collectionRef = collection(this.db, "analytics");
+
+      events.forEach((event) => {
+        const docRef = doc(collectionRef);
+        // Ensure timestamp is set correctly
+        const eventData = {
+          ...event,
+          timestamp: serverTimestamp(),
+        };
+        batch.set(docRef, eventData);
+      });
+
+      await batch.commit();
+      console.log(`✅ Batch logged ${events.length} events to analytics`);
+    } catch (error) {
+      console.error("❌ Error batch logging events:", error);
+      // Don't throw to avoid crashing the app for analytics
+    }
   }
 
   static async logEvent(event: any): Promise<void> {
-    // This is a placeholder - analytics events are handled by Firebase Analytics
-    console.log(`📊 Log event (placeholder):`, event);
+    if (!this._initialized || !this.db) {
+      console.warn("WebFirebaseService not initialized, skipping log event");
+      return;
+    }
+
+    try {
+      await addDoc(collection(this.db, "analytics"), {
+        ...event,
+        timestamp: serverTimestamp(),
+      });
+      console.log("✅ Logged single event to analytics");
+    } catch (error) {
+      console.error("❌ Error logging event:", error);
+    }
   }
 
   static async updateUser(userId: string, userData: any): Promise<void> {
@@ -1073,7 +1108,7 @@ export class WebFirebaseService {
     try {
       if (!WebFirebaseService.db) {
         console.error("Firestore not initialized");
-        return () => {}; // Return empty cleanup function
+        return () => { }; // Return empty cleanup function
       }
 
       console.log("👂 Starting feedback response listener for user:", userId);
@@ -1120,7 +1155,7 @@ export class WebFirebaseService {
       return unsubscribe;
     } catch (error) {
       console.error("❌ Error setting up feedback response listener:", error);
-      return () => {}; // Return empty cleanup function
+      return () => { }; // Return empty cleanup function
     }
   }
 }

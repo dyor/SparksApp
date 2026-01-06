@@ -125,7 +125,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       });
       setPhotos(migrated);
       if (JSON.stringify(migrated) !== JSON.stringify(savedData.photos)) {
-        setSparkData('food-cam', { photos: migrated });
+        saveData(migrated);
       }
     }
     requestPermissions();
@@ -133,11 +133,11 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     checkFileSystemStatus();
   }, [getSparkData]);
 
-  // Save data whenever photos change
-  useEffect(() => {
-    setSparkData('food-cam', { photos });
-    onStateChange?.({ photoCount: photos.length });
-  }, [photos]); // Removed setSparkData and onStateChange from dependencies
+  // Helper for saving data
+  const saveData = (updatedPhotos: FoodPhoto[]) => {
+    setSparkData('food-cam', { photos: updatedPhotos });
+    onStateChange?.({ photoCount: updatedPhotos.length });
+  };
 
   const requestPermissions = async () => {
     try {
@@ -267,7 +267,11 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
           time: now.toTimeString().substring(0, 5), // HH:MM format
         };
 
-        setPhotos(prev => [newPhoto, ...prev]);
+        setPhotos(prev => {
+          const updatedPhotos = [newPhoto, ...prev];
+          saveData(updatedPhotos);
+          return updatedPhotos;
+        });
       } catch (error) {
         console.error('Failed to save photo:', error);
         Alert.alert('Error', 'Failed to save photo. Please try again.');
@@ -348,7 +352,11 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
             HapticFeedback.light();
 
             // Remove from state first
-            setPhotos(prev => prev.filter(photo => photo.id !== photoId));
+            setPhotos(prev => {
+              const updatedPhotos = prev.filter(photo => photo.id !== photoId);
+              saveData(updatedPhotos);
+              return updatedPhotos;
+            });
 
             // Try to delete the physical file
             if (photoToDelete?.uri) {
@@ -386,9 +394,13 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       time: editTime || undefined,
     };
 
-    setPhotos(prev => prev.map(photo =>
-      photo.id === editingPhoto.id ? updatedPhoto : photo
-    ));
+    setPhotos(prev => {
+      const updatedPhotos = prev.map(photo =>
+        photo.id === editingPhoto.id ? updatedPhoto : photo
+      );
+      saveData(updatedPhotos);
+      return updatedPhotos;
+    });
 
     setEditModalVisible(false);
     setEditingPhoto(null);
@@ -408,7 +420,11 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
           style: 'destructive',
           onPress: async () => {
             // Remove from state first
-            setPhotos(prev => prev.filter(photo => photo.id !== editingPhoto.id));
+            setPhotos(prev => {
+              const updatedPhotos = prev.filter(photo => photo.id !== editingPhoto.id);
+              saveData(updatedPhotos);
+              return updatedPhotos;
+            });
 
             // Try to delete the physical file
             try {

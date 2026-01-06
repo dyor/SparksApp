@@ -687,17 +687,17 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
       // Unviewed items come first
       if (!a.completed && b.completed) return -1;
       if (a.completed && !b.completed) return 1;
-      
+
       // Both unviewed: sort by createdDate descending (newest first)
       if (!a.completed && !b.completed) {
         return (b.createdDate || '').localeCompare(a.createdDate || '');
       }
-      
+
       // Both viewed: sort by completedDate descending (most recently viewed first)
       if (a.completed && b.completed) {
         return (b.completedDate || '').localeCompare(a.completedDate || '');
       }
-      
+
       return 0;
     });
   };
@@ -751,25 +751,11 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
           {stats.completed} viewed • {stats.pending} pending
         </Text>
       </View>
-
-      {/* Provider dropdown */}
-      <View style={[styles.providerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Dropdown
-          key={`provider-${providerDropdownKey}`}
-          options={settings.providers}
-          selectedValue={selectedProvider}
-          onSelect={setSelectedProvider}
-          placeholder="Select provider (optional)"
-          style={[styles.providerDropdown, { backgroundColor: colors.background, borderColor: colors.border }]}
-          textStyle={[styles.providerDropdownText, { color: colors.text }]}
-        />
-      </View>
-
       {/* Add new toview */}
       <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TextInput
           style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-          placeholder="Add Toview [eg, Category: Toview (withPerson1, Person2)]"
+          placeholder="Category: Toview (withPerson1, Person2)"
           placeholderTextColor={colors.textSecondary}
           value={newToviewText}
           onChangeText={setNewToviewText}

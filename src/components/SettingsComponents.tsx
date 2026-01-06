@@ -188,12 +188,12 @@ interface SettingsInputProps {
   multiline?: boolean;
   numberOfLines?: number;
   keyboardType?:
-    | "default"
-    | "number-pad"
-    | "decimal-pad"
-    | "numeric"
-    | "email-address"
-    | "phone-pad";
+  | "default"
+  | "number-pad"
+  | "decimal-pad"
+  | "numeric"
+  | "email-address"
+  | "phone-pad";
 }
 
 export const SettingsInput: React.FC<SettingsInputProps> = ({
@@ -753,7 +753,7 @@ const FeedbackItem: React.FC<FeedbackItemProps> = ({
             <StarRating
               key={rating}
               rating={rating}
-              onRatingChange={() => {}}
+              onRatingChange={() => { }}
               disabled
               size={16}
             />
@@ -909,34 +909,21 @@ export const SettingsFeedbackSection = forwardRef<
       await FeedbackService.submitFeedback(feedbackData);
       console.log("✅ Feedback submitted successfully");
 
-      // Track analytics
-      await AnalyticsService.trackFeatureUsage(
-        "feedback_submitted",
-        sparkId,
-        sparkName,
-        {
-          rating: 0,
-          hasFeedback: !!feedback.trim(),
-        }
+      // Reload feedback list in background without awaiting
+      loadUserFeedback().catch((err) =>
+        console.error("Error reloading feedback in background:", err)
       );
 
-      // Track with simple analytics
-      const SimpleAnalytics = ServiceFactory.getAnalyticsService();
-      if (SimpleAnalytics.trackFeedbackSubmitted) {
-        SimpleAnalytics.trackFeedbackSubmitted(sparkId, sparkName, false, true);
-      }
-      console.log("✅ Analytics tracked");
-
-      // Reload feedback list
-      await loadUserFeedback();
-
-      Alert.alert(
-        "Thank You!",
-        "Your feedback has been submitted successfully."
-      );
+      // Show alert after modal is dismissed
+      setTimeout(() => {
+        Alert.alert(
+          "Thank You!",
+          "Your feedback has been submitted successfully."
+        );
+      }, 300);
     } catch (error) {
       console.error("Error submitting feedback:", error);
-      throw error;
+      throw error; // Rethrow so FeedbackModal can handle UI error state
     }
   };
 
@@ -956,8 +943,7 @@ export const SettingsFeedbackSection = forwardRef<
       while (initAttempts < maxAttempts && !initialized) {
         try {
           console.log(
-            `🔄 Attempt ${
-              initAttempts + 1
+            `🔄 Attempt ${initAttempts + 1
             }/${maxAttempts}: Initializing services...`
           );
           await ServiceFactory.ensureAnalyticsInitialized();
@@ -987,8 +973,7 @@ export const SettingsFeedbackSection = forwardRef<
             );
           } else {
             throw new Error(
-              `Failed to initialize services after ${maxAttempts} attempts: ${
-                error instanceof Error ? error.message : "Unknown error"
+              `Failed to initialize services after ${maxAttempts} attempts: ${error instanceof Error ? error.message : "Unknown error"
               }`
             );
           }
@@ -1146,9 +1131,8 @@ export const SettingsFeedbackSection = forwardRef<
       {/* Mark as Read Button - only show if there are unread responses */}
       {unreadCount > 0 && (
         <SettingsButton
-          title={`Mark ${unreadCount} Response${
-            unreadCount > 1 ? "s" : ""
-          } as Read`}
+          title={`Mark ${unreadCount} Response${unreadCount > 1 ? "s" : ""
+            } as Read`}
           onPress={async () => {
             try {
               const deviceId =

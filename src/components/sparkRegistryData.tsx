@@ -278,7 +278,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       id: "buzzy-bingo",
       title: "Buzzy Bingo",
       description: "Buzzword bingo game - mark squares as you hear tech terms",
-      icon: "🎯",
+      icon: "🐝",
       category: "game",
       createdAt: "2025-11-01T00:00:00.000Z",
       rating: 4.5,

@@ -204,6 +204,31 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     HapticFeedback.success();
   };
 
+  // Helper to check for today's entry
+  const hasEntryForToday = (goal: Goal): boolean => {
+    const today = formatDateString(new Date());
+    return goal.entries.some(e => e.date === today);
+  };
+
+  // Quick add entry for today from home screen
+  const handleQuickAddEntry = (goal: Goal) => {
+    const today = formatDateString(new Date());
+    const newEntry: GoalEntry = {
+      id: `entry_${Date.now()}`,
+      date: today,
+    };
+
+    const updatedGoal: Goal = {
+      ...goal,
+      entries: [...goal.entries, newEntry],
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedGoals = data.goals.map(g => g.id === goal.id ? updatedGoal : g);
+    saveData({ ...data, goals: updatedGoals });
+    HapticFeedback.success();
+  };
+
   // Update goal entries
   const updateGoalEntries = (entries: GoalEntry[]) => {
     if (!currentGoal) return;
@@ -375,79 +400,65 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     const height = 200;
     const padding = 30;
 
-    // Create data points for the entire year (365 days)
+    // Create data points for the year so far (up to today)
     const dataPoints: Array<{
       day: number;
-      actual: number | null; // null for future days
+      actual: number;
       target: number;
-      forecast: number;
     }> = [];
 
     const now = new Date();
     const currentYear = now.getFullYear();
     const startOfYear = new Date(currentYear, 0, 1);
     const todayDate = parseLocalDate(formatDateString(now));
+    const daysToShow = stats.daysSinceStartOfYear; // Truncate to today
 
-    for (let day = 0; day < stats.daysInYear; day++) {
+    for (let day = 0; day < daysToShow; day++) {
       const dayDate = new Date(currentYear, 0, 1);
       dayDate.setDate(dayDate.getDate() + day);
       const dayStr = formatDateString(dayDate);
-      const isPastOrToday = dayDate <= todayDate;
 
-      // Target value (prorated for entire year)
-      // day + 1 because day 0 is Jan 1 (first day), so we want to show progress through day+1
-      const targetValue = Math.floor((goal.targetPerYear / stats.daysInYear) * (day + 1));
+      // Target value: starts at 1 on Jan 1, increases linearly
+      // Formula: 1 + (targetPerYear - 1) * (dayNumber / daysInYear)
+      // day + 1 because day 0 is Jan 1 (first day)
+      const targetValue = 1 + ((goal.targetPerYear - 1) * (day + 1) / stats.daysInYear);
 
-      // Forecast value (based on current pace, projected for entire year)
-      // If we have 2 entries in 2 days, pace is 1/day, so forecast for day 365 is 365
-      const forecastValue = stats.daysSinceStartOfYear > 0
-        ? Math.floor((stats.actualCount / stats.daysSinceStartOfYear) * (day + 1))
-        : 0;
-
-      // Actual value (only for days up to today)
-      let actualValue: number | null = null;
-      if (isPastOrToday) {
-        actualValue = goal.entries.filter(e => {
-          const entryDate = parseLocalDate(e.date);
-          return entryDate <= dayDate && entryDate.getFullYear() === currentYear;
-        }).length;
-      }
+      // Actual value: cumulative count of entries up to this day
+      const actualValue = goal.entries.filter(e => {
+        const entryDate = parseLocalDate(e.date);
+        return entryDate <= dayDate && entryDate.getFullYear() === currentYear;
+      }).length;
 
       dataPoints.push({
         day,
         actual: actualValue,
         target: targetValue,
-        forecast: forecastValue,
       });
     }
 
     // Find max value for Y-axis scaling
     const allValues = [
-      ...dataPoints.map(d => d.actual).filter(v => v !== null) as number[],
+      ...dataPoints.map(d => d.actual),
       ...dataPoints.map(d => d.target),
-      ...dataPoints.map(d => d.forecast),
     ];
-    const maxValue = Math.max(...allValues, goal.targetPerYear, 1);
+    const maxValue = Math.max(...allValues, 1);
     const minValue = 0;
 
-    const getX = (day: number) => padding + (day / (stats.daysInYear - 1)) * (width - 2 * padding);
+    const getX = (day: number) => {
+      if (daysToShow <= 1) return padding + (width - 2 * padding) / 2;
+      return padding + (day / (daysToShow - 1)) * (width - 2 * padding);
+    };
     const getY = (value: number) => height - padding - ((value - minValue) / (maxValue - minValue)) * (height - 2 * padding);
 
     // Create path data for each line
-    // Target line (full year)
+    // Target line
     const targetPath = dataPoints.map((d, i) =>
       `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.target)}`
     ).join(' ');
 
-    // Forecast line (full year)
-    const forecastPath = dataPoints.map((d, i) =>
-      `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.forecast)}`
-    ).join(' ');
-
-    // Actual line (only up to today)
-    const actualDataPoints = dataPoints.filter(d => d.actual !== null);
-    const actualPath = actualDataPoints.map((d, i) =>
-      `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.actual!)}`
+    // Actual line
+    const actualPath = dataPoints.map((d, i) =>
+      `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.actual)}`
     ).join(' ');
 
     // Find today's index for marking
@@ -460,36 +471,27 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           <Line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
           <Line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
 
-          {/* Target line (dashed) - Full year */}
+          {/* Target line (dashed) - Black */}
           <Path
             d={targetPath}
-            stroke="#007AFF"
+            stroke="#000000"
             strokeWidth="2"
             strokeDasharray="4,4"
             fill="none"
           />
 
-          {/* Forecast line (dotted) - Full year - Color based on goal comparison */}
-          <Path
-            d={forecastPath}
-            stroke={stats.forecastForYear > goal.targetPerYear ? '#34C759' : stats.forecastForYear < goal.targetPerYear ? '#FF3B30' : '#000000'}
-            strokeWidth="2"
-            strokeDasharray="2,2"
-            fill="none"
-          />
-
-          {/* Actual line (solid) - Only up to today */}
-          {actualDataPoints.length > 0 && (
+          {/* Actual line (solid) - Green if forecast exceeds goal, red otherwise */}
+          {dataPoints.length > 0 && (
             <Path
               d={actualPath}
-              stroke="#FF3B30"
+              stroke={stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30'}
               strokeWidth="3"
               fill="none"
             />
           )}
 
           {/* Today marker (vertical line) */}
-          {todayIndex < stats.daysInYear && (
+          {todayIndex < daysToShow && (
             <Line
               x1={getX(todayIndex)}
               y1={padding}
@@ -503,41 +505,31 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           )}
 
           {/* Final point circles */}
-          {actualDataPoints.length > 0 && (
-            <Circle
-              cx={getX(actualDataPoints[actualDataPoints.length - 1].day)}
-              cy={getY(actualDataPoints[actualDataPoints.length - 1].actual!)}
-              r="4"
-              fill="#FF3B30"
-            />
+          {dataPoints.length > 0 && (
+            <>
+              <Circle
+                cx={getX(dataPoints[dataPoints.length - 1].day)}
+                cy={getY(dataPoints[dataPoints.length - 1].actual)}
+                r="4"
+                fill={stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30'}
+              />
+              <Circle
+                cx={getX(dataPoints[dataPoints.length - 1].day)}
+                cy={getY(dataPoints[dataPoints.length - 1].target)}
+                r="4"
+                fill="#000000"
+              />
+            </>
           )}
-          {/* Target endpoint */}
-          <Circle
-            cx={getX(stats.daysInYear - 1)}
-            cy={getY(dataPoints[dataPoints.length - 1].target)}
-            r="4"
-            fill="#007AFF"
-          />
-          {/* Forecast endpoint - Color based on goal comparison */}
-          <Circle
-            cx={getX(stats.daysInYear - 1)}
-            cy={getY(dataPoints[dataPoints.length - 1].forecast)}
-            r="4"
-            fill={stats.forecastForYear > goal.targetPerYear ? '#34C759' : stats.forecastForYear < goal.targetPerYear ? '#FF3B30' : '#000000'}
-          />
         </Svg>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15, marginTop: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 12, height: 3, backgroundColor: '#FF3B30', marginRight: 6 }} />
+            <View style={{ width: 12, height: 3, backgroundColor: stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30', marginRight: 6 }} />
             <Text style={{ fontSize: 10, color: colors.textSecondary }}>Actual</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 12, height: 3, backgroundColor: '#007AFF', marginRight: 6, borderStyle: 'dashed', borderWidth: 1, borderColor: '#007AFF' }} />
+            <View style={{ width: 12, height: 3, backgroundColor: '#000000', marginRight: 6, borderStyle: 'dashed', borderWidth: 1, borderColor: '#000000' }} />
             <Text style={{ fontSize: 10, color: colors.textSecondary }}>Target</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 12, height: 3, backgroundColor: '#34C759', marginRight: 6, borderStyle: 'dashed', borderWidth: 1, borderColor: '#34C759' }} />
-            <Text style={{ fontSize: 10, color: colors.textSecondary }}>Forecast</Text>
           </View>
         </View>
       </View>
@@ -883,16 +875,16 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           <SettingsFeedbackSection sparkName="Goal Tracker" sparkId="goal-tracker" />
           <SettingsSection title="Goals">
             {data.goals.map(goal => {
-            const stats = calculateStats(goal);
-            return (
-              <View key={goal.id} style={styles.goalCard}>
-                <Text style={styles.goalName}>{goal.name}</Text>
-                <Text style={styles.goalStats}>
-                  {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
-                </Text>
-                <Text style={[styles.goalStats, { color: stats.forecastColor }]}>
-                  Forecast: {stats.forecastForYear} for the year
-                </Text>
+              const stats = calculateStats(goal);
+              return (
+                <View key={goal.id} style={styles.goalCard}>
+                  <Text style={styles.goalName}>{goal.name}</Text>
+                  <Text style={styles.goalStats}>
+                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
+                  </Text>
+                  <Text style={[styles.goalStats, { color: stats.forecastColor }]}>
+                    Forecast: {stats.forecastForYear} for the year
+                  </Text>
                   <View style={styles.goalActions}>
                     <TouchableOpacity
                       style={[styles.actionButton, styles.secondaryButton]}
@@ -920,8 +912,8 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
             )}
           </SettingsSection>
           <SaveCancelButtons
-            onSave={onCloseSettings || (() => {})}
-            onCancel={onCloseSettings || (() => {})}
+            onSave={onCloseSettings || (() => { })}
+            onCancel={onCloseSettings || (() => { })}
             saveText="Done"
             cancelText="Close"
           />
@@ -1057,19 +1049,36 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           data.goals.map(goal => {
             const stats = calculateStats(goal);
             return (
-              <TouchableOpacity
-                key={goal.id}
-                style={styles.goalCard}
-                onPress={() => handleGoalPress(goal)}
-              >
-                <Text style={styles.goalName}>{goal.name}</Text>
-                <Text style={styles.goalStats}>
-                  {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
-                </Text>
-                <Text style={[styles.goalStats, { color: stats.forecastColor }]}>
-                  Forecast: {stats.forecastForYear} for the year
-                </Text>
-              </TouchableOpacity>
+              <View key={goal.id} style={[styles.goalCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() => handleGoalPress(goal)}
+                >
+                  <Text style={styles.goalName}>{goal.name}</Text>
+                  <Text style={styles.goalStats}>
+                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
+                  </Text>
+                  <Text style={[styles.goalStats, { color: stats.forecastColor, marginBottom: 0 }]}>
+                    Forecast: {stats.forecastForYear} for the year
+                  </Text>
+                </TouchableOpacity>
+
+                {!hasEntryForToday(goal) && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: colors.primary,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => handleQuickAddEntry(goal)}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>+1</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             );
           })
         )}
