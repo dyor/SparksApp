@@ -8,6 +8,9 @@ config.resolver.unstable_enablePackageExports = false;
 config.server = {
     ...config.server,
     rewriteRequestUrl: (url) => {
+        if (url.includes('/?platform=web')) {
+            return url.replace('/?', '/index.bundle?');
+        }
         if (url.startsWith('/?')) {
             return url.replace('/?', '/index.bundle?');
         }

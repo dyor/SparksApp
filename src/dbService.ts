@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSparkStore } from "./store/sparkStore";
 
 export interface Hole {
   hole_number: number;
@@ -36,57 +37,75 @@ const SCORES_KEY_PREFIX = "@sparks_scores_v1:"; // + roundId
 const COURSES_KEY = "@sparks_courses_v1"; // stores array of courses
 
 export async function initDB() {
-  // ensure rounds key exists
-  const existing = await AsyncStorage.getItem(ROUNDS_KEY);
-  if (!existing) {
-    await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify([]));
+  const data = useSparkStore.getState().getSparkData("scorecard");
+
+  // If already initialized in Zustand, we're good
+  if (data && data.rounds && data.courses) {
+    return;
   }
 
-  // ensure courses key exists with a default sample course
-  const existingCourses = await AsyncStorage.getItem(COURSES_KEY);
-  if (!existingCourses) {
-    const defaultCourse = {
-      id: 1,
-      name: "Local Course",
-      holes: [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 5, 4, 3, 4, 4, 5, 4, 3].map(
-        (par, idx) => ({ hole_number: idx + 1, par })
-      ),
-    };
-    await AsyncStorage.setItem(COURSES_KEY, JSON.stringify([defaultCourse]));
-  }
-}
+  // Otherwise, try to migrate from AsyncStorage
+  console.log("[dbService] Initializing Scorecard data in Zustand...");
 
-export async function getRounds(): Promise<Round[]> {
-  const raw = await AsyncStorage.getItem(ROUNDS_KEY);
-  if (!raw) return [];
+  let rounds: Round[] = [];
+  let courses: Course[] = [];
+  const scores: Record<number, ScoreRecord[]> = {};
+
   try {
-    return JSON.parse(raw) as Round[];
-  } catch (e) {
-    return [];
-  }
-}
+    const existingRounds = await AsyncStorage.getItem(ROUNDS_KEY);
+    rounds = existingRounds ? JSON.parse(existingRounds) : [];
 
-export async function getHoles(courseId: number): Promise<Hole[]> {
-  // Read from stored courses if present
-  try {
-    const raw = await AsyncStorage.getItem(COURSES_KEY);
-    if (raw) {
-      const courses = JSON.parse(raw) as Array<{
-        id: number;
-        name: string;
-        holes: Array<{ hole_number: number; par: number }>;
-      }>;
-      const course = courses.find((c) => c.id === courseId);
-      if (course) {
-        return course.holes.map((h) => ({
-          hole_number: h.hole_number,
-          par: h.par,
-          course_id: courseId,
-        }));
+    const existingCourses = await AsyncStorage.getItem(COURSES_KEY);
+    courses = existingCourses ? JSON.parse(existingCourses) : [];
+
+    // Migrate scores for each round
+    for (const r of rounds) {
+      const s = await AsyncStorage.getItem(SCORES_KEY_PREFIX + r.id);
+      if (s) {
+        scores[r.id] = JSON.parse(s);
       }
     }
   } catch (e) {
-    // fallthrough
+    console.error("[dbService] Error during migration:", e);
+  }
+
+  // If no courses, add default
+  if (courses.length === 0) {
+    courses = [
+      {
+        id: 1,
+        name: "Local Course",
+        holes: [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 5, 4, 3, 4, 4, 5, 4, 3].map(
+          (par, idx) => ({ hole_number: idx + 1, par })
+        ),
+      },
+    ];
+  }
+
+  useSparkStore.getState().setSparkData("scorecard", {
+    rounds,
+    courses,
+    scores,
+    initialized: true,
+  });
+}
+
+export async function getRounds(): Promise<Round[]> {
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  return data.rounds || [];
+}
+
+export async function getHoles(courseId: number): Promise<Hole[]> {
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  const courses = (data.courses || []) as Course[];
+  const course = courses.find((c) => c.id === courseId);
+
+  if (course) {
+    return course.holes.map((h) => ({
+      hole_number: h.hole_number,
+      par: h.par,
+      course_id: courseId,
+    }));
   }
 
   // Fallback to default 18-hole layout
@@ -99,14 +118,9 @@ export async function getHoles(courseId: number): Promise<Hole[]> {
 }
 
 export async function getScores(roundId: number): Promise<ScoreRecord[]> {
-  const key = SCORES_KEY_PREFIX + roundId;
-  const raw = await AsyncStorage.getItem(key);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
-  }
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  const scores = data.scores || {};
+  return scores[roundId] || [];
 }
 
 export async function saveScore(
@@ -116,8 +130,10 @@ export async function saveScore(
   putts: number | null,
   completed_at?: string
 ): Promise<void> {
-  const key = SCORES_KEY_PREFIX + roundId;
-  const existing = await getScores(roundId);
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  const allScores = { ...(data.scores || {}) };
+  const existing = [...(allScores[roundId] || [])];
+
   const idx = existing.findIndex((r) => r.hole_number === holeNumber);
   const record: ScoreRecord = {
     round_id: roundId,
@@ -126,24 +142,22 @@ export async function saveScore(
     putts,
     completed_at,
   };
+
   if (idx === -1) {
     existing.push(record);
   } else {
     existing[idx] = record;
   }
-  await AsyncStorage.setItem(key, JSON.stringify(existing));
+
+  allScores[roundId] = existing;
+  useSparkStore.getState().setSparkData("scorecard", { scores: allScores });
 }
 
 // Courses management
 
 export async function getCourses(): Promise<Course[]> {
-  const raw = await AsyncStorage.getItem(COURSES_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as Course[];
-  } catch (e) {
-    return [];
-  }
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  return data.courses || [];
 }
 
 export async function createCourse(
@@ -151,11 +165,12 @@ export async function createCourse(
   holes: Array<{ hole_number: number; par: number }>,
   expected_round_time?: number
 ): Promise<Course> {
-  const courses = await getCourses();
+  const courses = [...(await getCourses())];
   const id = courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1;
   const course: Course = { id, name, holes, expected_round_time };
   courses.push(course);
-  await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
+
+  useSparkStore.getState().setSparkData("scorecard", { courses });
   return course;
 }
 
@@ -165,26 +180,29 @@ export async function updateCourse(
   holes: Array<{ hole_number: number; par: number }>,
   expected_round_time?: number
 ): Promise<void> {
-  const courses = await getCourses();
+  const courses = [...(await getCourses())];
   const idx = courses.findIndex((c) => c.id === courseId);
   if (idx !== -1) {
     courses[idx] = { id: courseId, name, holes, expected_round_time };
-    await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
+    useSparkStore.getState().setSparkData("scorecard", { courses });
   }
 }
 
 export async function deleteCourse(courseId: number): Promise<void> {
-  const courses = await getCourses();
-  const remaining = courses.filter((c) => c.id !== courseId);
-  await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(remaining));
+  const courses = (await getCourses()).filter((c) => c.id !== courseId);
+  useSparkStore.getState().setSparkData("scorecard", { courses });
 }
 
 export async function deleteRound(roundId: number): Promise<void> {
-  const rounds = await getRounds();
-  const remaining = rounds.filter((r) => r.id !== roundId);
-  await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(remaining));
-  // Also clean up scores
-  await AsyncStorage.removeItem(SCORES_KEY_PREFIX + roundId);
+  const rounds = (await getRounds()).filter((r) => r.id !== roundId);
+  const data = useSparkStore.getState().getSparkData("scorecard");
+  const allScores = { ...(data.scores || {}) };
+  delete allScores[roundId];
+
+  useSparkStore.getState().setSparkData("scorecard", {
+    rounds,
+    scores: allScores,
+  });
 }
 
 // Rounds
@@ -193,7 +211,7 @@ export async function createRoundForCourse(courseId: number): Promise<Round> {
   const course = courses.find((c) => c.id === courseId);
   if (!course) throw new Error("Course not found");
 
-  const rounds = await getRounds();
+  const rounds = [...(await getRounds())];
   const id = rounds.length ? Math.max(...rounds.map((r) => r.id)) + 1 : 1;
   const round: Round = {
     id,
@@ -203,16 +221,17 @@ export async function createRoundForCourse(courseId: number): Promise<Round> {
     expected_round_time: course.expected_round_time,
   };
   rounds.push(round);
-  await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
+
+  useSparkStore.getState().setSparkData("scorecard", { rounds });
   return round;
 }
 
 export async function updateRound(round: Round): Promise<void> {
-  const rounds = await getRounds();
+  const rounds = [...(await getRounds())];
   const idx = rounds.findIndex((r) => r.id === round.id);
   if (idx !== -1) {
     rounds[idx] = round;
-    await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
+    useSparkStore.getState().setSparkData("scorecard", { rounds });
   }
 }
 

@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSparkStore } from "../store";
 import { useTheme } from "../contexts/ThemeContext";
 import {
   createCourse,
@@ -589,24 +590,30 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   showSettings = false,
   onCloseSettings,
 }) => {
+  const { getSparkData, setSparkData } = useSparkStore();
   const { colors, isDarkMode, toggleTheme } = useTheme();
   const styles = getStyles(colors, isDarkMode);
 
-  // Always start on Recent Rounds screen
+  // Load initial state from Zustand
+  const initialData = getSparkData("scorecard");
+
+  // Always start on Recent Rounds screen or previous screen
   const [screen, setScreen] = useState<
     "recent-rounds" | "scorecard" | "courses"
-  >("recent-rounds");
+  >(initialData?.screen || "recent-rounds");
 
   // Add missing state hooks
   const [isLoading, setIsLoading] = useState(false);
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [roundId, setRoundId] = useState<number | null>(null);
+  const [rounds, setRounds] = useState<any[]>(initialData?.rounds || []);
+  const [roundId, setRoundId] = useState<number | null>(
+    initialData?.roundId || null
+  );
   const [round, setRound] = useState<any>(null);
   const [holes, setHoles] = useState<any[]>([]);
   const [scores, setScores] = useState<
     Record<number, { strokes: string; putts: string; completed_at?: string }>
-  >({});
-  const [courses, setCourses] = useState<any[]>([]);
+  >(initialData?.scores || {});
+  const [courses, setCourses] = useState<any[]>(initialData?.courses || []);
   const [isRecording, setIsRecording] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   // For focusing next input in scorecard
@@ -623,7 +630,15 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [roundSummaries, setRoundSummaries] = useState<
     Record<number, { strokes: number; putts: number }>
-  >({});
+  >(initialData?.roundSummaries || {});
+
+  // Save UI state to Zustand whenever it changes
+  useEffect(() => {
+    setSparkData("scorecard", {
+      screen,
+      roundId,
+    });
+  }, [screen, roundId, setSparkData]);
 
   // Load all rounds for Recent Rounds screen
   useEffect(() => {
