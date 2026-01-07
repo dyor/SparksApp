@@ -1901,11 +1901,15 @@ const GolfBrainSettings: React.FC<{
     );
     const [hasChanges, setHasChanges] = useState(false);
 
-    console.log("GolfBrainSettings: Render. hasChanges:", hasChanges, "localSettings.countdown:", localSettings.swingRecording?.countdownSeconds);
+    // Synchronize local settings with global settings when global settings change
+    // This ensures hydration updates are captured if the settings modal is already open
+    useEffect(() => {
+      if (!hasChanges) {
+        setLocalSettings(JSON.parse(JSON.stringify(data.settings)));
+      }
+    }, [data.settings, hasChanges]);
 
     useEffect(() => {
-      console.log("GolfBrainSettings: Mounted with data.settings.countdown:", data.settings?.swingRecording?.countdownSeconds);
-      return () => console.log("GolfBrainSettings: Unmounted");
     }, []);
     useEffect(() => {
       if (initialFocus === "courses") {
@@ -1959,17 +1963,16 @@ const GolfBrainSettings: React.FC<{
     };
 
     const handleSaveSettings = () => {
-      console.log("Settings: Saving changes", JSON.stringify(localSettings, null, 2));
-      // Ensure we are passing the full local settings object
-      onUpdateSettings({
-        ...data.settings, // Start with existing global settings
-        ...localSettings, // Overlay local changes
-        // Ensure complex objects are merged if needed, though localSettings should be complete
+      const updatedSettings = {
+        ...data.settings,
+        ...localSettings,
         swingRecording: {
-          ...data.settings.swingRecording,
-          ...localSettings.swingRecording,
+          ...(data.settings.swingRecording || {}),
+          ...(localSettings.swingRecording || {}),
         }
-      });
+      };
+      console.log("saved data.settings.countdown value:", updatedSettings.swingRecording?.countdownSeconds);
+      onUpdateSettings(updatedSettings);
       setHasChanges(false);
       onClose();
     };
@@ -2387,7 +2390,7 @@ const GolfBrainSettings: React.FC<{
                   }
                   onChangeText={(text) => {
                     const val = parseInt(text) || 0;
-                    console.log("GolfBrainSettings: UI Input - countdownSeconds changed to:", val);
+                    console.log("changed data.settings.countdown value:", val);
                     setLocalSettings((prev) => ({
                       ...prev,
                       swingRecording: {
@@ -2941,7 +2944,6 @@ const GolfBrainSettings: React.FC<{
           <View style={GolfBrainSettingsStyles.saveCancelContainer}>
             <SaveCancelButtons
               onSave={() => {
-                console.log("GolfBrainSettings: Save button clicked!");
                 handleSaveSettings();
               }}
               onCancel={handleCancelSettings}
@@ -6638,7 +6640,6 @@ export const GolfBrainSpark: React.FC<
       const checkHydration = () => {
         // Check if the persist middleware has finished rehydrating
         const isHydrated = useSparkStore.persist && useSparkStore.persist.hasHydrated();
-        console.log("GolfBrain: Hydration check. Store hydrated:", isHydrated);
         if (isHydrated) {
           setStoreHydrated(true);
         }
@@ -6662,8 +6663,6 @@ export const GolfBrainSpark: React.FC<
 
     // Load saved data on mount - wait for hydration
     useEffect(() => {
-      console.log("GolfBrain: Data load effect running. storeHydrated:", storeHydrated, "dataLoaded:", dataLoaded, "savedSparkData exists:", !!savedSparkData);
-
       if (!storeHydrated && !savedSparkData) {
         // If not hydrated and no data, wait.
         // Note: if savedSparkData exists, hydration presumably happened or we have something.
@@ -6676,7 +6675,6 @@ export const GolfBrainSpark: React.FC<
       // Use the reactive data if available, or fall back to getSparkData logic (which returns {})
       // We cast to any to safely check emptiness or property existence if needed
       const savedData = (savedSparkData || getSparkData("golf-brain")) as GolfBrainData;
-      console.log("GolfBrain: Raw saved data loaded:", JSON.stringify(savedData));
 
       // Check if it's truly empty (initial store state returning {})
       const isEmpty = Object.keys(savedData).length === 0;
@@ -6730,7 +6728,7 @@ export const GolfBrainSpark: React.FC<
             },
           },
         };
-        console.log("GolfBrain: Merged data for initialization:", JSON.stringify(mergedData.settings));
+        console.log("hydration data.settings.countdown value:", mergedData.settings?.swingRecording?.countdownSeconds);
         setData(mergedData);
         if (savedData.currentRound) {
           setCurrentRound(savedData.currentRound);
@@ -6742,11 +6740,9 @@ export const GolfBrainSpark: React.FC<
           setCurrentScreen("hole-detail");
         }
         setDataLoaded(true);
-        setDataLoaded(true);
       } else {
         // Only resolve empty/new user if we are SURE we are hydrated
         if (storeHydrated) {
-          console.log("GolfBrain: No saved data found (or empty), initializing defaults.");
           setDataLoaded(true);
         }
       }
@@ -6808,7 +6804,7 @@ export const GolfBrainSpark: React.FC<
     // Save data whenever it changes
     useEffect(() => {
       if (dataLoaded) {
-        console.log("GolfBrain: Persisting data to sparkStore. Settings:", JSON.stringify(data.settings));
+        // Only save if it's not a round/course change that was already handled
         setSparkData("golf-brain", data);
         onStateChange?.({
           courseCount: data.courses?.length || 0,
@@ -7644,13 +7640,25 @@ export const GolfBrainSpark: React.FC<
     const handleUpdateSettings = (
       settings: Partial<GolfBrainData["settings"]>
     ) => {
-      console.log("GolfBrain: handleUpdateSettings called with:", JSON.stringify(settings));
       setData((prev) => {
+        // Calculate next state using functional update to avoid stale closures
+        const updatedSettings = { ...prev.settings, ...settings };
+
+        // Deep merge recording settings if they are part of the update
+        if (settings.swingRecording) {
+          updatedSettings.swingRecording = {
+            ...(prev.settings.swingRecording || {}),
+            ...settings.swingRecording
+          };
+        }
+
         const next = {
           ...prev,
-          settings: { ...prev.settings, ...settings }
+          settings: updatedSettings
         };
-        console.log("GolfBrain: setData callback. Resulting settings:", JSON.stringify(next.settings));
+
+        // CRITICAL: Save to store immediately to prevent race condition on unmount
+        setSparkData("golf-brain", next);
         return next;
       });
       HapticFeedback.light();
@@ -7663,7 +7671,8 @@ export const GolfBrainSpark: React.FC<
       },
     });
 
-    if (showSettings || internalShowSettings) {
+    if (dataLoaded && (showSettings || internalShowSettings)) {
+      // No read log here as we want the main page read value
       return (
         <GolfBrainSettings
           onClose={() => {
@@ -7700,6 +7709,8 @@ export const GolfBrainSpark: React.FC<
         />
       );
     }
+
+    console.log("read data.settings.countdown value:", data.settings?.swingRecording?.countdownSeconds);
 
     return (
       <View style={styles.container}>
