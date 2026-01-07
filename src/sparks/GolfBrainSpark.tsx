@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Video, ResizeMode, AVPlaybackStatus, VideoFullscreenUpdate } from "expo-av";
 
-import { PanGestureHandler, State } from "react-native-gesture-handler";
+import { PanGestureHandler, State, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSparkStore } from "../store";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
@@ -4094,12 +4094,9 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
-  }, [currentHole, expectedShots, expectedPutts, hole, currentShotIndex]);
+  }, [currentHole, expectedShots, expectedPutts, hole]);
 
-  // Scroll to top when switching shots
-  useEffect(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-  }, [currentShotIndex]);
+
 
   const addShot = () => {
     // Smart club selection based on user's default clubs
@@ -4186,6 +4183,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
   const goToPreviousShot = () => {
     if (currentShotIndex > 0) {
       setCurrentShotIndex(currentShotIndex - 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       HapticFeedback.light();
     }
   };
@@ -4194,6 +4192,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     const allShots = getAllShots();
     if (currentShotIndex < allShots.length - 1) {
       setCurrentShotIndex(currentShotIndex + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       HapticFeedback.light();
     }
   };
@@ -4968,9 +4967,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       minWidth: 60,
     },
     navButtonText: {
-      color: colors.text,
+      color: '#FF0000', // Changed for debugging
       fontWeight: "600",
-      fontSize: 12,
     },
     arrowButton: {
       backgroundColor: colors.primary, // Blue for navigation
@@ -5431,7 +5429,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
                 const allShots = getAllShots();
                 const canGoNext = currentShotIndex < allShots.length - 1;
                 if (canGoNext) {
-                  return { color: colors.text, fontSize: 12 };
+                  return { color: colors.text };
                 } else {
                   return currentHole < 18
                     ? { color: colors.background }
@@ -5576,43 +5574,44 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       </Modal>
 
       {/* Single Shot Display */}
-      <PanGestureHandler
-        onHandlerStateChange={({ nativeEvent }) => {
-          if (nativeEvent.state === State.END) {
-            const { translationX, velocityX } = nativeEvent;
-            const swipeThreshold = 50;
-            const velocityThreshold = 500;
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <PanGestureHandler
+          onHandlerStateChange={({ nativeEvent }) => {
+            if (nativeEvent.state === State.END) {
+              const { translationX, velocityX } = nativeEvent;
+              const swipeThreshold = 50;
+              const velocityThreshold = 500;
 
-            // Swipe right to left (Next) - negative translationX or high velocity to the left
-            if (
-              translationX < -swipeThreshold ||
-              velocityX < -velocityThreshold
-            ) {
-              if (canGoNext) {
-                HapticFeedback.light();
-                goToNextShot();
+              // Swipe right to left (Next) - negative translationX or high velocity to the left
+              if (
+                translationX < -swipeThreshold ||
+                velocityX < -velocityThreshold
+              ) {
+                if (canGoNext) {
+                  HapticFeedback.light();
+                  goToNextShot();
+                }
+              }
+              // Swipe left to right (Previous) - positive translationX or high velocity to the right
+              else if (
+                translationX > swipeThreshold ||
+                velocityX > velocityThreshold
+              ) {
+                if (canGoPrevious) {
+                  HapticFeedback.light();
+                  goToPreviousShot();
+                }
               }
             }
-            // Swipe left to right (Previous) - positive translationX or high velocity to the right
-            else if (
-              translationX > swipeThreshold ||
-              velocityX > velocityThreshold
-            ) {
-              if (canGoPrevious) {
-                HapticFeedback.light();
-                goToPreviousShot();
-              }
-            }
-          }
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <ScrollView
-            style={[styles.content, { flex: 1 }]}
-            contentContainerStyle={{ paddingBottom: 100 }}
-            showsVerticalScrollIndicator={true}
-            nestedScrollEnabled={true}
-          >
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              style={[styles.content, { flex: 1 }]}
+              contentContainerStyle={{ paddingBottom: 100 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
             {(() => {
               const shotInfo = getCurrentShotInfo();
               if (!shotInfo) {
@@ -5713,6 +5712,90 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
 
               return (
                 <View style={{ marginBottom: 16 }}>
+                  {/* Shot Grid Navigation - Moved to top */}
+                  <View style={styles.shotGridContainer}>
+                    {/* Shots Row */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.shotRow}
+                      contentContainerStyle={styles.shotRowContent}
+                    >
+                      {(shots || []).map((shot, index) => {
+                        const isPenalty = shot.direction === "penalty";
+                        return (
+                          <TouchableOpacity
+                            key={shot.id}
+                            style={[
+                              styles.shotButton,
+                              currentShotIndex === index && styles.activeShotButton,
+                              isPenalty && styles.penaltyButton,
+                            ]}
+                            onPress={() => setCurrentShotIndex(index)}
+                          >
+                            <Text
+                              style={[
+                                styles.shotButtonText,
+                                currentShotIndex === index &&
+                                styles.activeShotButtonText,
+                                isPenalty && styles.penaltyButtonText,
+                              ]}
+                            >
+                              {`s${index + 1}`}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Add Shot Button */}
+                      <TouchableOpacity
+                        style={styles.addShotGridButton}
+                        onPress={addShot}
+                      >
+                        <Text style={styles.addShotGridButtonText}>+shot</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+
+                    {/* Putts Row */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.shotRow}
+                      contentContainerStyle={styles.shotRowContent}
+                    >
+                      {(putts || []).map((putt, index) => (
+                        <TouchableOpacity
+                          key={putt.id}
+                          style={[
+                            styles.shotButton,
+                            currentShotIndex === (shots || []).length + index &&
+                            styles.activeShotButton,
+                          ]}
+                          onPress={() =>
+                            setCurrentShotIndex((shots || []).length + index)
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.shotButtonText,
+                              currentShotIndex === (shots || []).length + index &&
+                              styles.activeShotButtonText,
+                            ]}
+                          >
+                            p{index + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+
+                      {/* Add Putt Button */}
+                      <TouchableOpacity
+                        style={styles.addShotGridButton}
+                        onPress={addPutt}
+                      >
+                        <Text style={styles.addShotGridButtonText}>+putt</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+                  </View>
                   {/* Shot Card Section - Moved to top per user request */}
                   <View
                     style={[
@@ -5731,7 +5814,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
 
                     {/* Record Swing Component */}
                     <View style={{ marginBottom: 12, marginTop: 4 }}>
-                      {shotInfo.isShot && shotInfo.shot.videoUri ? (
+                      {shotInfo.shot.videoUri ? (
                         <View style={styles.videoContainer}>
                           <Video
                             ref={shotVideoRef}
@@ -6011,91 +6094,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
                         )}
                       </View>
                     </View>
-                  </View>
-
-                  {/* Shot Grid Navigation - Moved to top */}
-                  <View style={styles.shotGridContainer}>
-                    {/* Shots Row */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.shotRow}
-                      contentContainerStyle={styles.shotRowContent}
-                    >
-                      {(shots || []).map((shot, index) => {
-                        const isPenalty = shot.direction === "penalty";
-                        return (
-                          <TouchableOpacity
-                            key={shot.id}
-                            style={[
-                              styles.shotButton,
-                              currentShotIndex === index && styles.activeShotButton,
-                              isPenalty && styles.penaltyButton,
-                            ]}
-                            onPress={() => setCurrentShotIndex(index)}
-                          >
-                            <Text
-                              style={[
-                                styles.shotButtonText,
-                                currentShotIndex === index &&
-                                styles.activeShotButtonText,
-                                isPenalty && styles.penaltyButtonText,
-                              ]}
-                            >
-                              {`s${index + 1}`}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Add Shot Button */}
-                      <TouchableOpacity
-                        style={styles.addShotGridButton}
-                        onPress={addShot}
-                      >
-                        <Text style={styles.addShotGridButtonText}>+shot</Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-
-                    {/* Putts Row */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.shotRow}
-                      contentContainerStyle={styles.shotRowContent}
-                    >
-                      {(putts || []).map((putt, index) => (
-                        <TouchableOpacity
-                          key={putt.id}
-                          style={[
-                            styles.shotButton,
-                            currentShotIndex === (shots || []).length + index &&
-                            styles.activeShotButton,
-                          ]}
-                          onPress={() =>
-                            setCurrentShotIndex((shots || []).length + index)
-                          }
-                        >
-                          <Text
-                            style={[
-                              styles.shotButtonText,
-                              currentShotIndex === (shots || []).length + index &&
-                              styles.activeShotButtonText,
-                            ]}
-                          >
-                            p{index + 1}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-
-                      {/* Add Putt Button */}
-                      <TouchableOpacity
-                        style={styles.addShotGridButton}
-                        onPress={addPutt}
-                      >
-                        <Text style={styles.addShotGridButtonText}>+putt</Text>
-                      </TouchableOpacity>
-                    </ScrollView>
                   </View>
 
                   {/* Dynamic Navigation Pills - Contextual Next/Prev buttons */}
@@ -6438,7 +6436,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
             })()}
           </ScrollView>
         </View>
-      </PanGestureHandler>
+        </PanGestureHandler>
+      </GestureHandlerRootView>
 
       {/* Shot Navigation Arrows - Moved to bottom */}
     </View>
