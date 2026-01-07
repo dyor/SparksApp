@@ -43,6 +43,47 @@ const formatMinutes = (totalMinutes: number) => {
   return `${hours}:${minutes.toString().padStart(2, "0")}`;
 };
 
+const calculateHandicapIndexFromRounds = (
+  allRounds: any[],
+  summaries: Record<number, any>,
+  allCourses: any[]
+) => {
+  // 1. Get completed rounds with valid summaries
+  const completedRoundsWithDiffs = allRounds
+    .filter((r) => r.end_time && summaries[r.id]?.differential !== undefined)
+    .map((r) => ({
+      ...r,
+      differential: summaries[r.id].differential,
+    }));
+
+  if (completedRoundsWithDiffs.length === 0) return 0;
+
+  // 2. Sort by date descending and take last 20
+  const last20 = completedRoundsWithDiffs
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    .slice(0, 20);
+
+  // 3. Take lowest N based on WHS table
+  const sortedDiffs = last20.map((r) => r.differential).sort((a, b) => a - b);
+  const n = last20.length;
+  let numToTake = 1;
+  if (n >= 20) numToTake = 8;
+  else if (n >= 19) numToTake = 7;
+  else if (n >= 17) numToTake = 6;
+  else if (n >= 15) numToTake = 5;
+  else if (n >= 12) numToTake = 4;
+  else if (n >= 9) numToTake = 3;
+  else if (n >= 6) numToTake = 2;
+  else numToTake = 1;
+
+  const topDiffs = sortedDiffs.slice(0, numToTake);
+  const sum = topDiffs.reduce((a, b) => a + b, 0);
+  return sum / topDiffs.length;
+};
+
 const parseTimeToMinutes = (timeStr: string) => {
   const parts = timeStr.split(":");
   if (parts.length === 2) {
@@ -85,6 +126,7 @@ const HoleRow = React.forwardRef<
     onAutoAdvance?: () => void;
     expectedElapsedTime: number;
     startTime: string | null;
+    courseHandicap: number;
   }
 >(
   (
@@ -97,6 +139,7 @@ const HoleRow = React.forwardRef<
       onAutoAdvance,
       expectedElapsedTime,
       startTime,
+      courseHandicap,
     },
     ref
   ) => {
@@ -137,9 +180,22 @@ const HoleRow = React.forwardRef<
       }
     };
 
+    const strokesReceived = (() => {
+      const hcap = Math.max(0, courseHandicap);
+      const totalHoles = 18;
+      const baseStrokes = Math.floor(hcap / totalHoles);
+      const remainder = hcap % totalHoles;
+      const si = hole.stroke_index || hole.hole_number;
+      const extra = si <= remainder ? 1 : 0;
+      return baseStrokes + extra;
+    })();
+
     const strokesValue = parseInt(localStrokes);
-    const netValue = !isNaN(strokesValue) ? strokesValue - hole.par : 0;
-    const isUnderPar = !isNaN(strokesValue) && netValue < 0;
+    const netStrokes = !isNaN(strokesValue)
+      ? strokesValue - strokesReceived
+      : null;
+    const netValue = netStrokes !== null ? netStrokes - hole.par : 0;
+    const isUnderPar = netStrokes !== null && netValue < 0;
 
     let timeDiff: number | null = null;
     if (score.completed_at && startTime) {
@@ -160,6 +216,14 @@ const HoleRow = React.forwardRef<
       <View style={styles.tableRow}>
         <View style={styles.holeCol}>
           <Text style={styles.holeNumber}># {hole.hole_number}</Text>
+          <Text style={[styles.netText, { fontSize: 8, marginTop: -2 }]}>
+            SI: {hole.stroke_index}
+          </Text>
+          {strokesReceived > 0 && (
+            <Text style={{ color: colors.primary, fontSize: 10 }}>
+              {"•".repeat(strokesReceived)}
+            </Text>
+          )}
         </View>
         <View style={styles.parCol}>
           <Text style={styles.parText}>{hole.par}</Text>
@@ -202,9 +266,11 @@ const HoleRow = React.forwardRef<
         </View>
         <View style={styles.netCol}>
           <Text style={[styles.netText, isUnderPar && { color: "#2E7D32" }]}>
-            {!isNaN(strokesValue)
+            {netStrokes !== null
               ? netValue > 0
                 ? `+${netValue}`
+                : netValue === 0
+                ? "E"
                 : netValue
               : ""}
           </Text>
@@ -556,32 +622,103 @@ const getStyles = (colors: any, isDarkMode: boolean) =>
     },
   });
 
-const ScorecardFooter = ({ totals, styles }: { totals: any; styles: any }) => (
-  <View style={styles.tableFooter}>
-    <View style={styles.holeCol}>
-      <Text style={styles.footerLabel}>Total</Text>
+const ScorecardFooter = ({
+  totals,
+  styles,
+  onComplete,
+  isCompleted,
+  colors,
+}: {
+  totals: any;
+  styles: any;
+  onComplete: () => void;
+  isCompleted: boolean;
+  colors: any;
+}) => (
+  <View style={{ marginBottom: 40 }}>
+    <View style={styles.tableFooter}>
+      <View style={styles.holeCol}>
+        <Text style={styles.footerLabel}>Total</Text>
+      </View>
+      <View style={styles.parCol}>
+        <Text style={styles.footerValue}>{totals.par}</Text>
+      </View>
+      <View style={styles.inputCol}>
+        <Text style={styles.footerValue}>{totals.strokes}</Text>
+      </View>
+      <View style={styles.inputCol}>
+        <Text style={styles.footerValue}>{totals.putts}</Text>
+      </View>
+      <View style={styles.netCol}>
+        <Text
+          style={[styles.footerValue, totals.net < 0 && { color: "#2E7D32" }]}
+        >
+          {totals.strokes > 0
+            ? totals.net > 0
+              ? `+${totals.net}`
+              : totals.net === 0
+              ? "E"
+              : totals.net
+            : ""}
+        </Text>
+      </View>
+      <View style={styles.timeDiffCol} />
     </View>
-    <View style={styles.parCol}>
-      <Text style={styles.footerValue}>{totals.par}</Text>
-    </View>
-    <View style={styles.inputCol}>
-      <Text style={styles.footerValue}>{totals.strokes}</Text>
-    </View>
-    <View style={styles.inputCol}>
-      <Text style={styles.footerValue}>{totals.putts}</Text>
-    </View>
-    <View style={styles.netCol}>
-      <Text
-        style={[styles.footerValue, totals.net < 0 && { color: "#2E7D32" }]}
+
+    <View
+      style={{
+        padding: 16,
+        backgroundColor: "rgba(0,0,0,0.05)",
+        marginTop: 8,
+        borderRadius: 8,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, color: "gray" }}>Adjusted Gross:</Text>
+        <Text style={{ fontSize: 13, fontWeight: "bold" }}>
+          {totals.adjustedGross}
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          marginTop: 4,
+        }}
       >
-        {totals.strokes > 0
-          ? totals.net > 0
-            ? `+${totals.net}`
-            : totals.net
-          : ""}
-      </Text>
+        <Text style={{ fontSize: 13, color: "gray" }}>Differential:</Text>
+        <Text style={{ fontSize: 13, fontWeight: "bold" }}>
+          {totals.differential.toFixed(1)}
+        </Text>
+      </View>
     </View>
-    <View style={styles.timeDiffCol} />
+
+    {!isCompleted && (
+      <TouchableOpacity
+        onPress={onComplete}
+        style={{
+          backgroundColor: totals.isAllHolesFilled
+            ? colors.primary
+            : colors.border,
+          padding: 16,
+          borderRadius: 8,
+          marginTop: 20,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: totals.isAllHolesFilled ? "#fff" : colors.textSecondary,
+            fontWeight: "bold",
+            fontSize: 16,
+          }}
+        >
+          {totals.isAllHolesFilled
+            ? "COMPLETE ROUND"
+            : "SCORES REQUIRED FOR ALL HOLES"}
+        </Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
@@ -620,42 +757,112 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   const [startTime, setStartTime] = useState<string | null>(null);
   const [endTime, setEndTime] = useState<string | null>(null);
   const [holePars, setHolePars] = useState<Record<number, number>>({});
+  const [holeSIs, setHoleSIs] = useState<Record<number, number>>({});
+  const [courseRating, setCourseRating] = useState<string>("72.0");
+  const [courseSlope, setCourseSlope] = useState<string>("113");
+  const [handicapIndex, setHandicapIndex] = useState<string>("0.0");
+  const [calculatedIndex, setCalculatedIndex] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [roundSummaries, setRoundSummaries] = useState<
-    Record<number, { strokes: number; putts: number }>
+    Record<number, { strokes: number; putts: number; differential?: number }>
   >({});
+
+  const refreshGlobalData = useCallback(async () => {
+    await initDB();
+    const allRounds = await getRounds();
+    const allCourses = await getCourses();
+    setCourses(allCourses);
+
+    const summaries: Record<
+      number,
+      { strokes: number; putts: number; differential?: number }
+    > = {};
+    for (const r of allRounds) {
+      const scores = await getScores(r.id);
+      const course = allCourses.find((c) => c.id === r.course_id);
+
+      let totalStrokes = 0;
+      let totalPutts = 0;
+      let adjustedGross = 0;
+
+      const numHolesInCourse = course?.holes.length || 18;
+      const isNineHoles = numHolesInCourse === 9;
+      const totalPar = course?.holes.reduce((sum, h) => sum + h.par, 0) || 72;
+      const rating = course?.rating || totalPar;
+      const slope = course?.slope || 113;
+      const hIndexAtTime = r.handicap_index || 0;
+
+      // Course Handicap = (Handicap Index / 2 for 9 holes) * (Slope / 113) + (Rating - Par)
+      const effectiveIndex = isNineHoles ? hIndexAtTime / 2 : hIndexAtTime;
+      const cHandicap = Math.round(
+        effectiveIndex * (slope / 113) + (rating - totalPar)
+      );
+
+      scores.forEach((s) => {
+        if (s.strokes) {
+          totalStrokes += s.strokes;
+          if (course) {
+            const hole = course.holes.find(
+              (h) => h.hole_number === s.hole_number
+            );
+            if (hole) {
+              const si = hole.stroke_index || hole.hole_number;
+              // For 9 hole rounds, SI is usually 1-9. 18-hole formula cHandicap % 18 still works if we use 18.
+              // But for 9 holes, we use cHandicap % 9?
+              // Actually, cHandicap for 9 holes is already halved.
+              const strokesReceived =
+                Math.floor(cHandicap / numHolesInCourse) +
+                (si <= cHandicap % numHolesInCourse ? 1 : 0);
+              const maxHoleScore = hole.par + 2 + strokesReceived;
+              adjustedGross += Math.min(s.strokes, maxHoleScore);
+            }
+          }
+        }
+        if (s.putts) totalPutts += s.putts;
+      });
+
+      let differential = (adjustedGross - rating) * (113 / slope);
+      if (isNineHoles) {
+        // Simple scaling: double the 9-hole differential to get an 18-hole compatible value
+        differential = differential * 2.0;
+      }
+      summaries[r.id] = {
+        strokes: totalStrokes,
+        putts: totalPutts,
+        differential: totalStrokes > 0 ? differential : undefined,
+      };
+    }
+    setRoundSummaries(summaries);
+
+    const newCalculatedIndex = calculateHandicapIndexFromRounds(
+      allRounds,
+      summaries,
+      allCourses
+    );
+    setCalculatedIndex(newCalculatedIndex);
+    // Also update the state for the current scorecard if needed
+    setHandicapIndex(newCalculatedIndex.toFixed(1));
+
+    allRounds.sort((a, b) =>
+      b.createdAt && a.createdAt
+        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        : 0
+    );
+    setRounds(allRounds);
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshGlobalData();
+  }, [refreshGlobalData]);
 
   // Load all rounds for Recent Rounds screen
   useEffect(() => {
-    const fetchRounds = async () => {
+    if (screen === "recent-rounds") {
       setIsLoading(true);
-      await initDB();
-      const allRounds = await getRounds();
-      // Sort by date/time created, descending
-      allRounds.sort((a, b) =>
-        b.createdAt && a.createdAt
-          ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          : 0
-      );
-      setRounds(allRounds);
-
-      const summaries: Record<number, { strokes: number; putts: number }> = {};
-      for (const r of allRounds) {
-        const scores = await getScores(r.id);
-        let totalStrokes = 0;
-        let totalPutts = 0;
-        scores.forEach((s) => {
-          if (s.strokes) totalStrokes += s.strokes;
-          if (s.putts) totalPutts += s.putts;
-        });
-        summaries[r.id] = { strokes: totalStrokes, putts: totalPutts };
-      }
-      setRoundSummaries(summaries);
-
-      setIsLoading(false);
-    };
-    if (screen === "recent-rounds") fetchRounds();
-  }, [screen]);
+      refreshGlobalData().finally(() => setIsLoading(false));
+    }
+  }, [screen, refreshGlobalData]);
 
   // Load round data for Scorecard screen
   useEffect(() => {
@@ -675,6 +882,14 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       setStartTime(currentRound.start_time || null);
       setEndTime(currentRound.end_time || null);
       setExpectedRoundTime(currentRound.expected_round_time || 240);
+      setHandicapIndex(currentRound.handicap_index?.toString() || "0.0");
+
+      const allCourses = await getCourses();
+      const course = allCourses.find((c) => c.id === currentRound.course_id);
+      if (course) {
+        setCourseRating(course.rating?.toString() || "72.0");
+        setCourseSlope(course.slope?.toString() || "113");
+      }
 
       const courseHoles = await getHoles(currentRound.course_id);
       setHoles(courseHoles);
@@ -749,30 +964,44 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   };
 
   const handleDeleteCourse = async (id: number) => {
+    const course = courses.find((c) => c.id === id);
+    const courseName = course?.name || "this course";
+
     if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this course?")) {
+      const userInput = window.prompt(
+        `Are you sure you want to delete "${courseName}"?\nThis will also delete ALL rounds played at this course.\n\nPlease type the course name to confirm:`
+      );
+      if (userInput === courseName) {
         await deleteCourse(id);
-        // Refresh courses
         const allCourses = await getCourses();
         setCourses(allCourses);
+        // Also refresh rounds since they are deleted too
+        refreshGlobalData();
+      } else if (userInput !== null) {
+        alert("Course name did not match. Deletion cancelled.");
       }
     } else {
-      Alert.alert(
+      Alert.prompt(
         "Delete Course",
-        "Are you sure you want to delete this course?",
+        `Are you sure you want to delete "${courseName}"?\nThis will also delete ALL rounds played at this course.\n\nType the course name to confirm:`,
         [
           { text: "Cancel", style: "cancel" },
           {
             text: "Delete",
             style: "destructive",
-            onPress: async () => {
-              await deleteCourse(id);
-              // Refresh courses
-              const allCourses = await getCourses();
-              setCourses(allCourses);
+            onPress: async (text) => {
+              if (text === courseName) {
+                await deleteCourse(id);
+                const allCourses = await getCourses();
+                setCourses(allCourses);
+                refreshGlobalData();
+              } else {
+                Alert.alert("Error", "Course name did not match.");
+              }
             },
           },
-        ]
+        ],
+        "plain-text"
       );
     }
   };
@@ -852,14 +1081,6 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           );
         }
 
-        // If it's the last hole, set the end time
-        if (holeNumber === holes.length && !isNaN(s)) {
-          const updatedRound = { ...round, end_time: now };
-          await updateRound(updatedRound);
-          setRound(updatedRound);
-          setEndTime(now);
-        }
-
         return true;
       } catch (error) {
         console.error("Error saving score:", error);
@@ -870,146 +1091,106 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     [roundId, round, holes, scores, startTime, expectedRoundTime, updateRound]
   );
 
-  const wordToNumber = (word: string): string => {
-    const numberMap: Record<string, string> = {
-      zero: "0",
-      one: "1",
-      two: "2",
-      to: "2",
-      too: "2",
-      three: "3",
-      tree: "3",
-      four: "4",
-      for: "4",
-      fore: "4",
-      five: "5",
-      six: "6",
-      seven: "7",
-      eight: "8",
-      ate: "8",
-      nine: "9",
-      ten: "10",
-      eleven: "11",
-      twelve: "12",
-      thirteen: "13",
-      fourteen: "14",
-      fifteen: "15",
-      sixteen: "16",
-      seventeen: "17",
-      eighteen: "18",
-      nineteen: "19",
-      twenty: "20",
-    };
-    return numberMap[word.toLowerCase()] || word;
-  };
-
   const parseVoiceScore = useCallback(
     async (text: string) => {
       console.log("Voice transcript received:", text);
 
-      // Normalize common mishearings
-      let normalized = text
-        .toLowerCase()
-        .trim()
-        .replace(/\bwhole\b/g, "hole")
-        .replace(/\bhas\b/g, "as")
-        .replace(/\bhass\b/g, "as");
+      // 1. Convert words to digits
+      let normalized = text.toLowerCase();
+      const numberMap: Record<string, string> = {
+        zero: "0",
+        oh: "0",
+        one: "1",
+        won: "1",
+        two: "2",
+        to: "2",
+        too: "2",
+        three: "3",
+        tree: "3",
+        four: "4",
+        for: "4",
+        fore: "4",
+        five: "5",
+        six: "6",
+        seven: "7",
+        eight: "8",
+        ate: "8",
+        nine: "9",
+        ten: "10",
+        eleven: "11",
+        twelve: "12",
+        thirteen: "13",
+        fourteen: "14",
+        fifteen: "15",
+        sixteen: "16",
+        seventeen: "17",
+        eighteen: "18",
+        nineteen: "19",
+        twenty: "20",
+      };
 
-      console.log("Normalized:", normalized);
+      // Replace words with numbers - use word boundaries to avoid partial matches
+      Object.keys(numberMap).forEach((word) => {
+        const reg = new RegExp(`\\b${word}\\b`, "g");
+        normalized = normalized.replace(reg, numberMap[word]);
+      });
 
-      // Try multiple regex patterns for flexibility
-      // Pattern 1: [Hole|Number|Whole] # [enter|as] # and #
-      let regex =
-        /(?:hole|number|whole)\s+(\w+)\s+(?:enter|as)\s+(\w+)\s+and\s+(\w+)/i;
-      let match = normalized.match(regex);
-
-      // Pattern 2: [Hole|Number|Whole] # # and #
-      if (!match) {
-        regex = /(?:hole|number|whole)\s+(\w+)\s+(\w+)\s+and\s+(\w+)/i;
-        match = normalized.match(regex);
-      }
-
-      // Fallback Pattern: "number X enter/is Y and Z" (existing)
-      if (!match) {
-        regex = /number\s+(\w+)\s+(?:enter|is)\s+(\w+)\s+and\s+(\w+)/i;
-        match = normalized.match(regex);
-      }
-
-      if (match) {
-        const holeNum = parseInt(wordToNumber(match[1]));
-        const strokes = wordToNumber(match[2]);
-        const putts = wordToNumber(match[3]);
-
-        console.log(
-          `Parsed: hole=${holeNum}, strokes=${strokes}, putts=${putts}`
-        );
-
-        // Validate that we got valid numbers
-        if (
-          isNaN(holeNum) ||
-          isNaN(parseInt(strokes)) ||
-          isNaN(parseInt(putts))
-        ) {
-          setErrorMsg("Could not parse numbers from voice command.");
-          setTimeout(
-            () =>
-              setErrorMsg((curr) =>
-                curr === "Could not parse numbers from voice command."
-                  ? null
-                  : curr
-              ),
-            5000
-          );
-          return;
-        }
-
-        // Check if hole exists
-        if (holes.some((h) => h.hole_number === holeNum)) {
-          const success = await handleSaveScore(holeNum, strokes, putts);
-          if (success) {
-            setErrorMsg(null);
-          }
-        } else {
-          setErrorMsg(`Hole number ${holeNum} not found.`);
-          setTimeout(
-            () =>
-              setErrorMsg((curr) =>
-                curr === `Hole number ${holeNum} not found.` ? null : curr
-              ),
-            5000
-          );
-        }
-      } else {
-        console.log("No match found for voice command:", text);
-
-        // Check for partial match to give better feedback
-        const partialRegex = /(?:hole|number|whole)\s+(\w+)$/i;
-        const partialMatch = normalized.match(partialRegex);
-
-        if (partialMatch) {
-          const holeNum = wordToNumber(partialMatch[1]);
-          setErrorMsg(
-            `I heard Hole ${holeNum}, but please also say the score. Ex: "Number ${holeNum} 4 and 1"`
-          );
-        } else if (text.trim().length > 0) {
-          setErrorMsg(`Voice command not recognized: "${text}"`);
-        }
-
+      // 2. Extract all numbers
+      const matches = normalized.match(/\d+/g);
+      if (!matches || matches.length === 0) {
+        console.log("No numbers found in voice command:", text);
         if (text.trim().length > 0) {
-          setTimeout(
-            () =>
-              setErrorMsg((curr) =>
-                curr?.includes("not recognized") ||
-                curr?.includes("I heard Hole")
-                  ? null
-                  : curr
-              ),
-            5000
-          );
+          setErrorMsg(`No numbers found in: "${text}"`);
         }
+        return;
+      }
+
+      const numbers = matches.map((m) => parseInt(m));
+      console.log("Parsed numbers:", numbers);
+
+      let holeNum: number;
+      let strokes: string;
+      let putts: string;
+
+      if (numbers.length >= 3) {
+        // If three numbers, assign to hole, score and putts
+        holeNum = numbers[0];
+        strokes = numbers[1].toString();
+        putts = numbers[2].toString();
+      } else if (numbers.length === 2) {
+        // If two numbers, assign to score and putts
+        // Infer hole: find the first hole that doesn't have a strokes value
+        holeNum =
+          holes.find((h) => !scores[h.hole_number]?.strokes)?.hole_number || 1;
+        strokes = numbers[0].toString();
+        putts = numbers[1].toString();
+      } else if (numbers.length === 1) {
+        // If one number, assign to score
+        holeNum =
+          holes.find((h) => !scores[h.hole_number]?.strokes)?.hole_number || 1;
+        strokes = numbers[0].toString();
+        putts = scores[holeNum]?.putts || "";
+      } else {
+        return;
+      }
+
+      console.log(
+        `Assignment: hole=${holeNum}, strokes=${strokes}, putts=${putts}`
+      );
+
+      // Validate that the hole exists
+      if (!holes.some((h) => h.hole_number === holeNum)) {
+        setErrorMsg(`Hole number ${holeNum} not found.`);
+        setTimeout(() => setErrorMsg(null), 5000);
+        return;
+      }
+
+      const success = await handleSaveScore(holeNum, strokes, putts);
+      if (success) {
+        setErrorMsg(null);
       }
     },
-    [holes, handleSaveScore]
+    [holes, scores, handleSaveScore]
   );
 
   // Speech Recognition Event Handling
@@ -1062,18 +1243,45 @@ const ScorecardSpark: React.FC<SparkProps> = ({
 
   const calculateTotals = () => {
     let totalStrokes = 0;
+    let adjustedGross = 0;
     let totalPutts = 0;
     let scoredPar = 0;
+    let netScoreRelativeToPar = 0;
+
+    const numHolesInCourse = holes.length || 18;
+    const isNineHoles = numHolesInCourse === 9;
     const totalCoursePar = holes.reduce((sum, h) => sum + h.par, 0);
+    const hIndex = parseFloat(handicapIndex) || 0;
+    const ratingValue = parseFloat(courseRating) || totalCoursePar;
+    const slopeValue = parseFloat(courseSlope) || 113;
+
+    // Course Handicap = (Handicap Index / 2 for 9 holes) * (Slope / 113) + (Rating - Par)
+    const effectiveIndex = isNineHoles ? hIndex / 2 : hIndex;
+    const cHandicap = Math.round(
+      effectiveIndex * (slopeValue / 113) + (ratingValue - totalCoursePar)
+    );
+    const hcap = Math.max(0, cHandicap);
 
     holes.forEach((hole) => {
       const score = scores[hole.hole_number];
+      const si = hole.stroke_index || hole.hole_number;
+      const strokesReceived =
+        Math.floor(hcap / numHolesInCourse) +
+        (si <= hcap % numHolesInCourse ? 1 : 0);
+
       if (score) {
         const s = parseInt(score.strokes);
         const p = parseInt(score.putts);
         if (!isNaN(s)) {
           totalStrokes += s;
           scoredPar += hole.par;
+
+          // Adjusted Gross: Cap at Net Double Bogey (Par + 2 + Strokes Received)
+          const maxHoleScore = hole.par + 2 + strokesReceived;
+          adjustedGross += Math.min(s, maxHoleScore);
+
+          const netStrokes = s - strokesReceived;
+          netScoreRelativeToPar += netStrokes - hole.par;
         }
         if (!isNaN(p)) {
           totalPutts += p;
@@ -1081,12 +1289,68 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       }
     });
 
+    let differential = (adjustedGross - ratingValue) * (113 / slopeValue);
+    if (isNineHoles) {
+      differential = differential * 2.0;
+    }
+
     return {
       strokes: totalStrokes,
+      adjustedGross,
       putts: totalPutts,
       par: totalCoursePar,
-      net: totalStrokes > 0 ? totalStrokes - scoredPar : 0,
+      net: netScoreRelativeToPar,
+      differential: totalStrokes > 0 ? differential : 0,
+      isAllHolesFilled:
+        holes.length > 0 &&
+        holes.every((h) => {
+          const s = scores[h.hole_number]?.strokes;
+          return s !== "" && s !== undefined && !isNaN(parseInt(s));
+        }),
     };
+  };
+
+  const handleCompleteRound = async () => {
+    if (!roundId || !round) return;
+
+    const totals = calculateTotals();
+
+    if (!totals.isAllHolesFilled) {
+      const missingHoles = holes
+        .filter((h) => {
+          const s = scores[h.hole_number]?.strokes;
+          return s === "" || s === undefined || isNaN(parseInt(s));
+        })
+        .map((h) => h.hole_number);
+
+      const errorMsg = `Cannot finish round. The following holes are missing scores: ${missingHoles.join(
+        ", "
+      )}`;
+
+      if (Platform.OS === "web") {
+        alert(errorMsg);
+      } else {
+        Alert.alert("Incomplete Round", errorMsg);
+      }
+      return;
+    }
+
+    const complete = async () => {
+      const now = new Date().toISOString();
+      const updatedRound = { ...round, end_time: now };
+      await updateRound(updatedRound);
+      setRound(updatedRound);
+      setEndTime(now);
+      Alert.alert("Success", "Round completed!");
+
+      // Refresh rounds in background so history is updated
+      if (typeof refreshGlobalData === "function") {
+        await refreshGlobalData();
+      }
+      setScreen("recent-rounds");
+    };
+
+    await complete();
   };
 
   // --- Screen 1: Recent Rounds ---
@@ -1094,7 +1358,7 @@ const ScorecardSpark: React.FC<SparkProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={[styles.header, { justifyContent: "center" }]}>
-          <Text style={styles.headerTitle}>Golf Scorecard</Text>
+          <Text style={styles.headerTitle}>Score Cards</Text>
         </View>
         {isLoading ? (
           <View
@@ -1108,129 +1372,147 @@ const ScorecardSpark: React.FC<SparkProps> = ({
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
             ListHeaderComponent={
-              <>
+              <View style={{ paddingHorizontal: 16 }}>
+                <View
+                  style={{
+                    backgroundColor: colors.card,
+                    padding: 16,
+                    borderRadius: 12,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    CALCULATED INDEX
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 32,
+                      fontWeight: "bold",
+                      color: colors.primary,
+                      marginTop: 4,
+                    }}
+                  >
+                    {calculatedIndex.toFixed(1)}
+                  </Text>
+                </View>
+
                 <TouchableOpacity
-                  style={styles.newRoundButton}
+                  style={[styles.newRoundButton, { marginHorizontal: 0 }]}
                   onPress={() => setScreen("courses")}
                 >
                   <Text style={styles.newRoundButtonText}>NEW ROUND</Text>
                 </TouchableOpacity>
                 <Text style={styles.sectionTitle}>Recent Rounds</Text>
-              </>
+              </View>
             }
-            renderItem={({ item }) => (
-              <View
-                style={{
-                  backgroundColor: colors.card,
-                  borderRadius: 12,
-                  marginBottom: 12,
-                  marginHorizontal: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingRight: 12,
-                }}
-              >
-                <TouchableOpacity
+            renderItem={({ item }) => {
+              const summary = roundSummaries[item.id];
+              const isCompleted = !!item.end_time;
+
+              return (
+                <View
                   style={{
-                    flex: 1,
-                    padding: 16,
-                  }}
-                  onPress={() => {
-                    setRoundId(item.id);
-                    setScreen("scorecard");
+                    backgroundColor: colors.card,
+                    borderRadius: 12,
+                    marginBottom: 12,
+                    marginHorizontal: 16,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingRight: 12,
                   }}
                 >
-                  <View>
-                    <Text
-                      style={{
-                        fontWeight: "bold",
-                        color: colors.text,
-                        fontSize: 16,
-                      }}
-                    >
-                      {item.course_name}
-                    </Text>
-                    <Text
-                      style={{
-                        color: colors.textSecondary,
-                        fontSize: 13,
-                        marginTop: 4,
-                      }}
-                    >
-                      {item.createdAt
-                        ? new Date(item.createdAt).toLocaleString([], {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : ""}
-                      {item.start_time &&
-                        ` • ${new Date(item.start_time).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false,
-                        })}`}
-                      {item.end_time &&
-                        ` - ${new Date(item.end_time).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false,
-                        })}`}
-                    </Text>
-                    {roundSummaries[item.id] && (
-                      <Text
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      padding: 16,
+                    }}
+                    onPress={() => {
+                      setRoundId(item.id);
+                      setScreen("scorecard");
+                    }}
+                  >
+                    <View>
+                      <View
                         style={{
-                          color: colors.text,
-                          fontSize: 14,
-                          marginTop: 6,
-                          fontWeight: "600",
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
-                        Score: {roundSummaries[item.id].strokes} • Putts:{" "}
-                        {roundSummaries[item.id].putts}
-                        {item.start_time && item.end_time && (
-                          <>
-                            {" • Pace: "}
-                            {(() => {
-                              const diffMs =
-                                new Date(item.end_time).getTime() -
-                                new Date(item.start_time).getTime();
-                              const diffMins = Math.floor(diffMs / 60000);
-                              const h = Math.floor(diffMins / 60);
-                              const m = diffMins % 60;
-                              return `${h}:${m.toString().padStart(2, "0")}`;
-                            })()}
-                          </>
+                        <Text
+                          style={{
+                            fontWeight: "bold",
+                            color: colors.text,
+                            fontSize: 16,
+                            flex: 1,
+                          }}
+                        >
+                          {item.course_name}
+                        </Text>
+                        {!isCompleted && (
+                          <View
+                            style={{
+                              backgroundColor: colors.border,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 4,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: colors.textSecondary,
+                                fontWeight: "bold",
+                              }}
+                            >
+                              INCOMPLETE
+                            </Text>
+                          </View>
                         )}
+                      </View>
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: 13,
+                          marginTop: 4,
+                        }}
+                      >
+                        {item.createdAt
+                          ? new Date(item.createdAt).toLocaleString([], {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : ""}
+                        {isCompleted &&
+                          summary &&
+                          ` • ${
+                            summary.strokes
+                          } strokes • ${summary.differential?.toFixed(1)} diff`}
                       </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => handleDeleteRound(item.id)}
-                  style={{ padding: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#FF5252" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    setRoundId(item.id);
-                    setScreen("scorecard");
-                  }}
-                  style={{ padding: 8 }}
-                >
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            )}
+                  <TouchableOpacity
+                    onPress={() => handleDeleteRound(item.id)}
+                    style={{ padding: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#FF5252" />
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
             ListEmptyComponent={
               <Text
                 style={{
@@ -1250,6 +1532,19 @@ const ScorecardSpark: React.FC<SparkProps> = ({
 
   // --- Screen 2: Scorecard ---
   if (screen === "scorecard") {
+    const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
+    const hIndex = parseFloat(handicapIndex) || 0;
+    const rating = parseFloat(courseRating) || totalPar;
+    const slope = parseFloat(courseSlope) || 113;
+
+    const isNineHoles = holes.length === 9;
+    const effectiveIndexForHcap = isNineHoles ? hIndex / 2 : hIndex;
+
+    // Course Handicap = Handicap Index * (Slope Rating / 113) + (Course Rating - Par)
+    const courseHandicap = Math.round(
+      effectiveIndexForHcap * (slope / 113) + (rating - totalPar)
+    );
+
     const totals = calculateTotals();
     return (
       <SafeAreaView style={styles.container}>
@@ -1275,10 +1570,36 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                   marginTop: 2,
                 }}
               >
-                Ex: Number 6 4 and 1
+                Hcap: {courseHandicap} (Index: {hIndex.toFixed(1)})
               </Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {!round?.end_time && (
+                <TouchableOpacity
+                  onPress={handleCompleteRound}
+                  style={{
+                    backgroundColor: totals.isAllHolesFilled
+                      ? colors.primary
+                      : colors.border,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    marginRight: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: totals.isAllHolesFilled
+                        ? "#fff"
+                        : colors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    FINISH
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={() => setShowHelp(true)}
                 style={{ marginRight: 12 }}
@@ -1313,6 +1634,56 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                 />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Handicap Info Bar */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingVertical: 6,
+              backgroundColor: colors.card,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{ color: colors.text, fontSize: 13, fontWeight: "600" }}
+            >
+              Handicap Index:
+            </Text>
+            <TextInput
+              style={{
+                marginLeft: 8,
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 4,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                color: colors.text,
+                width: 60,
+                textAlign: "center",
+                fontSize: 13,
+              }}
+              value={handicapIndex}
+              onChangeText={(val) => {
+                setHandicapIndex(val);
+                if (roundId && round) {
+                  const idx = parseFloat(val);
+                  if (!isNaN(idx)) {
+                    updateRound({ ...round, handicap_index: idx });
+                  }
+                }
+              }}
+              keyboardType="numeric"
+              placeholder="0.0"
+            />
+            <View style={{ flex: 1 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+              Course Hcap: {courseHandicap}
+            </Text>
           </View>
 
           {/* Time Info Bar */}
@@ -1392,13 +1763,27 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Golf Scorecard Help</Text>
+                <Text style={styles.modalTitle}>Score Cards Help</Text>
                 <ScrollView style={{ maxHeight: 400 }}>
                   <Text style={styles.helpSectionTitle}>App Functions</Text>
                   <Text style={styles.helpText}>
                     • Track scores and putts for each hole.{"\n"}• Manage
                     multiple golf courses.{"\n"}• View history of completed
                     rounds.{"\n"}• Voice input for hands-free scoring.
+                  </Text>
+
+                  <Text style={styles.helpSectionTitle}>
+                    Handicap & Net Score
+                  </Text>
+                  <Text style={styles.helpText}>
+                    • **Course Handicap**: Calculated using your Index, Slope,
+                    and Rating.{"\n"}• **The Dots**: Represent strokes received
+                    based on the hole's Stroke Index (SI).{"\n"}• **Net Score**:
+                    Calculated as Gross Strokes - (Par + Strokes Received). "E"
+                    means Even net.{"\n"}• **Adjusted Gross**: Your score capped
+                    per-hole at Net Double Bogey for handicap tracking.{"\n"}•
+                    **Differential**: The resulting handicap performance for
+                    this round.
                   </Text>
 
                   <Text style={styles.helpSectionTitle}>Time Algorithm</Text>
@@ -1412,10 +1797,13 @@ const ScorecardSpark: React.FC<SparkProps> = ({
 
                   <Text style={styles.helpSectionTitle}>Voice Commands</Text>
                   <Text style={styles.helpText}>
-                    Use the microphone button and say:{"\n"}
-                    1. "Hole [number] enter [score] and [putts]"{"\n"}
-                    2. "Hole [number] [score] and [putts]"{"\n"}
-                    (You can also use "Number" instead of "Hole")
+                    Simply say the numbers, any words will be ignored:{"\n"}
+                    1. "[Score]" - Sets score for current hole.{"\n"}
+                    2. "[Score] [Putts]" - Sets score & putts for current hole.
+                    {"\n"}
+                    3. "[Hole] [Score] [Putts]" - Sets hole, score & putts.
+                    {"\n"}
+                    Example: "Four one" sets score 4, putts 1 for current hole.
                   </Text>
                 </ScrollView>
                 <TouchableOpacity
@@ -1515,13 +1903,20 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                       expectedRoundTime
                     )}
                     startTime={startTime}
+                    courseHandicap={courseHandicap}
                   />
                 )}
                 keyExtractor={(item) => item.hole_number.toString()}
                 contentContainerStyle={styles.listContent}
                 initialNumToRender={18}
                 ListFooterComponent={
-                  <ScorecardFooter totals={totals} styles={styles} />
+                  <ScorecardFooter
+                    totals={totals}
+                    styles={styles}
+                    onComplete={handleCompleteRound}
+                    isCompleted={!!round?.end_time}
+                    colors={colors}
+                  />
                 }
               />
             </>
@@ -1538,23 +1933,35 @@ const ScorecardSpark: React.FC<SparkProps> = ({
       setCourseName("");
       setNumHoles(18);
       setExpectedRoundTime(240);
+      setCourseRating("72.0");
+      setCourseSlope("113");
       const initialPars: Record<number, number> = {};
-      for (let i = 1; i <= 18; i++) initialPars[i] = 4;
+      const initialSIs: Record<number, number> = {};
+      for (let i = 1; i <= 18; i++) {
+        initialPars[i] = 4;
+        initialSIs[i] = i;
+      }
       setHolePars(initialPars);
+      setHoleSIs(initialSIs);
     };
 
     const handleEditCourse = (course: any) => {
       setEditingCourse(course);
       setCourseName(course.name);
       setNumHoles(course.holes.length);
+      setCourseRating(course.rating?.toString() || "72.0");
+      setCourseSlope(course.slope?.toString() || "113");
       setExpectedRoundTime(
         course.expected_round_time || (course.holes.length === 9 ? 120 : 240)
       );
       const initialPars: Record<number, number> = {};
+      const initialSIs: Record<number, number> = {};
       course.holes.forEach((h: any) => {
         initialPars[h.hole_number] = h.par;
+        initialSIs[h.hole_number] = h.stroke_index || h.hole_number;
       });
       setHolePars(initialPars);
+      setHoleSIs(initialSIs);
     };
 
     const handleSaveCourse = async () => {
@@ -1563,9 +1970,16 @@ const ScorecardSpark: React.FC<SparkProps> = ({
         return;
       }
 
+      const rating = parseFloat(courseRating) || 72.0;
+      const slope = parseInt(courseSlope) || 113;
+
       const holesData = [];
       for (let i = 1; i <= numHoles; i++) {
-        holesData.push({ hole_number: i, par: holePars[i] || 4 });
+        holesData.push({
+          hole_number: i,
+          par: holePars[i] || 4,
+          stroke_index: holeSIs[i] || i,
+        });
       }
 
       let savedCourse;
@@ -1574,24 +1988,33 @@ const ScorecardSpark: React.FC<SparkProps> = ({
           editingCourse.id,
           courseName,
           holesData,
+          rating,
+          slope,
           expectedRoundTime
         );
         savedCourse = {
           id: editingCourse.id,
           name: courseName,
           holes: holesData,
+          rating,
+          slope,
           expected_round_time: expectedRoundTime,
         };
       } else {
         savedCourse = await createCourse(
           courseName,
           holesData,
+          rating,
+          slope,
           expectedRoundTime
         );
       }
 
       // After saving, start a new round with this course
-      const newRound = await createRoundForCourse(savedCourse.id);
+      const newRound = await createRoundForCourse(
+        savedCourse.id,
+        calculatedIndex
+      );
       setRoundId(newRound.id);
       setEditingCourse(null);
       setScreen("scorecard");
@@ -1686,19 +2109,66 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                   keyboardType="numbers-and-punctuation"
                 />
 
-                <Text style={styles.sectionTitle}>Hole Pars</Text>
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Course Rating</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={courseRating}
+                      onChangeText={setCourseRating}
+                      placeholder="72.0"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Slope Rating</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={courseSlope}
+                      onChangeText={setCourseSlope}
+                      placeholder="113"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.sectionTitle}>Hole Setup</Text>
+                <View
+                  style={[
+                    styles.holeConfigRow,
+                    { borderBottomWidth: 0, paddingBottom: 0 },
+                  ]}
+                >
+                  <Text style={[styles.parText, { flex: 1 }]}>Hole</Text>
+                  <Text
+                    style={[
+                      styles.parText,
+                      { width: 120, textAlign: "center" },
+                    ]}
+                  >
+                    Par
+                  </Text>
+                  <Text
+                    style={[styles.parText, { width: 60, textAlign: "center" }]}
+                  >
+                    SI
+                  </Text>
+                </View>
               </>
             }
             renderItem={({ item: holeNum }) => (
               <View style={styles.holeConfigRow}>
-                <Text style={styles.parText}>Hole {holeNum}</Text>
-                <View style={styles.parSelector}>
+                <Text style={[styles.parText, { flex: 1 }]}># {holeNum}</Text>
+                <View style={[styles.parSelector, { width: 120 }]}>
                   {[3, 4, 5].map((p) => (
                     <TouchableOpacity
                       key={p}
                       style={[
                         styles.parButton,
                         holePars[holeNum] === p && styles.parButtonActive,
+                        { marginHorizontal: 2, width: 32, height: 32 },
                       ]}
                       onPress={() =>
                         setHolePars((prev) => ({ ...prev, [holeNum]: p }))
@@ -1715,6 +2185,27 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                     </TouchableOpacity>
                   ))}
                 </View>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    {
+                      width: 50,
+                      marginBottom: 0,
+                      textAlign: "center",
+                      padding: 4,
+                    },
+                  ]}
+                  value={holeSIs[holeNum]?.toString() || ""}
+                  onChangeText={(val) => {
+                    const si = parseInt(val);
+                    if (!isNaN(si)) {
+                      setHoleSIs((prev) => ({ ...prev, [holeNum]: si }));
+                    } else if (val === "") {
+                      setHoleSIs((prev) => ({ ...prev, [holeNum]: 0 }));
+                    }
+                  }}
+                  keyboardType="numeric"
+                />
               </View>
             )}
             ListFooterComponent={
@@ -1774,7 +2265,10 @@ const ScorecardSpark: React.FC<SparkProps> = ({
                       marginLeft: 12,
                     }}
                     onPress={async () => {
-                      const newRound = await createRoundForCourse(item.id);
+                      const newRound = await createRoundForCourse(
+                        item.id,
+                        calculatedIndex
+                      );
                       setRoundId(newRound.id);
                       setScreen("scorecard");
                     }}

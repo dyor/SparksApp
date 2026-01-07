@@ -4,6 +4,7 @@ export interface Hole {
   hole_number: number;
   par: number;
   course_id: number;
+  stroke_index: number;
 }
 
 export interface Round {
@@ -14,6 +15,7 @@ export interface Round {
   expected_round_time?: number; // in minutes
   start_time?: string; // ISO string
   end_time?: string; // ISO string
+  handicap_index?: number; // player's handicap index at the time of round
 }
 
 export interface ScoreRecord {
@@ -27,8 +29,10 @@ export interface ScoreRecord {
 export interface Course {
   id: number;
   name: string;
-  holes: Array<{ hole_number: number; par: number }>;
+  holes: Array<{ hole_number: number; par: number; stroke_index: number }>;
   expected_round_time?: number; // in minutes
+  rating: number;
+  slope: number;
 }
 
 const ROUNDS_KEY = "@sparks_rounds_v1";
@@ -45,12 +49,18 @@ export async function initDB() {
   // ensure courses key exists with a default sample course
   const existingCourses = await AsyncStorage.getItem(COURSES_KEY);
   if (!existingCourses) {
+    const pars = [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 5, 4, 3, 4, 4, 5, 4, 3];
+    const sis = [7, 13, 17, 11, 1, 5, 15, 3, 9, 8, 2, 12, 18, 6, 10, 4, 14, 16];
     const defaultCourse = {
       id: 1,
       name: "Local Course",
-      holes: [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 5, 4, 3, 4, 4, 5, 4, 3].map(
-        (par, idx) => ({ hole_number: idx + 1, par })
-      ),
+      rating: 72.0,
+      slope: 113,
+      holes: pars.map((par, idx) => ({
+        hole_number: idx + 1,
+        par,
+        stroke_index: sis[idx],
+      })),
     };
     await AsyncStorage.setItem(COURSES_KEY, JSON.stringify([defaultCourse]));
   }
@@ -71,16 +81,13 @@ export async function getHoles(courseId: number): Promise<Hole[]> {
   try {
     const raw = await AsyncStorage.getItem(COURSES_KEY);
     if (raw) {
-      const courses = JSON.parse(raw) as Array<{
-        id: number;
-        name: string;
-        holes: Array<{ hole_number: number; par: number }>;
-      }>;
+      const courses = JSON.parse(raw) as Course[];
       const course = courses.find((c) => c.id === courseId);
       if (course) {
         return course.holes.map((h) => ({
           hole_number: h.hole_number,
           par: h.par,
+          stroke_index: h.stroke_index,
           course_id: courseId,
         }));
       }
@@ -91,9 +98,11 @@ export async function getHoles(courseId: number): Promise<Hole[]> {
 
   // Fallback to default 18-hole layout
   const pars = [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 5, 4, 3, 4, 4, 5, 4, 3];
+  const sis = [7, 13, 17, 11, 1, 5, 15, 3, 9, 8, 2, 12, 18, 6, 10, 4, 14, 16];
   return pars.map((par, idx) => ({
     hole_number: idx + 1,
     par,
+    stroke_index: sis[idx],
     course_id: courseId,
   }));
 }
@@ -148,12 +157,21 @@ export async function getCourses(): Promise<Course[]> {
 
 export async function createCourse(
   name: string,
-  holes: Array<{ hole_number: number; par: number }>,
+  holes: Array<{ hole_number: number; par: number; stroke_index: number }>,
+  rating: number,
+  slope: number,
   expected_round_time?: number
 ): Promise<Course> {
   const courses = await getCourses();
   const id = courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1;
-  const course: Course = { id, name, holes, expected_round_time };
+  const course: Course = {
+    id,
+    name,
+    holes,
+    rating,
+    slope,
+    expected_round_time,
+  };
   courses.push(course);
   await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
   return course;
@@ -162,13 +180,22 @@ export async function createCourse(
 export async function updateCourse(
   courseId: number,
   name: string,
-  holes: Array<{ hole_number: number; par: number }>,
+  holes: Array<{ hole_number: number; par: number; stroke_index: number }>,
+  rating: number,
+  slope: number,
   expected_round_time?: number
 ): Promise<void> {
   const courses = await getCourses();
   const idx = courses.findIndex((c) => c.id === courseId);
   if (idx !== -1) {
-    courses[idx] = { id: courseId, name, holes, expected_round_time };
+    courses[idx] = {
+      id: courseId,
+      name,
+      holes,
+      rating,
+      slope,
+      expected_round_time,
+    };
     await AsyncStorage.setItem(COURSES_KEY, JSON.stringify(courses));
   }
 }
@@ -188,19 +215,25 @@ export async function deleteRound(roundId: number): Promise<void> {
 }
 
 // Rounds
-export async function createRoundForCourse(courseId: number): Promise<Round> {
+export async function createRoundForCourse(
+  courseId: number,
+  handicapIndex?: number
+): Promise<Round> {
   const courses = await getCourses();
   const course = courses.find((c) => c.id === courseId);
   if (!course) throw new Error("Course not found");
 
   const rounds = await getRounds();
   const id = rounds.length ? Math.max(...rounds.map((r) => r.id)) + 1 : 1;
+  const now = new Date().toISOString();
   const round: Round = {
     id,
     course_id: courseId,
     course_name: course.name,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    start_time: now,
     expected_round_time: course.expected_round_time,
+    handicap_index: handicapIndex,
   };
   rounds.push(round);
   await AsyncStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
