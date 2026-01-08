@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RouteProp } from "@react-navigation/native";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   MySparkStackParamList,
   MarketplaceStackParamList,
@@ -57,6 +57,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const [openCourseSelectionSignal, setOpenCourseSelectionSignal] = useState(0);
   const [showQuickSwitch, setShowQuickSwitch] = useState(false);
   const [sparkDarkMode, setSparkDarkMode] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Reset dark mode when leaving the spark
   useEffect(() => {
@@ -93,12 +94,12 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       flexDirection: "row",
       paddingHorizontal: 16,
       paddingVertical: 8,
+      paddingBottom: Math.max(insets.bottom, 8),
       backgroundColor: sparkDarkMode ? "#000000" : colors.surface,
       borderTopWidth: 1,
       borderTopColor: sparkDarkMode ? "#333333" : colors.border,
       justifyContent: "space-around",
       alignItems: "center",
-      height: 60,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,
@@ -193,7 +194,9 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   // Detect if we're in the marketplace or my sparks
   const isFromMarketplace =
     navigation.getState()?.routes[0]?.name === "MarketplaceList";
-  const isInUserCollection = isUserSpark(sparkId);
+  const isInUserCollection = useSparkStore((state) =>
+    state.userSparkIds.includes(sparkId)
+  );
 
   useEffect(() => {
     setCurrentSparkId(sparkId);
@@ -319,7 +322,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const SparkComponent = spark.component as React.ComponentType<any>;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <View style={{ flex: 1 }}>
         <SparkErrorBoundary>
           <SparkComponent

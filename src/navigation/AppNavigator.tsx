@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, Easing, View, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   NavigationContainer,
   useNavigation,
@@ -149,6 +150,7 @@ const CustomTabBar: React.FC<
   const [showQuickSwitch, setShowQuickSwitch] = React.useState(false);
   const [adminUnreadCount, setAdminUnreadCount] = React.useState(0);
   const isNavigatingRef = React.useRef(false);
+  const insets = useSafeAreaInsets();
 
   // Check for admin unread counts (feedback, reviews, submissions)
   React.useEffect(() => {
@@ -301,7 +303,7 @@ const CustomTabBar: React.FC<
       borderTopWidth: 1,
       borderTopColor: colors.border,
       paddingVertical: 8,
-      height: 60,
+      paddingBottom: Math.max(insets.bottom, 8),
     },
     tab: {
       flex: 1,

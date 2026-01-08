@@ -12,6 +12,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { SparkProps } from '../types/spark';
+import { GeminiService } from '../services/GeminiService';
 import {
     SettingsContainer,
     SettingsScrollView,
@@ -73,8 +74,6 @@ Cool: Let the cookies cool on the baking sheets for 5 minutes before transferrin
     shoppingChecked: [],
     cookingChecked: [],
 };
-
-import { GeminiService } from '../services/GeminiService';
 
 export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
     const { colors } = useTheme();
@@ -992,7 +991,34 @@ Generate the recipe now:`;
         );
     }
 
-    return null;
+    // Safety checks for mode inconsistency
+    if ((mode === 'view' || mode === 'shop' || mode === 'cook') && !selectedRecipe) {
+        setMode('list');
+        return null; // Next render will be list
+    }
+
+    if (mode === 'preview' && !generatedRecipe) {
+        setMode('list');
+        return null;
+    }
+
+    // Final fallback to ensure we don't return null
+    return (
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.title}>🍳 RecAIpe</Text>
+            </View>
+            <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Something went wrong</Text>
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={() => setMode('list')}
+                >
+                    <Text style={styles.buttonText}>Return to List</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 };
 
 export default RecAIpeSpark;
