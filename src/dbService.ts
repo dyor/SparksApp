@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useSparkStore } from "./store/sparkStore";
 
 export interface Hole {
   hole_number: number;
@@ -37,6 +36,8 @@ const SCORES_KEY_PREFIX = "@sparks_scores_v1:"; // + roundId
 const COURSES_KEY = "@sparks_courses_v1"; // stores array of courses
 
 export async function initDB() {
+  // Use a dynamic import or access the store lazily to avoid circular dependencies
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
 
   // If already initialized in Zustand, we're good
@@ -91,11 +92,13 @@ export async function initDB() {
 }
 
 export async function getRounds(): Promise<Round[]> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
   return data.rounds || [];
 }
 
 export async function getHoles(courseId: number): Promise<Hole[]> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
   const courses = (data.courses || []) as Course[];
   const course = courses.find((c) => c.id === courseId);
@@ -118,6 +121,7 @@ export async function getHoles(courseId: number): Promise<Hole[]> {
 }
 
 export async function getScores(roundId: number): Promise<ScoreRecord[]> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
   const scores = data.scores || {};
   return scores[roundId] || [];
@@ -130,6 +134,7 @@ export async function saveScore(
   putts: number | null,
   completed_at?: string
 ): Promise<void> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
   const allScores = { ...(data.scores || {}) };
   const existing = [...(allScores[roundId] || [])];
@@ -156,6 +161,7 @@ export async function saveScore(
 // Courses management
 
 export async function getCourses(): Promise<Course[]> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const data = useSparkStore.getState().getSparkData("scorecard");
   return data.courses || [];
 }
@@ -165,6 +171,7 @@ export async function createCourse(
   holes: Array<{ hole_number: number; par: number }>,
   expected_round_time?: number
 ): Promise<Course> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const courses = [...(await getCourses())];
   const id = courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1;
   const course: Course = { id, name, holes, expected_round_time };
@@ -180,6 +187,7 @@ export async function updateCourse(
   holes: Array<{ hole_number: number; par: number }>,
   expected_round_time?: number
 ): Promise<void> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const courses = [...(await getCourses())];
   const idx = courses.findIndex((c) => c.id === courseId);
   if (idx !== -1) {
@@ -189,11 +197,13 @@ export async function updateCourse(
 }
 
 export async function deleteCourse(courseId: number): Promise<void> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const courses = (await getCourses()).filter((c) => c.id !== courseId);
   useSparkStore.getState().setSparkData("scorecard", { courses });
 }
 
 export async function deleteRound(roundId: number): Promise<void> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const rounds = (await getRounds()).filter((r) => r.id !== roundId);
   const data = useSparkStore.getState().getSparkData("scorecard");
   const allScores = { ...(data.scores || {}) };
@@ -207,6 +217,7 @@ export async function deleteRound(roundId: number): Promise<void> {
 
 // Rounds
 export async function createRoundForCourse(courseId: number): Promise<Round> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const courses = await getCourses();
   const course = courses.find((c) => c.id === courseId);
   if (!course) throw new Error("Course not found");
@@ -227,6 +238,7 @@ export async function createRoundForCourse(courseId: number): Promise<Round> {
 }
 
 export async function updateRound(round: Round): Promise<void> {
+  const { useSparkStore } = await import("./store/sparkStore");
   const rounds = [...(await getRounds())];
   const idx = rounds.findIndex((r) => r.id === round.id);
   if (idx !== -1) {

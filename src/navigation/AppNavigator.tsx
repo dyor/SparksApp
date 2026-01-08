@@ -24,7 +24,7 @@ import { SparkSelectionScreen } from "../screens/SparkSelectionScreen";
 import { MarketplaceScreen } from "../screens/MarketplaceScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SparkScreen } from "../screens/SparkScreen";
-import { useAppStore } from "../store";
+import { useAppStore } from "../store/appStore";
 import { QuickSwitchModal } from "../components/QuickSwitchModal";
 import { getSparkById } from "../components/SparkRegistry";
 import { HapticFeedback } from "../utils/haptics";

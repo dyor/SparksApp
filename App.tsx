@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useSparkStore } from "./src/store";
+import { useSparkStore } from "./src/store/sparkStore";
 import "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -7,7 +7,7 @@ import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { ThemeProvider } from "./src/contexts/ThemeContext";
-import { useAppStore } from "./src/store";
+import { useAppStore } from "./src/store/appStore";
 import { useAuthStore } from "./src/store/authStore";
 import { NotificationService } from "./src/utils/notifications";
 import { FeedbackNotificationService } from "./src/services/FeedbackNotificationService";

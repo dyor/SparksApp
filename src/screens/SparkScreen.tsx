@@ -8,7 +8,8 @@ import {
   MarketplaceStackParamList,
 } from "../types/navigation";
 import { getSparkById } from "../components/SparkRegistry";
-import { useSparkStore, useAppStore } from "../store";
+import { useSparkStore } from "../store/sparkStore";
+import { useAppStore } from "../store/appStore";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
 import { QuickSwitchModal } from "../components/QuickSwitchModal";

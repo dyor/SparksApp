@@ -23,7 +23,7 @@ import { GeminiCommandParser } from "../services/GeminiCommandParser";
 import { CommandExecutor } from "../services/CommandExecutor";
 import { HapticFeedback } from "../utils/haptics";
 import { useNavigation } from "@react-navigation/native";
-import { useSparkStore } from "../store";
+import { useSparkStore } from "../store/sparkStore";
 import { getSparkById } from "../components/sparkRegistryData";
 import {
   SettingsContainer,

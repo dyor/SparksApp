@@ -19,7 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSparkStore } from "../store";
+import { useSparkStore } from "../store/sparkStore";
 import { useTheme } from "../contexts/ThemeContext";
 import {
   createCourse,
@@ -590,12 +590,13 @@ const ScorecardSpark: React.FC<SparkProps> = ({
   showSettings = false,
   onCloseSettings,
 }) => {
-  const { getSparkData, setSparkData } = useSparkStore();
+  const getSparkData = useSparkStore((state) => state.getSparkData);
+  const setSparkData = useSparkStore((state) => state.setSparkData);
   const { colors, isDarkMode, toggleTheme } = useTheme();
   const styles = getStyles(colors, isDarkMode);
 
-  // Load initial state from Zustand
-  const initialData = getSparkData("scorecard");
+  // Load initial state from Zustand (non-reactive)
+  const initialData = React.useMemo(() => getSparkData("scorecard"), []);
 
   // Always start on Recent Rounds screen or previous screen
   const [screen, setScreen] = useState<

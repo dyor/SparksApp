@@ -1,9 +1,7 @@
-
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SparkMetadata } from '../types/spark';
-import { sparkRegistry } from '../components/SparkRegistry';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SparkMetadata } from "../types/spark";
 
 interface SparkProgress {
   sparkId: string;
@@ -17,7 +15,10 @@ interface SparkProgress {
 interface SparkState {
   // Progress tracking
   sparkProgress: Record<string, SparkProgress>;
-  updateSparkProgress: (sparkId: string, progress: Partial<SparkProgress>) => void;
+  updateSparkProgress: (
+    sparkId: string,
+    progress: Partial<SparkProgress>
+  ) => void;
   getSparkProgress: (sparkId: string) => SparkProgress | undefined;
 
   // Spark data persistence
@@ -93,7 +94,7 @@ export const useSparkStore = create<SparkState>()(
         }));
 
         // Track analytics
-        import('../services/ServiceFactory').then(({ ServiceFactory }) => {
+        import("../services/ServiceFactory").then(({ ServiceFactory }) => {
           ServiceFactory.ensureAnalyticsInitialized().then(() => {
             const AnalyticsService = ServiceFactory.getAnalyticsService();
             if (AnalyticsService.trackSparkAdded) {
@@ -106,11 +107,11 @@ export const useSparkStore = create<SparkState>()(
 
       removeSparkFromUser: (sparkId) => {
         set((state) => ({
-          userSparkIds: state.userSparkIds.filter(id => id !== sparkId),
+          userSparkIds: state.userSparkIds.filter((id) => id !== sparkId),
         }));
 
         // Track analytics
-        import('../services/ServiceFactory').then(({ ServiceFactory }) => {
+        import("../services/ServiceFactory").then(({ ServiceFactory }) => {
           ServiceFactory.ensureAnalyticsInitialized().then(() => {
             const AnalyticsService = ServiceFactory.getAnalyticsService();
             if (AnalyticsService.trackSparkRemoved) {
@@ -152,13 +153,15 @@ export const useSparkStore = create<SparkState>()(
 
       removeFromFavorites: (sparkId) =>
         set((state) => ({
-          favoriteSparkIds: state.favoriteSparkIds.filter(id => id !== sparkId),
+          favoriteSparkIds: state.favoriteSparkIds.filter(
+            (id) => id !== sparkId
+          ),
         })),
 
       isFavorite: (sparkId) => get().favoriteSparkIds.includes(sparkId),
     }),
     {
-      name: 'sparks-data-storage',
+      name: "sparks-data-storage",
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

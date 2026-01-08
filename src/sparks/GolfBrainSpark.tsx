@@ -16,7 +16,7 @@ import {
 import { Video, ResizeMode } from "expo-av";
 
 import { PanGestureHandler, State } from "react-native-gesture-handler";
-import { useSparkStore } from "../store";
+import { useSparkStore } from "../store/sparkStore";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
 import {

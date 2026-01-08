@@ -22,7 +22,7 @@ try {
   console.log("expo-sensors not available, shake detection disabled");
   isSensorsAvailable = false;
 }
-import { useSparkStore } from "../store";
+import { useSparkStore } from "../store/sparkStore";
 import { HapticFeedback } from "../utils/haptics";
 import * as Sharing from "expo-sharing";
 import ConfettiCannon from 'react-native-confetti-cannon';
