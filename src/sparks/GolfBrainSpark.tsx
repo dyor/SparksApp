@@ -3878,6 +3878,10 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     };
   };
 
+  useEffect(() => {
+    onSaveHoleData(currentHole, shots, putts);
+  }, [shots, putts]);
+
   // Expose saveCurrentData method to parent
   useImperativeHandle(ref, () => ({
     saveCurrentData: () => {
@@ -6571,6 +6575,7 @@ export const GolfBrainSpark: React.FC<
     >("course-selection");
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [currentHole, setCurrentHole] = useState(1);
+    const [currentShotIndex, setCurrentShotIndex] = useState(0);
     const [currentRound, setCurrentRound] = useState<Round | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -6613,6 +6618,19 @@ export const GolfBrainSpark: React.FC<
       Record<number, { shots: Shot[]; putts: Shot[] }>
     >({});
     const holeDetailRef = useRef<{ saveCurrentData: () => void }>(null);
+
+    useEffect(() => {
+      return () => {
+        // Save current hole and shot index on unmount
+        if (dataLoaded) {
+          setSparkData("golf-brain", {
+            ...data,
+            currentHole,
+            currentShotIndex,
+          });
+        }
+      };
+    }, [data, dataLoaded, setSparkData, currentHole, currentShotIndex]);
 
     // React to parent signal to open Course Selection for a new round
     useEffect(() => {
@@ -6708,6 +6726,8 @@ export const GolfBrainSpark: React.FC<
               (c) => c.id === savedData.currentRound?.courseId
             ) || null
           );
+          setCurrentHole(savedData.currentHole || 1);
+          setCurrentShotIndex(savedData.currentShotIndex || 0);
           setCurrentScreen("hole-detail");
         }
         setDataLoaded(true);

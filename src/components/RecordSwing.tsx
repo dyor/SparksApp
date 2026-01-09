@@ -178,7 +178,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       // Start recording
       const video = await cameraRef.current.recordAsync({
         maxDuration: durationSeconds,
-        mute: true, // Use mute: true to avoid audio session conflicts/permissions
+        mute: false, // Use mute: true to avoid audio session conflicts/permissions
       });
 
       // Recording stopped (either manually or auto-stop)
@@ -516,7 +516,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
                 Alert.alert("Camera Error", `Failed to start camera: ${error.message}`);
                 setShowCamera(false);
               }}
-              mute={true}
+              mute={false}
             >
               <View style={styles.cameraOverlay}>
                 {countdown !== null && (

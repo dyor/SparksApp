@@ -53,15 +53,9 @@ export const CommonModal: React.FC<CommonModalProps> = ({
     const ContentWrapper = scrollable ? ScrollView : View;
 
     // When keyboard is visible, extend modal content to full width and bottom to avoid white space on sides
-    const modalContentStyle = keyboardVisible
-        ? [commonStyles.modalContent, { 
-            width: '100%', 
-            maxWidth: '100%',
-            marginBottom: 0, 
-            borderBottomLeftRadius: 0, 
-            borderBottomRightRadius: 0 
-        }]
-        : commonStyles.modalContent;
+        const modalContentStyle = keyboardVisible
+            ? [commonStyles.modalContent, commonStyles.modalContentKeyboardVisible]
+            : commonStyles.modalContent;
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

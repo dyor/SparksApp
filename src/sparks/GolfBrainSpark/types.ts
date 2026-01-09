@@ -64,6 +64,8 @@ export interface GolfBrainData {
   courses: Course[];
   rounds: Round[];
   currentRound?: Round;
+  currentHole?: number;
+  currentShotIndex?: number;
   settings: {
     defaultCourse?: string;
     showHints: boolean;

@@ -128,7 +128,7 @@ export class MockFirebaseService {
   }
 
   // Analytics Events
-  static async logEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<void> {
+  static async logAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<void> {
     const eventId = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullEvent: AnalyticsEvent = {
       id: eventId,
@@ -255,7 +255,7 @@ export class MockFirebaseService {
   // Batch Operations
   static async batchLogEvents(events: Omit<AnalyticsEvent, 'id' | 'timestamp'>[]): Promise<void> {
     for (const event of events) {
-      await this.logEvent(event);
+      await this.logAnalyticsEvent(event);
     }
     console.log('Mock: Batch logged events', events.length);
   }

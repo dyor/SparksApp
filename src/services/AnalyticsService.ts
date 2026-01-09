@@ -364,7 +364,7 @@ export class AnalyticsService {
 
     // Flush immediately for crashes
     try {
-      await FirebaseService.logEvent(event);
+      await FirebaseService.logAnalyticsEvent(event);
     } catch (error) {
       console.error('Error logging crash:', error);
     }

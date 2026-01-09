@@ -347,7 +347,7 @@ export class WebFirebaseService {
     }
   }
 
-  static async logAnalyticsEvent(event: AnalyticsEvent): Promise<void> {
+  static async logAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<void> {
     if (!this._initialized || !this.db) {
       throw new Error("Firebase not initialized");
     }
@@ -359,7 +359,7 @@ export class WebFirebaseService {
       };
 
       await addDoc(collection(this.db, "analytics"), eventData);
-      console.log("✅ Analytics event logged:", event.eventName);
+      console.log("✅ Analytics event logged:", event.eventType);
     } catch (error) {
       console.error("❌ Error logging analytics event:", error);
       throw error;

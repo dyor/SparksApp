@@ -119,6 +119,14 @@ export const createCommonStyles = (colors: ThemeColors) => {
             alignItems: 'center',
         },
 
+        modalContentKeyboardVisible: {
+            width: '100%',
+            maxWidth: '100%',
+            marginBottom: 0,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+        },
+
         // Empty states
         emptyState: {
             alignItems: 'center',

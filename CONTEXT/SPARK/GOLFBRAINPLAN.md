@@ -12,3 +12,21 @@
     - **Immediate Persistence:** Added an explicit `setSparkData` call inside the state update logic. This ensures data is committed to the global store immediately, preventing race conditions if the component unmounts (e.g., closing the modal).
     - **Local State Synchronization:** Added a synchronization `useEffect` inside the `GolfBrainSettings` component. This ensures the local modal state stays in sync with background hydration or global updates.
     - **Hydration Guard:** Implemented a check to only render the settings UI once `dataLoaded` is true, ensuring it never initializes with default/stale state.
+
+## Plan for State and Video Persistence - Jan 6
+
+### Phase 1: State Restoration
+
+1.  **[x] Modify `GolfBrainData` Interface:** Add `currentHole` and `currentShotIndex` to the `GolfBrainData` interface in `src/sparks/GolfBrainSpark/types.ts`.
+2.  **[x] Persist State on Unmount:** Implement a `useEffect` cleanup function in `GolfBrainSpark.tsx` to save `currentHole` and `currentShotIndex` to the `useSparkStore`.
+3.  **[x] Restore State on Mount:** Update the data loading `useEffect` in `GolfBrainSpark.tsx` to read the persisted `currentHole` and `currentShotIndex` and initialize the component's state accordingly.
+
+### Phase 2: Video Persistence
+
+1.  **[x] Ensure Immediate Save After Recording:** In `handleRecordingComplete` in `GolfBrainSpark.tsx`, ensure that `onSaveHoleData` is called immediately after the state is updated with the new `videoUri`.
+2.  **[x] Verify Save/Load Logic:** Review `onSaveHoleData` and `onLoadHoleData` in `GolfBrainSpark.tsx` to confirm that the `videoUri` is being correctly persisted and retrieved from the `useSparkStore`.
+
+### Phase 3: Enable Audio Recording
+
+1.  **[x] Locate `RecordSwing` component:** Find the `RecordSwing.tsx` file in the `src/components` directory.
+2.  **[x] Update `recordAsync` options:** In `RecordSwing.tsx`, find the call to `camera.recordAsync()` and ensure the options object includes `mute: false` to enable audio recording.
