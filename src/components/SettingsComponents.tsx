@@ -900,8 +900,7 @@ export const SettingsFeedbackSection = forwardRef<
         sparkId,
         sparkName,
         rating: 0, // No rating for feedback-only submissions
-        sessionId: sessionInfo.sessionId,
-        platform: "ios" as "ios" | "android" | "web",
+        platform: Platform.OS as "ios" | "android" | "web",
         comment: "", // Ensure comment is not undefined
         feedback: feedback.trim() || "", // Ensure feedback is not undefined
       };
@@ -999,7 +998,7 @@ export const SettingsFeedbackSection = forwardRef<
         sparkName,
         rating,
         sessionId: sessionInfo.sessionId || deviceId,
-        platform: "ios" as "ios" | "android" | "web",
+        platform: Platform.OS as "ios" | "android" | "web",
         comment: "", // Ensure comment is not undefined to prevent Firebase error
         feedback: "", // Also set feedback to empty string just in case
       };

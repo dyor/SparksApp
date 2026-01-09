@@ -62,6 +62,9 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
   const [manualInput, setManualInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const isHydrated = useSparkStore(state => state.isHydrated);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -99,18 +102,26 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
 
   // Load history on mount
   useEffect(() => {
+    if (!isHydrated) return;
+    if (dataLoaded) return;
+
+    console.log('🔄 SpeakSpark: Loading data, isHydrated:', isHydrated);
     const savedData = getSparkData("speak-spark");
     if (savedData?.history) {
+      console.log(`📦 SpeakSpark: Loading ${savedData.history.length} history items`);
       setHistory(savedData.history);
     }
-  }, []);
+    setDataLoaded(true);
+  }, [getSparkData, isHydrated, dataLoaded]);
 
   // Save history when it changes
   useEffect(() => {
+    if (!dataLoaded) return;
+
     if (history.length > 0) {
       setSparkData("speak-spark", { history });
     }
-  }, [history]);
+  }, [history, dataLoaded]);
 
   // Listen to store updates for clearing (or when returning from settings)
   useEffect(() => {

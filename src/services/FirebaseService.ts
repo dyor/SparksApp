@@ -32,6 +32,27 @@ export class FirebaseService {
     console.log('🔥 Database instance:', this.db ? 'Connected' : 'Not connected');
   }
 
+  private static _initialized = isFirebaseAvailable;
+
+  static async initialize(): Promise<void> {
+    console.log('🔥 FirebaseService.initialize() called');
+    if (isFirebaseAvailable) {
+      this._initialized = true;
+      console.log('✅ Native Firebase available');
+    } else {
+      console.log('⚠️ Native Firebase NOT available');
+    }
+  }
+
+  static isInitialized(): boolean {
+    return this._initialized;
+  }
+
+  static async getCurrentUser(): Promise<any | null> {
+    // Native Firebase Auth usually handled elsewhere, but we can return null for parity
+    return null;
+  }
+
   // User Management
   static async createUser(userData: Partial<User>): Promise<string> {
     if (!isFirebaseAvailable) {
@@ -168,7 +189,11 @@ export class FirebaseService {
   }
 
   // Analytics Events
-  static async logEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<void> {
+  static async logAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<void> {
+    if (!isFirebaseAvailable || !this.db) {
+      console.log('⚠️ Firebase not available, skipping logAnalyticsEvent');
+      return;
+    }
     try {
       const cleanedEvent = this.cleanObject(event);
       await this.db.collection('analytics').add({
@@ -176,7 +201,7 @@ export class FirebaseService {
         timestamp: firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error logging event:', error);
+      console.error('Error logging analytics event:', error);
       throw error;
     }
   }

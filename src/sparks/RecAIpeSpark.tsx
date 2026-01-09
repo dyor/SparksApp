@@ -88,6 +88,9 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
     const [editText, setEditText] = useState('');
     const [refinePrompt, setRefinePrompt] = useState('');
     const [apiKeyAvailable, setApiKeyAvailable] = useState<boolean | null>(null);
+    const [dataLoaded, setDataLoaded] = useState(false);
+
+    const isHydrated = useSparkStore(state => state.isHydrated);
 
     // Check API key availability
     useEffect(() => {
@@ -98,8 +101,13 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
 
     // Load data and restore state
     useEffect(() => {
+        if (!isHydrated) return;
+        if (dataLoaded) return;
+
+        console.log('🔄 RecAIpeSpark: Loading data, isHydrated:', isHydrated);
         const saved = getSparkData('recaipe') as any;
-        if (saved?.recipes) {
+        if (saved?.recipes && saved.recipes.length > 0) {
+            console.log(`📦 RecAIpeSpark: Loading ${saved.recipes.length} recipes`);
             setData({ recipes: saved.recipes });
             // Restore previous state
             if (saved.lastMode) {
@@ -111,13 +119,16 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
                     setSelectedRecipe(recipe);
                 }
             }
+            setDataLoaded(true);
         } else {
+            console.log('📦 RecAIpeSpark: No recipes found, using starter');
             // Initialize with starter recipe
             const initialData = { recipes: [STARTER_RECIPE] };
             setData(initialData);
             setSparkData('recaipe', initialData);
+            setDataLoaded(true);
         }
-    }, []);
+    }, [isHydrated, getSparkData, dataLoaded]);
 
     // Save data with state
     const saveData = (newData: RecAIpeData) => {
@@ -132,6 +143,8 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
 
     // Update state persistence whenever mode or recipe changes
     useEffect(() => {
+        if (!dataLoaded) return;
+
         if (data.recipes.length > 0) {
             const dataWithState = {
                 recipes: data.recipes,
@@ -140,7 +153,7 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
             };
             setSparkData('recaipe', dataWithState);
         }
-    }, [mode, selectedRecipe?.id]);
+    }, [mode, selectedRecipe?.id, data.recipes, dataLoaded]);
 
     // AI Generation
     const generateRecipe = async (prompt: string, currentRecipe?: string) => {

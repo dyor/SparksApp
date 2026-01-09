@@ -132,8 +132,14 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  const isHydrated = useSparkStore(state => state.isHydrated);
+
   // Load saved data on mount
   useEffect(() => {
+    if (!isHydrated) return;
+    if (dataLoaded) return;
+
+    console.log('🔄 MinuteMinderSpark: Loading data, isHydrated:', isHydrated);
     const savedData = getSparkData('minute-minder');
     if (savedData.activitiesText) {
       setActivitiesText(savedData.activitiesText);
@@ -147,7 +153,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       });
     }
     setDataLoaded(true);
-  }, [getSparkData]);
+  }, [getSparkData, isHydrated, dataLoaded]);
 
   // Handle Scan Schedule
   const handleScanSchedule = async () => {

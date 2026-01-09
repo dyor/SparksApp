@@ -41,6 +41,10 @@ interface SparkState {
   addToFavorites: (sparkId: string) => void;
   removeFromFavorites: (sparkId: string) => void;
   isFavorite: (sparkId: string) => boolean;
+
+  // Hydration
+  isHydrated: boolean;
+  setHydrated: (hydrated: boolean) => void;
 }
 
 export const useSparkStore = create<SparkState>()(
@@ -51,8 +55,10 @@ export const useSparkStore = create<SparkState>()(
       sparkData: {},
       userSparkIds: [], // No default sparks - user starts with empty collection
       favoriteSparkIds: [],
+      isHydrated: false,
 
       // Actions
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
       updateSparkProgress: (sparkId, progress) =>
         set((state) => {
           const existingProgress = state.sparkProgress[sparkId] || {
@@ -160,6 +166,9 @@ export const useSparkStore = create<SparkState>()(
     {
       name: 'sparks-data-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated(true);
+      },
     }
   )
 );

@@ -333,6 +333,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('ready');
@@ -347,19 +348,19 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const recordingRef = useRef<NodeJS.Timeout | null>(null);
   const recordingObjectRef = useRef<Audio.Recording | null>(null);
 
-  // Cleanup on unmount and when recording changes
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🧹 SoundboardSpark: Unmounting, cleaning up resources...');
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (recordingRef.current) clearInterval(recordingRef.current);
-      if (sound) {
-        sound.unloadAsync().catch(console.warn);
-      }
-      if (recording || recordingObjectRef.current) {
-        const currentRecording = recordingObjectRef.current || recording;
-        if (currentRecording) {
-          currentRecording.stopAndUnloadAsync().catch(console.warn);
-        }
+
+      // Cleanup sound is handled by the dedicated useEffect below
+
+      if (recordingObjectRef.current) {
+        recordingObjectRef.current.stopAndUnloadAsync().catch(err =>
+          console.log('ℹ️ SoundboardSpark: No active recording to cleanup on unmount')
+        );
       }
     };
   }, []);
@@ -535,8 +536,13 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   };
 
   const stopRecording = async () => {
+    if (recordingState !== 'recording') {
+      console.log('ℹ️ stopRecording called but not in recording state:', recordingState);
+      return;
+    }
+
     try {
-      console.log('Stopping recording...');
+      console.log('🛑 Stopping recording...');
       if (recordingRef.current) {
         clearInterval(recordingRef.current);
         recordingRef.current = null;
@@ -544,27 +550,28 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       const currentRecording = recordingObjectRef.current || recording;
       if (currentRecording) {
-        console.log('Getting recording status...');
+        console.log('📊 Getting recording status...');
         const status = await currentRecording.getStatusAsync();
         const actualDuration = status.durationMillis ? status.durationMillis / 1000 : 0;
-        console.log(`Recording duration: ${actualDuration}s`);
+        console.log(`⏱️ Recording duration: ${actualDuration}s`);
 
-        console.log('Stopping and unloading recording...');
+        console.log('📥 Stopping and unloading recording...');
         await currentRecording.stopAndUnloadAsync();
         const uri = currentRecording.getURI();
 
         setRecordedUri(uri);
         setRecordedDuration(actualDuration);
-        console.log('Setting recording state to recorded');
+        console.log('✅ Setting recording state to recorded. URI:', uri);
         setRecordingState('recorded');
         setRecording(null);
         recordingObjectRef.current = null;
       } else {
-        console.log('No recording object found to stop');
+        console.warn('⚠️ No recording object found to stop');
+        setRecordingState('ready');
       }
     } catch (error) {
-      console.error('Failed to stop recording:', error);
-      Alert.alert('Error', 'Failed to stop recording.');
+      console.error('❌ Failed to stop recording:', error);
+      Alert.alert('Error', 'Failed to stop recording. Please try again.');
       setRecordingState('ready');
     }
   };
@@ -662,9 +669,17 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   };
 
   // Load saved data on mount
+  const isHydrated = useSparkStore(state => state.isHydrated);
+
   useEffect(() => {
+    console.log('🔄 SoundboardSpark: Hydration Effect. isHydrated:', isHydrated);
+    if (!isHydrated) return;
+
     const savedData = getSparkData('soundboard') as SoundboardData;
+    console.log('📦 SoundboardSpark: Load saved data:', savedData ? 'Found' : 'Not found');
+
     if (savedData?.soundChips) {
+      console.log(`📦 SoundboardSpark: Loading ${savedData.soundChips.length} sound chips`);
       // TODO TEMPORARY - DELETE AFTER MIGRATION:
       // Migrate any absolute file:// URIs to relative paths so they survive container moves
       const migrated = savedData.soundChips.map((chip) => {
@@ -673,15 +688,21 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       });
       setSoundChips(migrated);
       if (JSON.stringify(migrated) !== JSON.stringify(savedData.soundChips)) {
+        console.log('📦 SoundboardSpark: Migrating paths to relative format...');
         setSparkData('soundboard', { ...savedData, soundChips: migrated });
       }
+    } else {
+      console.log('📦 SoundboardSpark: No sound chips found in store');
     }
+    setDataLoaded(true);
     // Debug file system status
     checkFileSystemStatus();
-  }, [getSparkData]);
+  }, [getSparkData, isHydrated]);
 
   // Save data whenever soundChips change
   useEffect(() => {
+    if (!dataLoaded) return;
+
     const categories = Array.from(new Set(soundChips.map(chip => chip.category)));
     const soundboardData: SoundboardData = {
       soundChips,
@@ -690,7 +711,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     };
     setSparkData('soundboard', soundboardData);
     onStateChange?.({ soundCount: soundChips.length, categories: categories.length });
-  }, [soundChips]);
+  }, [soundChips, dataLoaded]);
 
   // Cleanup audio on unmount
   useEffect(() => {

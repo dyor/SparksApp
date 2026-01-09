@@ -6631,41 +6631,16 @@ export const GolfBrainSpark: React.FC<
       }
     }, [openCourseSelectionSignal]);
 
-    // Track store hydration state
-    const [storeHydrated, setStoreHydrated] = useState(false);
-
-    // Subscribe to store updates for checking hydration
-    // We use a polling approach as a fallback because onFinishHydration is hard to hook into dynamically
-    useEffect(() => {
-      const checkHydration = () => {
-        // Check if the persist middleware has finished rehydrating
-        const isHydrated = useSparkStore.persist && useSparkStore.persist.hasHydrated();
-        if (isHydrated) {
-          setStoreHydrated(true);
-        }
-      };
-
-      checkHydration();
-
-      const interval = setInterval(() => {
-        if (!storeHydrated) {
-          checkHydration();
-        } else {
-          clearInterval(interval);
-        }
-      }, 500);
-
-      return () => clearInterval(interval);
-    }, [storeHydrated]);
+    // Hydration state from store
+    const isHydrated = useSparkStore(state => state.isHydrated);
 
     // Use reactive selector for spark data
     const savedSparkData = useSparkStore(state => state.sparkData["golf-brain"]);
 
     // Load saved data on mount - wait for hydration
     useEffect(() => {
-      if (!storeHydrated && !savedSparkData) {
+      if (!isHydrated && !savedSparkData) {
         // If not hydrated and no data, wait.
-        // Note: if savedSparkData exists, hydration presumably happened or we have something.
         return;
       }
 
@@ -6673,14 +6648,10 @@ export const GolfBrainSpark: React.FC<
       if (dataLoaded) return;
 
       // Use the reactive data if available, or fall back to getSparkData logic (which returns {})
-      // We cast to any to safely check emptiness or property existence if needed
       const savedData = (savedSparkData || getSparkData("golf-brain")) as GolfBrainData;
 
       // Check if it's truly empty (initial store state returning {})
       const isEmpty = Object.keys(savedData).length === 0;
-
-      // If store says hydrated but data is empty, it's a new user.
-      // If store NOT hydrated and data empty, we should have waited (covered by first check)
 
       if (savedData && !isEmpty) {
         // Ensure default courses are always available
@@ -6740,13 +6711,11 @@ export const GolfBrainSpark: React.FC<
           setCurrentScreen("hole-detail");
         }
         setDataLoaded(true);
-      } else {
+      } else if (isHydrated) {
         // Only resolve empty/new user if we are SURE we are hydrated
-        if (storeHydrated) {
-          setDataLoaded(true);
-        }
+        setDataLoaded(true);
       }
-    }, [storeHydrated, savedSparkData, dataLoaded, getSparkData]);
+    }, [isHydrated, savedSparkData, dataLoaded, getSparkData]);
 
     // Handle screen navigation based on data state
     useEffect(() => {

@@ -11,21 +11,32 @@ import { MockFirebaseService } from './MockFirebaseService';
 import { MockAnalyticsService } from './MockAnalyticsService';
 import { WebAnalyticsService } from './WebAnalyticsService';
 import { WebFirebaseService } from './WebFirebaseService';
+import { FirebaseService as NativeFirebaseService } from './FirebaseService';
 import { SimpleAnalyticsService } from './SimpleAnalyticsService';
+import { Platform } from 'react-native';
 
-// Check if Firebase Web SDK is available
-let isFirebaseAvailable = false;
+// Detect available Firebase implementations
+let isWebFirebaseAvailable = false;
+let isNativeFirebaseAvailable = false;
 
 try {
-  // Try to import Firebase Web SDK
+  // Check Web SDK
   require('firebase/app');
-  require('firebase/analytics');
-  require('firebase/auth');
-  require('firebase/firestore');
-  isFirebaseAvailable = true;
+  isWebFirebaseAvailable = true;
 } catch (error) {
-  isFirebaseAvailable = false;
+  isWebFirebaseAvailable = false;
 }
+
+try {
+  // Check Native SDK
+  const { FirebaseService: native } = require('./FirebaseService');
+  isNativeFirebaseAvailable = native.isInitialized();
+} catch (error) {
+  isNativeFirebaseAvailable = false;
+}
+
+const isFirebaseAvailable = isWebFirebaseAvailable || isNativeFirebaseAvailable;
+const useNativeFirebase = (Platform.OS === 'android' || Platform.OS === 'ios') && isNativeFirebaseAvailable;
 
 // Service factory that uses real Firebase in development builds, falls back to mock if needed
 export class ServiceFactory {
@@ -33,9 +44,15 @@ export class ServiceFactory {
   private static analyticsServiceInitialized = false;
 
   static getFirebaseService() {
-    if (isFirebaseAvailable) {
+    if (useNativeFirebase) {
+      console.log('📱 Using Native Firebase Service');
+      return NativeFirebaseService;
+    }
+    if (isWebFirebaseAvailable) {
+      console.log('🌐 Using Web Firebase Service');
       return WebFirebaseService;
     }
+    console.log('⚠️ Using Mock Firebase Service');
     return MockFirebaseService;
   }
 
@@ -47,7 +64,13 @@ export class ServiceFactory {
   }
 
   static async ensureFirebaseInitialized() {
-    if (isFirebaseAvailable && !this.firebaseServiceInitialized) {
+    if (useNativeFirebase) {
+      await NativeFirebaseService.initialize();
+      this.firebaseServiceInitialized = true;
+      return;
+    }
+
+    if (isWebFirebaseAvailable && !this.firebaseServiceInitialized) {
       try {
         await WebFirebaseService.initialize();
         this.firebaseServiceInitialized = true;
@@ -55,7 +78,7 @@ export class ServiceFactory {
         // Wait a bit to ensure Firebase is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        console.error('❌ Failed to initialize Firebase service:', error);
+        console.error('❌ Failed to initialize Web Firebase service:', error);
       }
     }
   }
