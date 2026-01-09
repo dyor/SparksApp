@@ -270,7 +270,7 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
-  const styles = createStyles(colors);
+  const styles = createStyles(colors, insets);
 
   return (
     <View style={styles.container}>
