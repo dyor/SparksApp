@@ -1,5 +1,5 @@
-import React from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Modal, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { createCommonStyles } from '../styles/CommonStyles';
@@ -32,8 +32,36 @@ export const CommonModal: React.FC<CommonModalProps> = ({
 }) => {
     const { colors } = useTheme();
     const commonStyles = createCommonStyles(colors);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => setKeyboardVisible(true)
+        );
+        const keyboardDidHideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setKeyboardVisible(false)
+        );
+
+        return () => {
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
+        };
+    }, []);
 
     const ContentWrapper = scrollable ? ScrollView : View;
+
+    // When keyboard is visible, extend modal content to full width and bottom to avoid white space on sides
+    const modalContentStyle = keyboardVisible
+        ? [commonStyles.modalContent, { 
+            width: '100%', 
+            maxWidth: '100%',
+            marginBottom: 0, 
+            borderBottomLeftRadius: 0, 
+            borderBottomRightRadius: 0 
+        }]
+        : commonStyles.modalContent;
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -47,7 +75,7 @@ export const CommonModal: React.FC<CommonModalProps> = ({
                             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
                         </TouchableWithoutFeedback>
                         <View
-                            style={commonStyles.modalContent}
+                            style={modalContentStyle}
                             onStartShouldSetResponder={() => true}
                         >
                             <Text style={commonStyles.modalTitle}>{title}</Text>

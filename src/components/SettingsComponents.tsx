@@ -4,6 +4,7 @@ import React, {
   useImperativeHandle,
   forwardRef,
   useCallback,
+  useRef,
 } from "react";
 import {
   View,
@@ -17,6 +18,7 @@ import {
   Modal,
   RefreshControl,
   Platform,
+  Keyboard,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
@@ -557,8 +559,18 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const { colors } = useTheme();
   const [feedback, setFeedback] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const textInputRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
+    // Dismiss keyboard first
+    if (textInputRef.current) {
+      textInputRef.current.blur();
+    }
+    Keyboard.dismiss();
+    
+    // Small delay to ensure keyboard is dismissed before submitting
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     setIsSubmitting(true);
     try {
       await onSubmit(0, feedback); // Rating is handled separately now
@@ -627,6 +639,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       </Text>
 
       <TextInput
+        ref={textInputRef}
         style={{
           backgroundColor: colors.background,
           borderColor: colors.border,

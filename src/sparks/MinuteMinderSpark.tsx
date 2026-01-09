@@ -906,12 +906,24 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       marginBottom: 8,
     },
     editButton: {
-      alignSelf: 'flex-end',
+      flex: 1,
       paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingVertical: 16,
       backgroundColor: colors.primary,
-      borderRadius: 8,
-      marginBottom: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    actionButtonsRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 10,
+    },
+    startStopButton: {
+      flex: 2,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
     },
     editButtonText: {
       color: '#fff',
@@ -1147,34 +1159,33 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const current = getCurrentActivity();
   const organizedActivities = getOrganizedActivities();
 
+  const truncate = (str: string, max: number) => {
+    return str.length > max ? str.substring(0, max - 3) + '...' : str;
+  };
+
   return (
     <View style={styles.container}>
-      {/* Fixed header with clock */}
-      <View style={styles.fixedHeader}>
-        <View style={styles.header}>
-          <Text style={styles.title}>⏳ Minute Minder</Text>
-          <Text style={styles.subtitle}>Make every minute matter</Text>
-        </View>
+      {/* Fixed header with clock and action buttons */}
+      <View style={[styles.fixedHeader, timerState.isActive && { paddingTop: 10, paddingBottom: 5 }]}>
+        {!timerState.isActive && (
+          <View style={[styles.header, { marginBottom: 20 }]}>
+            <Text style={styles.title}>⏳ Minute Minder</Text>
+            <Text style={styles.subtitle}>Make every minute matter</Text>
+          </View>
+        )}
 
         {!isEditing && (
-          <>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => setIsEditing(true)}
-            >
-              <Text style={styles.editButtonText}>✏️ Edit</Text>
-            </TouchableOpacity>
-
+          <View>
             {timerState.isActive && current && (
-              <View style={styles.timerSection}>
+              <View style={[styles.timerSection, { marginBottom: 15 }]}>
                 <TeeTimeCircularProgress
                   progress={getCurrentActivityProgress()}
-                  size={200}
+                  size={180}
                   strokeWidth={12}
                 >
                   <View style={styles.circleContent}>
                     <Text style={styles.activityNameText}>
-                      {current.status === 'current' ? current.activity.name : `${current.activity.name} starts in`}
+                      {current.status === 'current' ? truncate(current.activity.name, 20) : `${truncate(current.activity.name, 15)} starts in`}
                     </Text>
                     <Text style={styles.timeText}>
                       {showFlameAnimations && countdownSeconds > 0 ? countdownSeconds : formatTime(getActivityTime(current.activity, current.status))}
@@ -1187,28 +1198,22 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
               </View>
             )}
 
-            {!timerState.isActive && (
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
-                  onPress={handleStartTimer}
-                >
-                  <Text style={styles.buttonText}>Start Timer</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={[styles.actionButtonsRow, { marginBottom: 5 }]}>
+              <TouchableOpacity
+                style={[styles.startStopButton, timerState.isActive ? styles.dangerButton : { backgroundColor: colors.primary }]}
+                onPress={timerState.isActive ? handleStopTimer : handleStartTimer}
+              >
+                <Text style={styles.buttonText}>{timerState.isActive ? 'Stop Timer' : 'Start Timer'}</Text>
+              </TouchableOpacity>
 
-            {timerState.isActive && (
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={[styles.button, styles.dangerButton]}
-                  onPress={handleStopTimer}
-                >
-                  <Text style={styles.buttonText}>Stop Timer</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => setIsEditing(true)}
+              >
+                <Text style={styles.editButtonText}>✏️ Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
 

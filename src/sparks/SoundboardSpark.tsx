@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking } from 'react-native';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
@@ -423,39 +423,68 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
   const setupAudioMode = async (forRecording = false) => {
     try {
-      await Audio.requestPermissionsAsync();
+      console.log('🎤 setupAudioMode: forRecording =', forRecording);
 
-      if (forRecording) {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } else {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: false,
-          playThroughEarpieceAndroid: false,
-        });
+      const { status: existingStatus, canAskAgain } = await Audio.getPermissionsAsync();
+      console.log('🎤 setupAudioMode: status =', existingStatus, 'canAskAgain =', canAskAgain);
+
+      if (existingStatus !== 'granted') {
+        if (!canAskAgain) {
+          Alert.alert(
+            'Microphone Required',
+            'Microphone access is disabled. Please enable it in your device settings to record sounds.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
+          );
+          return false;
+        }
+
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Microphone access is required to record sounds.');
+          return false;
+        }
       }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: forRecording,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        interruptionModeAndroid: 1, // DoNotMix
+        interruptionModeIOS: 1, // DoNotMix
+      });
+
+      return true;
     } catch (error) {
       console.error('Failed to setup audio mode:', error);
+      Alert.alert('Audio Error', `Failed to configure audio: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     }
   };
 
   const startRecording = async () => {
     try {
+      HapticFeedback.light();
+      console.log('🔵 startRecording: beginning');
+
       // Comprehensive cleanup first
       await cleanupAllRecordings();
+      console.log('🔵 startRecording: cleanup done');
 
       // Add a delay to ensure cleanup is complete
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      await setupAudioMode(true);
+      const success = await setupAudioMode(true);
+      if (!success) {
+        console.log('🔴 startRecording: setupAudioMode failed');
+        return;
+      }
+
+      console.log('🔵 startRecording: switching to countdown');
       setRecordingState('countdown');
       setCountdown(3);
 
@@ -480,7 +509,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
   const beginRecording = async () => {
     try {
-      // Prevent multiple simultaneous calls
+      // Prevent multiple simultaneous calls - allow 'countdown' state to proceed
       if (recordingState === 'recording') {
         console.log('Recording already in progress, skipping');
         return;
@@ -501,17 +530,34 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       // Add a delay to ensure cleanup is complete
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      const recordingOptions = {
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      // Re-setup audio mode for recording (critical for iOS release builds)
+      const success = await setupAudioMode(true);
+      if (!success) {
+        console.log('🔴 beginRecording: setupAudioMode failed');
+        setRecordingState('ready');
+        Alert.alert('Error', 'Failed to configure audio for recording.');
+        return;
+      }
+
+      const recordingOptions: Audio.RecordingOptions = {
         android: {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+          extension: '.m4a',
+          outputFormat: 2, // Android: MPEG_4
+          audioEncoder: 3, // Android: AAC
+          sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
         },
         ios: {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+          extension: '.m4a',
+          outputFormat: 1, // iOS: MPEG4AAC
+          audioQuality: 127, // Max
+          sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
         },
         web: {
           mimeType: 'audio/webm',
@@ -522,6 +568,10 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       console.log('Attempting to create recording...');
       const { recording: newRecording } = await Audio.Recording.createAsync(recordingOptions);
       console.log('Recording created successfully');
+
+      if (!newRecording) {
+        throw new Error('Recording object was not created');
+      }
 
       setRecording(newRecording);
       recordingObjectRef.current = newRecording;
@@ -709,13 +759,33 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         console.log('📦 SoundboardSpark: Migrating paths to relative format...');
         setSparkData('soundboard', { ...savedData, soundChips: migrated });
       }
-    } else {
-      console.log('📦 SoundboardSpark: No sound chips found in store');
-      hasLoadedRef.current = true; // Even if empty, we've "loaded" the empty state correctly
     }
     setDataLoaded(true);
+
+    // Ensure soundboard directory exists immediately
+    const ensureDir = async () => {
+      try {
+        const soundboardDir = `${FileSystem.documentDirectory}${SOUNDBOARD_DIR_NAME}`;
+        const dirInfo = await FileSystem.getInfoAsync(soundboardDir);
+        if (!dirInfo.exists) {
+          console.log('📁 SoundboardSpark: Creating soundboard directory...');
+          await FileSystem.makeDirectoryAsync(soundboardDir, { intermediates: true });
+        }
+      } catch (error) {
+        console.error('❌ SoundboardSpark: Failed to ensure soundboard directory:', error);
+      }
+    };
+    ensureDir();
+
     // Debug file system status
     checkFileSystemStatus();
+
+    // Pre-warm permissions
+    Audio.getPermissionsAsync().then(({ status, canAskAgain }) => {
+      if (status !== 'granted' && canAskAgain) {
+        Audio.requestPermissionsAsync();
+      }
+    });
   }, [getSparkData, isHydrated]);
 
   // Save data whenever soundChips change

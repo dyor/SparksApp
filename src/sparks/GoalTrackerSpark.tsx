@@ -27,6 +27,7 @@ import {
   SaveCancelButtons,
 } from '../components/SettingsComponents';
 import { HapticFeedback } from '../utils/haptics';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 interface GoalEntry {
   id: string;
@@ -45,11 +46,13 @@ interface Goal {
 interface GoalTrackerData {
   goals: Goal[];
   currentGoalId: string | null; // Track which goal user was viewing
+  currentScreen: 'home' | 'goal-detail'; // Track which screen user was on
 }
 
 const DEFAULT_DATA: GoalTrackerData = {
   goals: [],
   currentGoalId: null,
+  currentScreen: 'home',
 };
 
 export const GoalTrackerSpark: React.FC<SparkProps> = ({
@@ -66,13 +69,15 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     return saved ? { ...DEFAULT_DATA, ...saved } : DEFAULT_DATA;
   });
 
-  const [currentScreen, setCurrentScreen] = useState<'home' | 'goal-detail'>('home');
+  const [currentScreen, setCurrentScreen] = useState<'home' | 'goal-detail'>(data.currentScreen || 'home');
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [showEditEntryModal, setShowEditEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<GoalEntry | null>(null);
   const [newGoalName, setNewGoalName] = useState('');
   const [newGoalTarget, setNewGoalTarget] = useState('');
   const [editEntryDate, setEditEntryDate] = useState('');
+  const [showCelebration, setShowCelebration] = useState(false);
+  const confettiRef = React.useRef<any>(null);
 
   // Save data wrapper
   const saveData = (newData: GoalTrackerData) => {
@@ -80,18 +85,11 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     setSparkData('goal-tracker', newData);
   };
 
-  // Initialize screen based on saved currentGoalId
-  useEffect(() => {
-    if (data.currentGoalId) {
-      const goal = data.goals.find(g => g.id === data.currentGoalId);
-      if (goal) {
-        setCurrentScreen('goal-detail');
-      } else {
-        // Goal was deleted, clear currentGoalId
-        saveData({ ...data, currentGoalId: null });
-      }
-    }
-  }, []); // Only run on mount
+  // Handle screen changes and persistence
+  const handleSetScreen = (screen: 'home' | 'goal-detail', goalId: string | null = data.currentGoalId) => {
+    setCurrentScreen(screen);
+    saveData({ ...data, currentScreen: screen, currentGoalId: goalId });
+  };
 
   // Get current goal
   const currentGoal = useMemo(() => {
@@ -101,14 +99,13 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
 
   // Navigate to goal detail
   const handleGoalPress = (goal: Goal) => {
-    saveData({ ...data, currentGoalId: goal.id });
-    setCurrentScreen('goal-detail');
+    handleSetScreen('goal-detail', goal.id);
     HapticFeedback.light();
   };
 
   // Navigate back to home
   const handleBackToHome = () => {
-    setCurrentScreen('home');
+    handleSetScreen('home', null);
     HapticFeedback.light();
   };
 
@@ -148,6 +145,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       ...data,
       goals: [...data.goals, newGoal],
       currentGoalId: newGoal.id,
+      currentScreen: 'goal-detail',
     });
 
     setNewGoalName('');
@@ -155,6 +153,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     setShowAddGoalModal(false);
     setCurrentScreen('goal-detail');
     HapticFeedback.success();
+    triggerCelebration();
   };
 
   // Add +1 entry
@@ -179,6 +178,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
               };
               updateGoalEntries([...currentGoal.entries, newEntry]);
               HapticFeedback.success();
+              triggerCelebration();
             },
           },
           {
@@ -201,6 +201,16 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     };
 
     updateGoalEntries([...currentGoal.entries, newEntry]);
+    HapticFeedback.success();
+    triggerCelebration();
+  };
+
+  const triggerCelebration = () => {
+    setShowCelebration(true);
+    // Use setTimeout to ensure the ref is set and component is mounted, especially on iOS release builds
+    setTimeout(() => {
+      confettiRef.current?.start();
+    }, 100);
     HapticFeedback.success();
   };
 
@@ -227,6 +237,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     const updatedGoals = data.goals.map(g => g.id === goal.id ? updatedGoal : g);
     saveData({ ...data, goals: updatedGoals });
     HapticFeedback.success();
+    triggerCelebration();
   };
 
   // Update goal entries
@@ -321,7 +332,13 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           onPress: () => {
             const updatedGoals = data.goals.filter(g => g.id !== goalId);
             const updatedCurrentGoalId = data.currentGoalId === goalId ? null : data.currentGoalId;
-            saveData({ ...data, goals: updatedGoals, currentGoalId: updatedCurrentGoalId });
+            const updatedScreen = data.currentGoalId === goalId ? 'home' : data.currentScreen;
+            saveData({
+              ...data,
+              goals: updatedGoals,
+              currentGoalId: updatedCurrentGoalId,
+              currentScreen: updatedScreen
+            });
             if (data.currentGoalId === goalId) {
               setCurrentScreen('home');
             }
@@ -994,6 +1011,18 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           </View>
         </ScrollView>
 
+        {/* Celebration Confetti */}
+        {showCelebration && (
+          <ConfettiCannon
+            ref={confettiRef}
+            count={50}
+            origin={{ x: Dimensions.get('window').width / 2, y: -20 }}
+            autoStart={false}
+            fadeOut={true}
+            onAnimationEnd={() => setShowCelebration(false)}
+          />
+        )}
+
         {/* Edit Entry Modal */}
         <Modal visible={showEditEntryModal} transparent animationType="slide">
           <View style={styles.modalContainer}>
@@ -1122,6 +1151,17 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           </View>
         </View>
       </Modal>
+
+      {showCelebration && (
+        <ConfettiCannon
+          ref={confettiRef}
+          count={50}
+          origin={{ x: Dimensions.get('window').width / 2, y: -20 }}
+          autoStart={false}
+          fadeOut={true}
+          onAnimationEnd={() => setShowCelebration(false)}
+        />
+      )}
     </View>
   );
 };

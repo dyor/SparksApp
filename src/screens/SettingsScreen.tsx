@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSparkStore, useAppStore } from '../store';
@@ -22,6 +23,7 @@ import { GeminiService } from '../services/GeminiService';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const {
     sparkData,
@@ -876,7 +878,7 @@ export const SettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, insets: { top: number }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -884,7 +886,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 30,
-    paddingTop: 20,
+    paddingTop: Math.max(insets.top + 20, 40),
   },
   title: {
     fontSize: 28,
