@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking } from 'react-native';
 import { Audio } from 'expo-av';
+import { IOSOutputFormat, IOSAudioQuality, AndroidOutputFormat, AndroidAudioEncoder } from 'expo-av/build/Audio/RecordingConstants';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -539,25 +540,32 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         return;
       }
 
+      // Add a small delay to ensure audio session is fully ready
+      // This helps prevent kAudioFormatUnsupportedDataFormatError on iOS
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Use Expo's preset for high quality recording (ensures format compatibility)
+      // The key fix: Remove Linear PCM settings when using AAC format
+      // Error 1718449215 (kAudioFormatUnsupportedDataFormatError) is caused by
+      // including Linear PCM settings with AAC format
       const recordingOptions: Audio.RecordingOptions = {
         android: {
           extension: '.m4a',
-          outputFormat: 2, // Android: MPEG_4
-          audioEncoder: 3, // Android: AAC
+          outputFormat: AndroidOutputFormat.MPEG_4,
+          audioEncoder: AndroidAudioEncoder.AAC,
           sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
         },
         ios: {
           extension: '.m4a',
-          outputFormat: 1, // iOS: MPEG4AAC
-          audioQuality: 127, // Max
+          outputFormat: IOSOutputFormat.MPEG4AAC,
+          audioQuality: IOSAudioQuality.MAX,
           sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
+          // CRITICAL: Do NOT include Linear PCM settings (linearPCMBitDepth, etc.) 
+          // when using AAC format - they cause kAudioFormatUnsupportedDataFormatError (1718449215)
         },
         web: {
           mimeType: 'audio/webm',
@@ -566,8 +574,16 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       };
 
       console.log('Attempting to create recording...');
-      const { recording: newRecording } = await Audio.Recording.createAsync(recordingOptions);
-      console.log('Recording created successfully');
+      let newRecording: Audio.Recording;
+      try {
+        const result = await Audio.Recording.createAsync(recordingOptions);
+        newRecording = result.recording;
+        console.log('Recording created successfully');
+      } catch (createError: any) {
+        console.error('❌ Failed to create recording:', createError);
+        const errorMessage = createError?.message || String(createError);
+        throw new Error(`Failed to create recording: ${errorMessage}`);
+      }
 
       if (!newRecording) {
         throw new Error('Recording object was not created');
@@ -596,9 +612,21 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       }, 1000);
       console.log('Recording countdown timer started');
     } catch (error) {
-      console.error('Failed to begin recording:', error);
-      Alert.alert('Error', 'Failed to start recording.');
+      console.error('❌ Failed to begin recording:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error details:', {
+        message: errorMessage,
+        error,
+        recordingState,
+        hasRecording: !!recording,
+      });
+      Alert.alert(
+        'Recording Failed',
+        `Failed to start recording: ${errorMessage}\n\nPlease check:\n- Microphone permissions are granted\n- No other app is using the microphone\n- Try restarting the app`
+      );
       setRecordingState('ready');
+      // Cleanup any partial state
+      await cleanupAllRecordings();
     }
   };
 

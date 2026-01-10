@@ -19,6 +19,7 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
+import { isExpoGo } from "../utils/expoGoDetection";
 import { GeminiCommandParser } from "../services/GeminiCommandParser";
 import { CommandExecutor } from "../services/CommandExecutor";
 import { HapticFeedback } from "../utils/haptics";
@@ -274,8 +275,16 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
 
   const toggleListening = async () => {
     if (isListening) {
-      await ExpoSpeechRecognitionModule.stop();
+      if (!isExpoGo()) {
+        await ExpoSpeechRecognitionModule.stop();
+      }
     } else {
+      if (isExpoGo()) {
+        setErrorMessage("Speech recognition is not available in Expo Go. Please use a development build.");
+        setTimeout(() => setErrorMessage(null), 5000);
+        return;
+      }
+
       try {
         const result =
           await ExpoSpeechRecognitionModule.requestPermissionsAsync();

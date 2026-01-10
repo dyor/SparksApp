@@ -562,17 +562,19 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const textInputRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
-    // Dismiss keyboard first
+    // Prevent double submission
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    // Dismiss keyboard immediately without waiting
     if (textInputRef.current) {
       textInputRef.current.blur();
     }
     Keyboard.dismiss();
     
-    // Small delay to ensure keyboard is dismissed before submitting
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    setIsSubmitting(true);
     try {
+      // Submit immediately - don't wait for keyboard animation
       await onSubmit(0, feedback); // Rating is handled separately now
       HapticFeedback.success();
       onClose();
@@ -580,7 +582,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       setFeedback("");
     } catch (error) {
       Alert.alert("Error", "Failed to submit feedback. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -610,7 +611,10 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           backgroundColor: colors.primary,
           opacity: isSubmitting ? 0.6 : 1,
         }}
-        onPress={handleSubmit}
+        onPress={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
         disabled={isSubmitting}
       >
         <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>

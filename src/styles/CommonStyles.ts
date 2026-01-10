@@ -125,6 +125,7 @@ export const createCommonStyles = (colors: ThemeColors) => {
             marginBottom: 0,
             borderBottomLeftRadius: 0,
             borderBottomRightRadius: 0,
+            paddingBottom: 0,
         },
 
         // Empty states

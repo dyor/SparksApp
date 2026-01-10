@@ -1,4 +1,5 @@
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
+import { isExpoGo } from '../utils/expoGoDetection';
 
 class VoiceCommandServiceClass {
     private isListening = false;
@@ -15,8 +16,17 @@ class VoiceCommandServiceClass {
     }
 
     async requestPermissions(): Promise<boolean> {
-        const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-        return result.granted;
+        if (isExpoGo()) {
+            console.warn('⚠️ ExpoSpeechRecognition is not available in Expo Go');
+            return false;
+        }
+        try {
+            const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+            return result.granted;
+        } catch (error) {
+            console.error('Error requesting speech recognition permissions:', error);
+            return false;
+        }
     }
 
     async startListening(
@@ -25,6 +35,11 @@ class VoiceCommandServiceClass {
         onStateChange: (isListening: boolean) => void
     ) {
         if (this.isListening) return;
+
+        if (isExpoGo()) {
+            onError('Speech recognition is not available in Expo Go. Please use a development build.');
+            return;
+        }
 
         this.onResultCallback = onResult;
         this.onErrorCallback = onError;
@@ -35,14 +50,6 @@ class VoiceCommandServiceClass {
             if (!hasPermissions) {
                 throw new Error('Microphone permission denied');
             }
-
-            // Start method depends on the library version, checking docs standard
-            // ExpoSpeechRecognitionModule.start({ ... })
-
-            // Since I don't have the exact API docs for this specific library version in front of me,
-            // I'll assume standard Expo module pattern.
-            // Wait, the plan said "new dependency". I should check usage if possible.
-            // But standard pattern is usually:
 
             this.isListening = true;
             this.onStateChangeCallback(true);
@@ -56,9 +63,6 @@ class VoiceCommandServiceClass {
                 addsPunctuation: true,
             });
 
-            // We need to setup event listeners
-            // For a singleton service, we might need to reference the listeners globally or re-attach.
-
         } catch (error: any) {
             this.isListening = false;
             if (this.onStateChangeCallback) this.onStateChangeCallback(false);
@@ -68,6 +72,12 @@ class VoiceCommandServiceClass {
 
     async stopListening() {
         if (!this.isListening) return;
+
+        if (isExpoGo()) {
+            this.isListening = false;
+            if (this.onStateChangeCallback) this.onStateChangeCallback(false);
+            return;
+        }
 
         try {
             await ExpoSpeechRecognitionModule.stop();
@@ -79,7 +89,7 @@ class VoiceCommandServiceClass {
     }
 
     isAvailable(): boolean {
-        return true; // We can add a proper check if the module supports it
+        return !isExpoGo(); // Not available in Expo Go
     }
 }
 

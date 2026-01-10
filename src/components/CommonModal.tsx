@@ -53,9 +53,9 @@ export const CommonModal: React.FC<CommonModalProps> = ({
     const ContentWrapper = scrollable ? ScrollView : View;
 
     // When keyboard is visible, extend modal content to full width and bottom to avoid white space on sides
-        const modalContentStyle = keyboardVisible
-            ? [commonStyles.modalContent, commonStyles.modalContentKeyboardVisible]
-            : commonStyles.modalContent;
+    const modalContentStyle = keyboardVisible
+        ? [commonStyles.modalContent, commonStyles.modalContentKeyboardVisible]
+        : commonStyles.modalContent;
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -64,7 +64,10 @@ export const CommonModal: React.FC<CommonModalProps> = ({
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                 >
-                    <View style={commonStyles.modalOverlay}>
+                    <View style={[
+                        commonStyles.modalOverlay,
+                        keyboardVisible && { justifyContent: 'flex-end' }
+                    ]}>
                         <TouchableWithoutFeedback testID="modal-backdrop" onPress={onClose}>
                             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
                         </TouchableWithoutFeedback>
