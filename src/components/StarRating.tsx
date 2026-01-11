@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,11 @@ export const StarRating: React.FC<StarRatingProps> = ({
   const [scaleAnimations] = useState(
     Array.from({ length: maxRating }, () => new Animated.Value(1))
   );
+
+  // Sync internal state with prop changes
+  useEffect(() => {
+    setAnimatedRating(rating);
+  }, [rating]);
 
   const handleStarPress = (selectedRating: number) => {
     if (disabled) return;

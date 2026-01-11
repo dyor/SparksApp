@@ -371,6 +371,13 @@ Generate the recipe now:`;
             borderRadius: 16,
             padding: 16,
             marginBottom: 12,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        recipeInfo: {
+            flex: 1,
+            marginRight: 12,
         },
         recipeTitle: {
             fontSize: 18,
@@ -609,7 +616,18 @@ Generate the recipe now:`;
                                     HapticFeedback.selection();
                                 }}
                             >
-                                <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                                <View style={styles.recipeInfo}>
+                                    <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                                </View>
+                                {recipe.rating !== undefined && recipe.rating > 0 && (
+                                    <StarRating
+                                        rating={recipe.rating}
+                                        onRatingChange={() => { }}
+                                        disabled
+                                        size={16}
+                                        showLabel={false}
+                                    />
+                                )}
                             </TouchableOpacity>
                         ))
                     )}

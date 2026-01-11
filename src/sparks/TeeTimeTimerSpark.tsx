@@ -710,7 +710,10 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   onStateChange,
   onComplete
 }) => {
-  const { getSparkData, setSparkData, isHydrated } = useSparkStore();
+  const getSparkData = useSparkStore(state => state.getSparkData);
+  const setSparkData = useSparkStore(state => state.setSparkData);
+  const isHydrated = useSparkStore(state => state.isHydrated);
+  
   const { colors } = useTheme();
 
   const [activities, setActivities] = useState<Activity[]>(defaultActivities);
@@ -780,25 +783,30 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
   // Save data whenever activities or timerState change - with dataLoaded guard
   useEffect(() => {
-    if (!dataLoaded) return; // ✅ Prevent overwriting during hydration
+    if (!dataLoaded || !isHydrated) return; // ✅ Prevent overwriting during hydration
 
-    console.log(`📦 TeeTimeTimerSpark: Saving ${activities.length} activities to store...`);
-    setSparkData('tee-time-timer', {
-      activities,
-      timerState: {
-        ...timerState,
-        teeTime: timerState.teeTime ? timerState.teeTime.toISOString() : null,
-        startTime: timerState.startTime ? timerState.startTime.toISOString() : null,
-        completedActivities: Array.from(timerState.completedActivities),
-      },
-      lastUsed: new Date().toISOString(),
-    });
-    onStateChange?.({
-      activityCount: activities.length,
-      isActive: timerState.isActive,
-      hasTeeTime: timerState.teeTime !== null,
-    });
-  }, [activities, timerState, dataLoaded, setSparkData, onStateChange]);
+    const saveToStore = () => {
+      console.log(`📦 TeeTimeTimerSpark: Saving ${activities.length} activities and state to store...`);
+      setSparkData('tee-time-timer', {
+        activities,
+        timerState: {
+          ...timerState,
+          teeTime: timerState.teeTime ? timerState.teeTime.toISOString() : null,
+          startTime: timerState.startTime ? timerState.startTime.toISOString() : null,
+          completedActivities: Array.from(timerState.completedActivities),
+        },
+        lastUsed: new Date().toISOString(),
+      });
+      
+      onStateChange?.({
+        activityCount: activities.length,
+        isActive: timerState.isActive,
+        hasTeeTime: timerState.teeTime !== null,
+      });
+    };
+
+    saveToStore();
+  }, [activities, timerState, dataLoaded, isHydrated, setSparkData, onStateChange]);
 
   // Timer logic
   useEffect(() => {
@@ -1120,7 +1128,8 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   };
 
   const saveActivities = (newActivities: Activity[]) => {
-    setActivities(newActivities);
+    console.log('💾 TeeTimeTimerSpark: saveActivities called with', newActivities.length, 'activities');
+    setActivities([...newActivities]);
     HapticFeedback.success();
   };
 
