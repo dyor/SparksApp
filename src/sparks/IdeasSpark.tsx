@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { useSparkStore } from '../store';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, FlatList, Modal, ScrollView, Platform } from 'react-native';
+import { useSparkStore } from '../store/sparkStore';
+import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { createCommonStyles } from '../styles/CommonStyles';
-import { Input } from '../components/FormComponents';
-import { SettingsContainer, SettingsScrollView, SettingsHeader, SettingsFeedbackSection } from '../components/SettingsComponents';
+import { StyleTokens } from '../styles/StyleTokens';
+import {
+    SettingsContainer,
+    SettingsScrollView,
+    SettingsHeader,
+    SettingsFeedbackSection,
+    SettingsButton,
+    SettingsSection,
+    SettingsText
+} from '../components/SettingsComponents';
+import { FeedbackService } from '../services/FeedbackService';
+import { ServiceFactory } from '../services/ServiceFactory';
+import Markdown from 'react-native-markdown-display';
+import { CommonModal } from '../components/CommonModal';
 
 interface Idea {
     id: string;
-    content: string;
-    createdAt: string; // ISO string
+    text: string;
+    timestamp: number;
 }
 
 interface IdeasSparkProps {
@@ -17,250 +31,527 @@ interface IdeasSparkProps {
     onCloseSettings?: () => void;
 }
 
-export const IdeasSpark: React.FC<IdeasSparkProps> = ({ showSettings, onCloseSettings }) => {
-    const { getSparkData, setSparkData } = useSparkStore();
-    const { colors } = useTheme();
-    const commonStyles = createCommonStyles(colors);
+// Help Modal Content
+const HELP_CONTENT = `
+# Ideas Spark Help
+
+**Functionality:**
+- **Capture Ideas**: Document your thoughts quickly.
+- **Markdown Support**: Use **bold**, *italics*, and URLs.
+- **Search & Sort**: Find ideas easily. Sort by entered date or alphabetically.
+
+**View Modes:**
+- **Condensed**: Shows 2 lines of text.
+- **Default**: Shows 4 lines of text.
+- **Expanded**: Click an idea to see full text.
+
+**Editing:**
+- Click the edit icon to modify an idea.
+- Use formatting tools for emphasis.
+- Save requires confirmation.
+`;
+
+const HelpModal: React.FC<{ visible: boolean; onClose: () => void; themeColors: any }> = ({ visible, onClose, themeColors }) => (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: themeColors.surface, borderRadius: 16, padding: 20, width: '100%', maxHeight: '80%' }}>
+                <ScrollView>
+                    <Markdown style={{ body: { color: themeColors.text } }}>
+                        {HELP_CONTENT}
+                    </Markdown>
+                </ScrollView>
+                <TouchableOpacity onPress={onClose} style={{ marginTop: 20, padding: 12, backgroundColor: themeColors.primary, borderRadius: 8, alignItems: 'center' }}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Close</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    </Modal>
+);
+
+const IdeasSettings: React.FC<{
+    onClose: () => void;
+    currentTheme: 'light' | 'dark';
+    onToggleTheme: () => void;
+}> = ({ onClose, currentTheme, onToggleTheme }) => {
+    const [helpVisible, setHelpVisible] = useState(false);
+
+    return (
+        <SettingsContainer>
+            <SettingsScrollView>
+                <SettingsHeader
+                    title="Ideas Settings"
+                    subtitle="Manage your idea preferences"
+                    icon="💡"
+                    sparkId="ideas"
+                />
+                <SettingsFeedbackSection sparkName="Ideas" sparkId="ideas" />
+
+                <SettingsSection title="Appearance">
+                    <SettingsButton
+                        title={`Current Theme: ${currentTheme.toUpperCase()} (Tap to Toggle)`}
+                        onPress={onToggleTheme}
+                        variant="outline"
+                    />
+                </SettingsSection>
+
+                <SettingsSection title="Help">
+                    <SettingsButton
+                        title="How to use Ideas"
+                        onPress={() => setHelpVisible(true)}
+                        variant="secondary"
+                    />
+                </SettingsSection>
+
+                <SettingsButton title="Close" variant="secondary" onPress={onClose} />
+                <HelpModal visible={helpVisible} onClose={() => setHelpVisible(false)} themeColors={getThemeColors(currentTheme)} />
+            </SettingsScrollView>
+        </SettingsContainer>
+    );
+};
+
+const getThemeColors = (mode: 'light' | 'dark') => mode === 'light' ? {
+    background: '#F2F2F7',
+    surface: '#FFFFFF',
+    text: '#000000',
+    textSecondary: '#8E8E93',
+    border: '#C6C6C8',
+    primary: '#007AFF',
+    error: '#FF3B30',
+    danger: '#FF3B30',
+    success: '#34C759'
+} : {
+    background: '#000000',
+    surface: '#1C1C1E',
+    text: '#FFFFFF',
+    textSecondary: '#8E8E93',
+    border: '#38383A',
+    primary: '#0A84FF',
+    error: '#FF453A',
+    danger: '#FF453A',
+    success: '#32D74B'
+};
+
+export const IdeasSpark: React.FC<IdeasSparkProps> = ({
+    showSettings = false,
+    onCloseSettings,
+}) => {
+    const getSparkData = useSparkStore((state: any) => state.getSparkData);
+    const setSparkData = useSparkStore((state: any) => state.setSparkData);
+    const globalTheme = useTheme();
+
+    // Local state
+    const [localThemeMode, setLocalThemeMode] = useState<'light' | 'dark'>('light');
+
+    // Compute local colors based on theme mode
+    const colors = getThemeColors(localThemeMode);
 
     const [ideas, setIdeas] = useState<Idea[]>([]);
-    const [newIdea, setNewIdea] = useState('');
-    const [searchKeyword, setSearchKeyword] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [newIdeaText, setNewIdeaText] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'date' | 'alpha'>('date');
+    const [isCondensedMode, setIsCondensedMode] = useState(false); // Default is 4 lines (false)
+    const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
 
-    // Load ideas on mount
+    // Edit Mode State
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editText, setEditText] = useState('');
+    const [selection, setSelection] = useState({ start: 0, end: 0 }); // Track text selection
+    const inputRef = useRef<TextInput>(null);
+
+    // Initial Load
     useEffect(() => {
-        const data = getSparkData('ideas');
-        if (data && data.ideas) {
-            setIdeas(data.ideas);
+        const savedData = getSparkData('ideas');
+        if (savedData.ideas) {
+            setIdeas(savedData.ideas);
+        }
+        if (savedData.localThemeMode) {
+            setLocalThemeMode(savedData.localThemeMode);
         }
     }, [getSparkData]);
 
-    // Save ideas when changed
+    // Persistence
     useEffect(() => {
-        const data = getSparkData('ideas');
-        setSparkData('ideas', { ...data, ideas });
-    }, [ideas, setSparkData, getSparkData]);
+        const savedData = getSparkData('ideas');
+        setSparkData('ideas', { ...savedData, ideas, localThemeMode });
+    }, [ideas, localThemeMode, setSparkData, getSparkData]);
 
-    const handleAddIdea = () => {
-        if (!newIdea.trim()) return;
+    useEffect(() => {
+        ServiceFactory.getAnalyticsService().trackSparkOpen('ideas', 'Ideas');
+    }, []);
 
-        const idea: Idea = {
+    // --- Helper: Convert Custom Tags to Markdown for rendering ---
+    const preprocessText = (text: string) => {
+        if (!text) return '';
+        return text
+            .replace(/<b\s+([\s\S]*?)\s+b>/g, '**$1**')   // Bold: <b text b> -> **text**
+            .replace(/<i\s+([\s\S]*?)\s+i>/g, '*$1*')    // Italic: <i text i> -> *text*
+            .replace(/<j\s+([\s\S]*?)\s+j>/g, '==$1==')  // (Optional extra)
+            .replace(/<h\s+([\s\S]*?)\s+h>/g, '`$1`')    // Highlight: <h text h> -> `text`
+            .replace(/<#\s+([\s\S]*?)\s+#>/g, '\n# $1\n'); // Header: <# text #> -> # text
+    };
+
+    const addIdea = () => {
+        if (editingId) return; // Disable adding while editing
+        if (!newIdeaText.trim()) return;
+        const newIdea: Idea = {
             id: Date.now().toString(),
-            content: newIdea.trim(),
-            createdAt: new Date().toISOString(),
+            text: newIdeaText.trim(),
+            timestamp: Date.now(),
+        };
+        setIdeas(prev => [newIdea, ...prev]);
+        setNewIdeaText('');
+        HapticFeedback.light();
+    };
+
+    const confirmDelete = (id: string) => {
+        const performDelete = () => {
+            setIdeas(prev => prev.filter(i => i.id !== id));
+            HapticFeedback.medium();
         };
 
-        setIdeas([idea, ...ideas]); // Newest first
-        setNewIdea('');
+        if (Platform.OS === 'web') {
+            if (window.confirm("Are you sure you want to delete this idea?")) {
+                performDelete();
+            }
+        } else {
+            Alert.alert(
+                "Delete Idea",
+                "Are you sure you want to delete this idea?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: performDelete }
+                ]
+            );
+        }
     };
 
-    const formatDate = (isoString: string) => {
-        return isoString.split('T')[0];
+    const startEditing = (idea: Idea) => {
+        if (editingId) return; // Prevent starting another edit if one is active
+        setEditingId(idea.id);
+        setEditText(idea.text);
+        setSelection({ start: 0, end: 0 }); // Reset selection
+        // Expanded state is handled logically in renderItem now
     };
 
-    const renderContentWithHighlight = (content: string, keyword: string) => {
-        if (!keyword) return <Text style={{ color: colors.text }}>{content}</Text>;
+    const saveEdit = () => {
+        const performSave = () => {
+            setIdeas(prev => prev.map(i => i.id === editingId ? { ...i, text: editText } : i));
+            setEditingId(null);
+            setEditText('');
+            HapticFeedback.success();
+        };
 
-        const parts = content.split(new RegExp(`(${keyword})`, 'gi'));
-        return (
-            <Text style={{ color: colors.text }}>
-                {parts.map((part, index) =>
-                    part.toLowerCase() === keyword.toLowerCase() ? (
-                        <Text key={index} style={styles.highlightedText}>{part}</Text>
-                    ) : (
-                        <Text key={index}>{part}</Text>
-                    )
-                )}
-            </Text>
-        );
+        if (Platform.OS === 'web') {
+            if (window.confirm("Are you sure you want to save changes?")) {
+                performSave();
+            }
+        } else {
+            Alert.alert(
+                "Save Changes",
+                "Are you sure you want to save changes?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Save", onPress: performSave }
+                ]
+            );
+        }
     };
 
-    const filteredIdeas = ideas.filter(idea => {
-        const matchKeyword = !searchKeyword || idea.content.toLowerCase().includes(searchKeyword.toLowerCase());
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditText('');
+    };
 
-        // Simple date string comparison (YYYY-MM-DD)
-        const ideaDate = idea.createdAt.split('T')[0];
-        const afterStart = !startDate || ideaDate >= startDate;
-        const beforeEnd = !endDate || ideaDate <= endDate;
+    const insertFormat = (tag: string, closeTag?: string) => {
+        const start = selection.start;
+        const end = selection.end;
+        const tagEnd = closeTag || tag; // Use same tag for closing if not specified (e.g. **)
 
-        return matchKeyword && afterStart && beforeEnd;
-    });
+        if (start === end) {
+            // No selection: insert at cursor (or append if unknown)
+            // Just inserting the tags empty like "**|**" 
+            const newText = editText.slice(0, start) + tag + tagEnd + editText.slice(end);
+            setEditText(newText);
+            // Ideally move cursor inside keys, but RN selection prop control is tricky on some platforms w/o state sync
+        } else {
+            // Wrap selection
+            const selectedText = editText.slice(start, end);
+            const newText = editText.slice(0, start) + tag + selectedText + tagEnd + editText.slice(end);
+            setEditText(newText);
+        }
+    };
+
+    const filteredIdeas = ideas
+        .filter(i => i.text.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => {
+            if (sortBy === 'date') return b.timestamp - a.timestamp;
+            return a.text.localeCompare(b.text);
+        });
 
     const styles = StyleSheet.create({
-        ...commonStyles,
-        container: {
-            flex: 1,
-            backgroundColor: colors.background,
-            padding: 16,
+        container: { flex: 1, backgroundColor: colors.background },
+        header: { padding: 16, paddingTop: 60, backgroundColor: colors.surface },
+        titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+        title: { fontSize: 28, fontWeight: 'bold', color: colors.text },
+        controls: { flexDirection: 'row', gap: 10 },
+        controlBtn: { padding: 8, backgroundColor: colors.background, borderRadius: 8 },
+        searchBar: { backgroundColor: colors.background, padding: 10, borderRadius: 8, color: colors.text },
+
+        listContent: { padding: 16, paddingBottom: 100 },
+        card: {
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            marginBottom: 16,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: colors.border
         },
-        header: {
-            fontSize: 24,
+        cardHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8
+        },
+        dateText: { fontSize: 12, color: colors.textSecondary },
+        headerIcons: { flexDirection: 'row', gap: 12 },
+        iconText: { fontSize: 18 },
+
+
+        disabledCard: { opacity: 0.5 }, // Visual feedback for disabled items
+
+        // Edit Mode Styles
+        editContainer: {},
+        editInput: {
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 8,
+            padding: 8,
+            color: colors.text,
+            minHeight: 300,
+            textAlignVertical: 'top',
+            marginBottom: 8
+        },
+        toolbar: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+        toolBtn: { padding: 6, backgroundColor: colors.background, borderRadius: 4, borderWidth: 1, borderColor: colors.border },
+        actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+        saveBtn: { padding: 8, backgroundColor: colors.primary, borderRadius: 6 },
+        cancelBtn: { padding: 8, backgroundColor: colors.border, borderRadius: 6 },
+        btnText: { color: '#fff', fontWeight: '600' },
+
+        inputArea: {
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            padding: 16,
+            backgroundColor: colors.surface,
+            opacity: editingId ? 0.5 : 1 // Dim input area when editing
+        },
+        mainInput: {
+            backgroundColor: colors.background,
+            borderRadius: 12,
+            padding: 12,
+            color: colors.text,
+            minHeight: 60
+        },
+        addBtn: {
+            backgroundColor: colors.primary,
+            padding: 12,
+            borderRadius: 12,
+            alignItems: 'center',
+            marginTop: 8
+        },
+        // Help Modal Styles
+        helpScroll: {
+            padding: 10,
+            borderRadius: 8,
+            backgroundColor: colors.background,
+            marginBottom: 10,
+        },
+        helpSectionTitle: {
+            fontSize: 18,
             fontWeight: 'bold',
             color: colors.text,
-            marginBottom: 16,
-            textAlign: 'center',
+            marginBottom: 8,
         },
-        inputContainer: {
-            flexDirection: 'row',
-            marginBottom: 16,
-            gap: 8,
-        },
-        addButton: {
-            backgroundColor: colors.primary,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            borderRadius: 8,
-            height: 50, // Match typical input height
-            marginTop: 22, // Align with input field (below label spacer)
-        },
-        addButtonText: {
-            color: 'white',
-            fontWeight: 'bold',
-        },
-        searchContainer: {
-            marginBottom: 16,
-            backgroundColor: colors.surface,
-            padding: 12,
-            borderRadius: 8,
-        },
-        ideasList: {
-            flex: 1,
-        },
-        ideaCard: {
-            backgroundColor: colors.surface,
-            padding: 16,
-            borderRadius: 8,
-            marginBottom: 12,
-            borderLeftWidth: 4,
-            borderLeftColor: colors.primary,
-        },
-        ideaDate: {
-            fontSize: 12,
-            color: colors.textSecondary,
+        helpText: {
+            fontSize: 14,
+            color: colors.text,
             marginBottom: 4,
         },
-        ideaText: {
-            fontSize: 16,
-            color: colors.text,
-            lineHeight: 22,
-        },
-        highlightedText: {
-            textDecorationLine: 'underline',
-            fontWeight: 'bold',
-            backgroundColor: 'rgba(255, 255, 0, 0.2)',
-            color: colors.text,
-        },
-        emptyText: {
-            textAlign: 'center',
-            color: colors.textSecondary,
-            marginTop: 20,
-        },
-        settingsCloseButton: {
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 8,
+        helpTagRow: {
+            flexDirection: 'row',
             alignItems: 'center',
-            borderWidth: 1,
-            backgroundColor: 'transparent',
-            marginTop: 20,
-            alignSelf: 'center',
+            marginBottom: 4,
+            marginLeft: 10,
+        },
+        helpCode: {
+            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+            backgroundColor: colors.border,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 4,
+            marginRight: 8,
+            color: colors.text,
+            fontSize: 13,
+        },
+        helpDesc: {
+            fontSize: 14,
+            color: colors.text,
         },
     });
 
     if (showSettings) {
-        return (
-            <SettingsContainer>
-                <SettingsScrollView>
-                    <SettingsHeader
-                        title="Ideas Settings"
-                        subtitle="Manage your ideas spark"
-                        icon="💡"
-                        sparkId="ideas"
-                    />
-
-                    <SettingsFeedbackSection sparkName="Ideas" sparkId="ideas" />
-
-                    <TouchableOpacity
-                        style={[styles.settingsCloseButton, { borderColor: colors.border }]}
-                        onPress={() => onCloseSettings?.()}
-                    >
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-                            Close
-                        </Text>
-                    </TouchableOpacity>
-                </SettingsScrollView>
-            </SettingsContainer>
-        );
+        return <IdeasSettings
+            onClose={onCloseSettings!}
+            currentTheme={localThemeMode}
+            onToggleTheme={() => setLocalThemeMode(prev => prev === 'light' ? 'dark' : 'light')}
+        />;
     }
 
-    return (
-        <View style={styles.container}>
-            <Text style={styles.header}>Ideas 💡</Text>
+    const renderItem = ({ item }: { item: Idea }) => {
+        const isEditing = editingId === item.id;
+        const isReferenceIDExpanded = expandedIdeaId === item.id;
 
-            <View style={styles.inputContainer}>
-                <Input
-                    containerStyle={{ flex: 1, marginBottom: 0 }}
-                    placeholder="New Idea..."
-                    value={newIdea}
-                    onChangeText={setNewIdea}
-                    label="Capture Idea"
-                />
-                <TouchableOpacity style={styles.addButton} onPress={handleAddIdea}>
-                    <Text style={styles.addButtonText}>Add</Text>
-                </TouchableOpacity>
-            </View>
+        // If editing, always show full edit view.
+        // If not editing, but another item IS editing, disable this item.
+        const isOtherEditing = editingId !== null && !isEditing;
 
-            <View style={styles.searchContainer}>
-                <Input
-                    label="Search Keywords"
-                    placeholder="Search..."
-                    value={searchKeyword}
-                    onChangeText={setSearchKeyword}
-                    containerStyle={{ marginBottom: 12 }}
-                />
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                        <Input
-                            label="Start Date"
-                            placeholder="2024-01-01"
-                            value={startDate}
-                            onChangeText={setStartDate}
-                            containerStyle={{ marginBottom: 0 }}
-                        />
+        if (isEditing) {
+            return (
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.dateText}>Editing...</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                        <Input
-                            label="End Date"
-                            placeholder="2024-12-31"
-                            value={endDate}
-                            onChangeText={setEndDate}
-                            containerStyle={{ marginBottom: 0 }}
+                    <View style={styles.editContainer}>
+                        <View style={[styles.toolbar, { justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity onPress={() => insertFormat('<b ', ' b>')} style={styles.toolBtn}><Text style={{ color: colors.text, fontWeight: 'bold' }}>B</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => insertFormat('<i ', ' i>')} style={styles.toolBtn}><Text style={{ color: colors.text, fontStyle: 'italic' }}>I</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => insertFormat('<h ', ' h>')} style={styles.toolBtn}><Text style={{ color: colors.text, backgroundColor: '#fff176' }}>H</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => insertFormat('<# ', ' #>')} style={styles.toolBtn}><Text style={{ color: colors.text, fontWeight: 'bold' }}>T</Text></TouchableOpacity>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity onPress={saveEdit} style={[styles.toolBtn, { backgroundColor: colors.primary }]}>
+                                    <Text style={{ color: 'white', fontWeight: 'bold' }}>SAVE</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={cancelEdit} style={[styles.toolBtn, { borderColor: colors.danger }]}>
+                                    <Text style={{ color: colors.danger }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        <TextInput
+                            value={editText}
+                            onChangeText={setEditText}
+                            onSelectionChange={(e: any) => setSelection(e.nativeEvent.selection)}
+                            style={styles.editInput}
+                            multiline
+                            placeholder="Write your idea here (use <b text b> for bold...)"
+                            placeholderTextColor={colors.textSecondary}
+                            autoFocus
                         />
                     </View>
                 </View>
+            );
+        }
+
+        // Logic for view mode:
+        // Combined with check for disabled state
+
+
+        return (
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                    if (isOtherEditing) return; // Locked
+                    setExpandedIdeaId(isReferenceIDExpanded ? null : item.id);
+                }}
+                disabled={isOtherEditing}
+                style={[styles.card, isOtherEditing && styles.disabledCard]}
+            >
+                <View style={styles.cardHeader}>
+                    <Text style={styles.dateText}>{new Date(item.timestamp).toLocaleDateString()}</Text>
+                    {!isOtherEditing && (
+                        <View style={styles.headerIcons}>
+                            <TouchableOpacity onPress={() => startEditing(item)} hitSlop={10}>
+                                <Text style={styles.iconText}>✏️</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => confirmDelete(item.id)} hitSlop={10}>
+                                <Text style={styles.iconText}>🗑️</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+
+                <View style={{
+                    maxHeight: isReferenceIDExpanded ? undefined : (isCondensedMode ? 60 : 120),
+                    overflow: 'hidden'
+                }}>
+                    <Markdown style={{
+                        body: { color: colors.text, fontSize: 16, lineHeight: 24 },
+                        link: { color: colors.primary, textDecorationLine: 'underline' },
+                        code_inline: {
+                            backgroundColor: '#fff176', // Yellow highlight
+                            color: colors.text,         // Keep text color
+                            fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif', // Reset font to look like normal text
+                            fontWeight: 'bold',
+                            borderRadius: 4,
+                            paddingHorizontal: 4
+                        }
+                    }}>
+                        {preprocessText(item.text)}
+                    </Markdown>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <View style={styles.titleRow}>
+                    <Text style={styles.title}>💡 Ideas</Text>
+                    <View style={styles.controls}>
+                        <TouchableOpacity onPress={() => setSortBy(prev => prev === 'date' ? 'alpha' : 'date')} style={styles.controlBtn}>
+                            <Text style={{ fontSize: 16, color: colors.text }}>{sortBy === 'date' ? '📅' : 'AZ'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setIsCondensedMode(!isCondensedMode)} style={styles.controlBtn}>
+                            <Text style={{ fontSize: 16, color: colors.text }}>{isCondensedMode ? 'Expand View 🔽' : 'Condense View 🔼'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+                <TextInput
+                    style={styles.searchBar}
+                    placeholder="Search..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    editable={!editingId} // Disable search while editing
+                />
             </View>
 
-            <ScrollView style={styles.ideasList}>
-                {filteredIdeas.map(idea => (
-                    <View key={idea.id} style={styles.ideaCard}>
-                        <Text style={styles.ideaDate}>{formatDate(idea.createdAt)}</Text>
-                        <Text style={styles.ideaText}>
-                            {renderContentWithHighlight(idea.content, searchKeyword)}
-                        </Text>
-                    </View>
-                ))}
-                {filteredIdeas.length === 0 && (
-                    <Text style={styles.emptyText}>
-                        No ideas found
-                    </Text>
+            <FlatList
+                data={filteredIdeas}
+                renderItem={renderItem}
+                keyExtractor={(item: Idea) => item.id}
+                contentContainerStyle={styles.listContent}
+                ListEmptyComponent={<View style={{ alignItems: 'center', marginTop: 40 }}><Text style={{ color: colors.textSecondary }}>No ideas yet</Text></View>}
+            />
+
+            <View style={styles.inputArea} pointerEvents={editingId ? 'none' : 'auto'}>
+                <TextInput
+                    style={styles.mainInput}
+                    placeholder="New Idea..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={newIdeaText}
+                    onChangeText={setNewIdeaText}
+                    multiline
+                    editable={!editingId}
+                />
+                {newIdeaText.trim().length > 0 && (
+                    <TouchableOpacity onPress={addIdea} style={styles.addBtn}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save Idea</Text>
+                    </TouchableOpacity>
                 )}
-            </ScrollView>
+            </View>
         </View>
     );
 };
-
-export default IdeasSpark;
