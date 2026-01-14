@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.26",
+    "version": "1.0.28",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -75,7 +75,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mattdyor.sparks",
-      "buildNumber": "1.0.26",
+      "buildNumber": "1.0.28",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "requireFullScreen": false,
@@ -126,7 +126,7 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.26"
+      "versionName": "1.0.28"
     },
     "extra": {
       "eas": {

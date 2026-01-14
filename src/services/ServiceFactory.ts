@@ -14,6 +14,7 @@ import { WebFirebaseService } from './WebFirebaseService';
 import { FirebaseService as NativeFirebaseService } from './FirebaseService';
 import { SimpleAnalyticsService } from './SimpleAnalyticsService';
 import { Platform } from 'react-native';
+import { isExpoGo } from '../utils/expoGoDetection';
 
 // Detect available Firebase implementations
 let isWebFirebaseAvailable = false;
@@ -28,9 +29,10 @@ try {
 }
 
 try {
-  // Check Native SDK
+  // Check Native SDK module availability
   const { FirebaseService: native } = require('./FirebaseService');
-  isNativeFirebaseAvailable = native.isInitialized();
+  isNativeFirebaseAvailable = native.isModuleAvailable() && !isExpoGo();
+  console.log('🔥 Native Firebase available:', isNativeFirebaseAvailable, '(isExpoGo:', isExpoGo(), ')');
 } catch (error) {
   isNativeFirebaseAvailable = false;
 }
@@ -79,6 +81,7 @@ export class ServiceFactory {
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.error('❌ Failed to initialize Web Firebase service:', error);
+        throw error; // Rethrow to inform the caller
       }
     }
   }
@@ -104,6 +107,7 @@ export class ServiceFactory {
         this.analyticsServiceInitialized = true;
       } catch (error) {
         console.error('❌ Failed to initialize Analytics service:', error);
+        throw error; // Rethrow to inform the caller
       }
     }
   }

@@ -250,21 +250,32 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
       const filename = `dream_${Date.now()}.m4a`;
 
       // Save recording to permanent storage
-      const permanentUri = await DreamRecordingService.saveRecordingToStorage(recordedUri, filename);
+      const permanentUri = recordedUri.startsWith('file://') && !recordedUri.includes('dream-catcher')
+        ? await DreamRecordingService.saveRecordingToStorage(recordedUri, filename)
+        : recordedUri;
 
-      // Save dream entry
-      const dream = await DreamStorageService.saveDream({
-        timestamp: now.getTime(),
-        date: dateStr,
-        audioUri: permanentUri,
-        transcription: transcription.trim(),
-        geminiInterpretation: geminiInterpretation || undefined,
-      });
-
-      setCurrentDream(dream);
+      if (currentDream) {
+        // Update existing dream
+        await DreamStorageService.updateDream(currentDream.id, {
+          audioUri: permanentUri,
+          transcription: transcription.trim(),
+          geminiInterpretation: geminiInterpretation || undefined,
+        });
+      } else {
+        // Save new dream entry
+        const dream = await DreamStorageService.saveDream({
+          timestamp: now.getTime(),
+          date: dateStr,
+          audioUri: permanentUri,
+          transcription: transcription.trim(),
+          geminiInterpretation: geminiInterpretation || undefined,
+        });
+        setCurrentDream(dream);
+      }
       await loadDreamHistory();
 
-      Alert.alert('Saved!', 'Your dream has been saved to your journal.', [
+      Alert.alert('Saved!', 'Your dream and its interpretation have been saved to your journal.', [
+        { text: 'View History', onPress: () => { resetState(); setShowHistory(true); } },
         { text: 'OK', onPress: resetState }
       ]);
       HapticFeedback.success();
@@ -392,7 +403,11 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
                   setRecordedUri(dream.audioUri);
                   setTranscription(dream.transcription);
                   setGeminiInterpretation(dream.geminiInterpretation || null);
-                  setRecordingState('transcribed');
+                  if (dream.geminiInterpretation) {
+                    setRecordingState('interpreted');
+                  } else {
+                    setRecordingState('transcribed');
+                  }
                   setShowHistory(false);
                 }}
               >
@@ -537,8 +552,18 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
                 onPress={interpretWithGemini}
                 disabled={!transcription.trim()}
               >
-                <Text style={styles.actionButtonText}>✨ Discuss with Gemini</Text>
+                <Text style={styles.actionButtonText}>
+                  ✨ {geminiInterpretation ? 'Re-interpret' : 'Discuss with Gemini'}
+                </Text>
               </TouchableOpacity>
+              {geminiInterpretation && (
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setRecordingState('interpreted')}
+                >
+                  <Text style={styles.actionButtonText}>👁️ View</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={styles.buttonRow}>
               <TouchableOpacity
@@ -581,6 +606,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
                 styles.interpretationBox,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
+              nestedScrollEnabled={true}
             >
               <Text style={[styles.interpretationText, { color: colors.text }]}>
                 {geminiInterpretation}
@@ -596,7 +622,6 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
               style={[styles.secondaryButton, { borderColor: colors.border }]}
               onPress={() => {
                 setRecordingState('transcribed');
-                setGeminiInterpretation(null);
               }}
             >
               <Text style={[styles.secondaryButtonText, { color: colors.text }]}>

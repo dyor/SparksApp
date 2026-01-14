@@ -1,6 +1,6 @@
 {
   "name": "sparksapp",
-  "version": "1.0.26",
+  "version": "1.0.28",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -92,6 +92,7 @@
     "eas-cli": "^16.22.0",
     "jest": "~29.7.0",
     "jest-expo": "~53.0.13",
+    "patch-package": "^8.0.1",
     "react-test-renderer": "19.0.0",
     "typescript": "~5.8.3"
   },

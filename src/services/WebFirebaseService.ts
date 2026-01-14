@@ -185,7 +185,14 @@ export class WebFirebaseService {
     >
   ): Promise<string> {
     if (!this._initialized || !this.db) {
-      throw new Error("Firebase not initialized");
+      const configValid = validateFirebaseConfig();
+      throw new Error(
+        `Firebase not initialized. ${
+          !configValid 
+            ? "Missing configuration (check .env file)." 
+            : "Initialization failed (check logs)."
+        }`
+      );
     }
 
     try {

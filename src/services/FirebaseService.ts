@@ -13,36 +13,62 @@ import { MockFirebaseService } from './MockFirebaseService';
 let firestore: any = null;
 let isFirebaseAvailable = false;
 
-try {
-  const firebaseModule = require('@react-native-firebase/firestore');
-  firestore = firebaseModule.default;
-  isFirebaseAvailable = true;
-  console.log('Firebase is available');
-} catch (error) {
-  console.log('Firebase not available, using mock service:', (error as any).message);
-  isFirebaseAvailable = false;
-}
+const loadFirestore = () => {
+  try {
+    // Try to require firestore
+    const firebaseModule = require('@react-native-firebase/firestore');
+    firestore = firebaseModule.default;
+    isFirebaseAvailable = true;
+    console.log('✅ Native Firebase Firestore module is available');
+    return true;
+  } catch (error) {
+    console.log('⚠️ Native Firebase Firestore not available:', (error as any).message);
+    isFirebaseAvailable = false;
+    return false;
+  }
+};
+
+// Initial load attempt
+loadFirestore();
 
 export class FirebaseService {
-  private static db = isFirebaseAvailable ? firestore() : null;
-
-  private static _initialized = isFirebaseAvailable;
+  private static db: any = null;
+  private static _initialized = false;
 
   static async initialize(): Promise<void> {
     console.log('🔥 FirebaseService.initialize() called');
+    
+    // Try to load again if not already available (might have been missing at load time)
+    if (!isFirebaseAvailable) {
+      loadFirestore();
+    }
+
     console.log('🔥 Firebase available:', isFirebaseAvailable);
-    console.log('🔥 Database instance:', this.db ? 'Connected' : 'Not connected');
 
     if (isFirebaseAvailable) {
-      this._initialized = true;
-      console.log('✅ Native Firebase available');
+      try {
+        if (!this.db) {
+          this.db = firestore();
+        }
+        this._initialized = true;
+        console.log('✅ Native Firebase initialized and database instance created');
+      } catch (dbError) {
+        console.error('❌ Failed to initialize Native Firebase database:', dbError);
+        this._initialized = false;
+        throw dbError;
+      }
     } else {
-      console.log('⚠️ Native Firebase NOT available');
+      console.log('⚠️ Native Firebase NOT available, will fallback to other services');
+      // Don't throw here, ServiceFactory will handle the fallback
     }
   }
 
   static isInitialized(): boolean {
     return this._initialized;
+  }
+
+  static isModuleAvailable(): boolean {
+    return isFirebaseAvailable;
   }
 
   static async getCurrentUser(): Promise<any | null> {
@@ -96,6 +122,9 @@ export class FirebaseService {
 
   // Feedback Management
   static async submitFeedback(feedback: Omit<SparkFeedback, 'id' | 'timestamp'>): Promise<void> {
+    if (!this._initialized || !this.db) {
+      throw new Error('Native Firebase not initialized. Database connection missing.');
+    }
     try {
       const cleanedFeedback = this.cleanObject(feedback);
       await this.db.collection('feedback').add({
