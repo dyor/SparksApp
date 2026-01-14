@@ -33,14 +33,14 @@ export interface SparkChartProps {
 export const SparkChart: React.FC<SparkChartProps> = ({
   series,
   height = 200,
-  padding = 30,
+  padding = 20,
   showZeroLine = false,
-  showLegend = true,
+  showLegend = false,
   showTooltips = true,
   onPointPress,
 }) => {
   const { colors } = useTheme();
-  const [chartWidth, setChartWidth] = useState(Dimensions.get('window').width - 40);
+  const [chartWidth, setChartWidth] = useState(Dimensions.get('window').width * 0.95);
   const [selectedPoint, setSelectedPoint] = useState<{ point: DataPoint; series: ChartSeries; x: number; y: number } | null>(null);
 
   const handleLayout = (event: LayoutChangeEvent) => {

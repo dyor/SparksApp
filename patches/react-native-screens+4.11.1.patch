@@ -106,6 +106,29 @@ diff --git a/node_modules/react-native-screens/android/bin/src/paper/java/com/sw
 new file mode 100644
 index 0000000..feafeb5
 Binary files /dev/null and b/node_modules/react-native-screens/android/bin/src/paper/java/com/swmansion/rnscreens/NativeScreensModuleSpec.class differ
+diff --git a/node_modules/react-native-screens/src/fabric/bottom-tabs/BottomTabsAccessoryContentNativeComponent.ts b/node_modules/react-native-screens/src/fabric/bottom-tabs/BottomTabsAccessoryContentNativeComponent.ts
+new file mode 100644
+index 0000000..707435e
+--- /dev/null
++++ b/node_modules/react-native-screens/src/fabric/bottom-tabs/BottomTabsAccessoryContentNativeComponent.ts
+@@ -0,0 +1,17 @@
++'use client';
++
++import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
++import type * as CT from 'react-native/Libraries/Types/CodegenTypes';
++import type { ViewProps } from 'react-native';
++
++type BottomAccessoryEnvironment = 'regular' | 'inline';
++
++export interface NativeProps extends ViewProps {
++  // Temporarily commented out due to codegen issue - will be fixed in future version
++  // environment: CT.WithDefault<BottomAccessoryEnvironment, 'regular'>;
++}
++
++export default codegenNativeComponent<NativeProps>(
++  'RNSBottomTabsAccessoryContent',
++  {},
++);
 diff --git a/node_modules/react-native-screens/src/fabric/bottom-tabs/BottomTabsAccessoryNativeComponent.ts b/node_modules/react-native-screens/src/fabric/bottom-tabs/BottomTabsAccessoryNativeComponent.ts
 new file mode 100644
 index 0000000..a33bbb7

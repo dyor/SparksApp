@@ -81,7 +81,7 @@ Use these existing services and components instead of recreating them:
 
 ### 5. Charts (`SparkChart`)
 - **Location**: `src/components/SparkChart.tsx`
-- **Usage**: Standardized line charts with support for multiple series, dashed/solid lines, and emoji markers. Supports touch tooltips.
+- **Usage**: Standardized line charts with support for multiple series, dashed/solid lines, and emoji markers. Supports touch tooltips. Legend is disabled by default to maximize chart space but can be enabled via `showLegend={true}`. Better suited for full-width displays (90%+ of screen).
 
 ### 6. Feedback (`SettingsFeedbackSection`)
 - **Location**: `src/components/SettingsComponents.tsx`

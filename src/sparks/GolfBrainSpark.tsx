@@ -19,6 +19,7 @@ import { PanGestureHandler, State, GestureHandlerRootView } from "react-native-g
 import { useSparkStore } from "../store";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
+import { SparkChart, ChartSeries } from "../components/SparkChart";
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -937,12 +938,14 @@ const RoundSummaryScreen: React.FC<{
       },
       // Graph styles
       graphContainer: {
-        margin: 20,
-        padding: 16,
+        marginHorizontal: 10,
+        marginVertical: 20,
+        padding: 5,
         backgroundColor: colors.surface,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: colors.border,
+        alignSelf: 'stretch',
       },
       graphTitle: {
         fontSize: 16,
@@ -953,9 +956,9 @@ const RoundSummaryScreen: React.FC<{
       },
       graph: {
         height: 220,
-        width: 300,
+        width: '100%',
         position: "relative",
-        paddingHorizontal: 8,
+        paddingHorizontal: 0,
         alignSelf: "center",
       },
       graphLine: {
@@ -1487,122 +1490,71 @@ const RoundSummaryScreen: React.FC<{
           const validGrossScores = scores.filter((s) => s.gross !== null);
           const validNetScores = scores.filter((s) => s.net !== null);
 
+          const getEmojiForHole = (holeNum: number) => {
+            const holeScore = round.holeScores?.find(hs => hs.holeNumber === holeNum);
+            const holeHasFire = holeScore?.shots?.some(shot => shot.direction === "fire");
+            const holeHasPoorShot = holeScore?.shots?.some(shot => shot.poorShot === true);
+            
+            if (holeHasFire && holeHasPoorShot) return "🔥💩";
+            if (holeHasFire) return "🔥";
+            if (holeHasPoorShot) return "💩";
+            return undefined;
+          };
+
+          const grossSeries: ChartSeries[] = [
+            {
+              id: 'gross',
+              label: 'Gross Over Par',
+              color: colors.primary,
+              data: validGrossScores.map(s => ({
+                x: s.hole,
+                y: s.gross || 0,
+                label: `Hole ${s.hole}: ${s.gross > 0 ? '+' : ''}${s.gross}`,
+                emoji: getEmojiForHole(s.hole)
+              })),
+              style: 'solid',
+              strokeWidth: 3
+            }
+          ];
+
+          const netSeries: ChartSeries[] = [
+            {
+              id: 'net',
+              label: 'Net Over Par',
+              color: "#4CAF50",
+              data: validNetScores.map(s => ({
+                x: s.hole,
+                y: s.net || 0,
+                label: `Hole ${s.hole}: ${s.net > 0 ? '+' : ''}${s.net}`,
+                emoji: getEmojiForHole(s.hole)
+              })),
+              style: 'solid',
+              strokeWidth: 3
+            }
+          ];
+
           return (
             <View>
               {/* Gross Score Graph */}
               <View style={styles.graphContainer}>
                 <Text style={styles.graphTitle}>Cumulative Shots Over Par</Text>
                 <View style={styles.graph}>
-                  {(() => {
-                    const validScores = validGrossScores;
-                    if (validScores.length < 2) {
-                      return (
-                        <Text
-                          style={{
-                            textAlign: "center",
-                            color: colors.text,
-                            marginTop: 40,
-                          }}
-                        >
-                          Complete at least 2 holes to see score progression
-                        </Text>
-                      );
-                    }
-
-                    // Prepare data for LineChart
-                    const chartData = validScores.map((score, index) => {
-                      const holeHasFire = round.holeScores?.some(
-                        (hs) =>
-                          hs.holeNumber === score.hole &&
-                          hs.shots?.some((shot) => shot.direction === "fire")
-                      );
-                      const holeHasPoorShot = round.holeScores?.some(
-                        (hs) =>
-                          hs.holeNumber === score.hole &&
-                          hs.shots?.some((shot) => shot.poorShot === true)
-                      );
-
-                      return {
-                        value: score.gross,
-                        label: score.hole.toString(),
-                        dataPointText:
-                          score.gross > 0
-                            ? `+${score.gross}`
-                            : score.gross.toString(),
-                        dataPointColor: colors.primary,
-                        dataPointRadius: 6,
-                        holeHasFire,
-                        holeHasPoorShot,
-                        customDataPoint:
-                          holeHasFire || holeHasPoorShot ? (
-                            <View style={{ alignItems: "center" }}>
-                              <Text style={{ fontSize: 12, marginBottom: 2 }}>
-                                {holeHasFire ? "🔥" : ""}
-                                {holeHasPoorShot ? "💩" : ""}
-                              </Text>
-                              <View
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: colors.primary,
-                                }}
-                              />
-                            </View>
-                          ) : undefined,
-                      };
-                    });
-
-                    return (
-                      <View style={styles.graph}>
-                        {/* Zero line */}
-                        <View style={[styles.graphZeroLine, { top: 100 }]} />
-
-                        {/* Custom line chart - dots only */}
-                        <View style={styles.customChart}>
-                          {chartData.map((point, index) => {
-                            const x = index * (280 / (chartData.length - 1));
-                            const y = 100 - point.value * 20; // Scale factor of 20
-
-                            return (
-                              <View key={`point-${index}`}>
-                                {/* Data point */}
-                                <View
-                                  style={[
-                                    styles.graphDataPoint,
-                                    {
-                                      left: x - 6,
-                                      top: y - 6,
-                                      backgroundColor: colors.primary,
-                                    },
-                                  ]}
-                                />
-                                {/* Fire and poop emojis if applicable */}
-                                {point.customDataPoint && (
-                                  <Text
-                                    style={[
-                                      styles.graphFireEmoji,
-                                      {
-                                        left: x - 8,
-                                        top: y - 20,
-                                      },
-                                    ]}
-                                  >
-                                    {point.holeHasFire ? "🔥" : ""}
-                                    {point.holeHasPoorShot ? "💩" : ""}
-                                  </Text>
-                                )}
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    );
-                  })()}
+                  {validGrossScores.length < 2 ? (
+                    <Text style={{ textAlign: "center", color: colors.text, marginTop: 40 }}>
+                      Complete at least 2 holes to see score progression
+                    </Text>
+                  ) : (
+                    <SparkChart 
+                      series={grossSeries} 
+                      showZeroLine={true} 
+                      height={200}
+                      showLegend={false}
+                    />
+                  )}
                 </View>
                 <View style={styles.graphLabels}>
-                  {validGrossScores.map((score, index) => (
-                    <Text key={`gross-${score.hole}`} style={styles.graphLabel}>
+                  {validGrossScores.map((score) => (
+                    <Text key={`gross-label-${score.hole}`} style={styles.graphLabel}>
                       {score.hole}
                     </Text>
                   ))}
@@ -1612,120 +1564,24 @@ const RoundSummaryScreen: React.FC<{
               {/* Net Score Graph */}
               {handicap !== undefined && (
                 <View style={styles.graphContainer}>
-                  <Text style={styles.graphTitle}>
-                    Cumulative Shots Over Net Par
-                  </Text>
+                  <Text style={styles.graphTitle}>Cumulative Shots Over Net Par</Text>
                   <View style={styles.graph}>
-                    {(() => {
-                      const validScores = validNetScores;
-                      if (validScores.length < 2) {
-                        return (
-                          <Text
-                            style={{
-                              textAlign: "center",
-                              color: colors.text,
-                              marginTop: 40,
-                            }}
-                          >
-                            Complete at least 2 holes to see net score progression
-                          </Text>
-                        );
-                      }
-
-                      // Prepare data for LineChart
-                      const chartData = validScores.map((score, index) => {
-                        const holeHasFire = round.holeScores?.some(
-                          (hs) =>
-                            hs.holeNumber === score.hole &&
-                            hs.shots?.some((shot) => shot.direction === "fire")
-                        );
-                        const holeHasPoorShot = round.holeScores?.some(
-                          (hs) =>
-                            hs.holeNumber === score.hole &&
-                            hs.shots?.some((shot) => shot.poorShot === true)
-                        );
-
-                        return {
-                          value: score.net,
-                          label: score.hole.toString(),
-                          dataPointText:
-                            score.net > 0
-                              ? `+${score.net}`
-                              : score.net.toString(),
-                          dataPointColor: "#4CAF50",
-                          dataPointRadius: 6,
-                          holeHasFire,
-                          holeHasPoorShot,
-                          customDataPoint:
-                            holeHasFire || holeHasPoorShot ? (
-                              <View style={{ alignItems: "center" }}>
-                                <Text style={{ fontSize: 12, marginBottom: 2 }}>
-                                  {holeHasFire ? "🔥" : ""}
-                                  {holeHasPoorShot ? "💩" : ""}
-                                </Text>
-                                <View
-                                  style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 4,
-                                    backgroundColor: "#4CAF50",
-                                  }}
-                                />
-                              </View>
-                            ) : undefined,
-                        };
-                      });
-
-                      return (
-                        <View style={styles.graph}>
-                          {/* Zero line */}
-                          <View style={[styles.graphZeroLine, { top: 100 }]} />
-
-                          {/* Custom line chart - dots only */}
-                          <View style={styles.customChart}>
-                            {chartData.map((point, index) => {
-                              const x = index * (280 / (chartData.length - 1));
-                              const y = 100 - point.value * 20; // Scale factor of 20
-
-                              return (
-                                <View key={`net-point-${index}`}>
-                                  {/* Data point */}
-                                  <View
-                                    style={[
-                                      styles.graphDataPoint,
-                                      {
-                                        left: x - 6,
-                                        top: y - 6,
-                                        backgroundColor: "#4CAF50",
-                                      },
-                                    ]}
-                                  />
-                                  {/* Fire and poop emojis if applicable */}
-                                  {point.customDataPoint && (
-                                    <Text
-                                      style={[
-                                        styles.graphFireEmoji,
-                                        {
-                                          left: x - 8,
-                                          top: y - 20,
-                                        },
-                                      ]}
-                                    >
-                                      {point.holeHasFire ? "🔥" : ""}
-                                      {point.holeHasPoorShot ? "💩" : ""}
-                                    </Text>
-                                  )}
-                                </View>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      );
-                    })()}
+                    {validNetScores.length < 2 ? (
+                      <Text style={{ textAlign: "center", color: colors.text, marginTop: 40 }}>
+                        Complete at least 2 holes to see net score progression
+                      </Text>
+                    ) : (
+                      <SparkChart 
+                        series={netSeries} 
+                        showZeroLine={true} 
+                        height={200}
+                        showLegend={false}
+                      />
+                    )}
                   </View>
                   <View style={styles.graphLabels}>
-                    {validNetScores.map((score, index) => (
-                      <Text key={`net-${score.hole}`} style={styles.graphLabel}>
+                    {validNetScores.map((score) => (
+                      <Text key={`net-label-${score.hole}`} style={styles.graphLabel}>
                         {score.hole}
                       </Text>
                     ))}

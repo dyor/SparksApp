@@ -4,6 +4,7 @@ import { Svg, Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { SparkChart, ChartSeries } from '../components/SparkChart';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -740,82 +741,36 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
     const playerSet = playerSets.find(s => s.id === activeGame.activeSetId);
     if (!playerSet) return null;
 
-    const width = Dimensions.get('window').width - 40;
-    const height = 200;
-    const padding = 30;
-
-    // Calculate cumulative scores for each player
-    const cumulativeScores: Record<string, number[]> = {};
-    playerSet.players.forEach(player => {
+    const series: ChartSeries[] = playerSet.players.map((player, playerIndex) => {
       let sum = 0;
-      cumulativeScores[player] = [0]; // Start at 0
-      activeGame.rounds.forEach(round => {
+      const data = [{ x: 0, y: 0, label: `${player}: 0` }]; // Start at 0
+      
+      activeGame.rounds.forEach((round, i) => {
         sum += round[player] || 0;
-        cumulativeScores[player].push(sum);
+        data.push({ 
+          x: i + 1, 
+          y: sum, 
+          label: `${player}: ${sum} (R${i + 1}: ${round[player] || 0})` 
+        });
       });
+
+      return {
+        id: player,
+        label: player,
+        data,
+        color: getPlayerColor(playerIndex),
+        style: 'solid',
+        strokeWidth: 3,
+      };
     });
 
-    const allScores = Object.values(cumulativeScores).flat();
-    const minScore = Math.min(...allScores, 0);
-    const maxScore = Math.max(...allScores, 1);
-    const range = maxScore - minScore;
-
-    const getX = (index: number) => padding + (index * (width - 2 * padding)) / (activeGame.rounds.length);
-    const getY = (score: number) => height - padding - ((score - minScore) / range) * (height - 2 * padding);
-
     return (
-      <View style={{ marginVertical: 20, alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
-        <Svg width={width} height={height}>
-          {/* Axis lines */}
-          <Line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
-          <Line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
-
-          {/* Zero line if there are negative scores */}
-          {minScore < 0 && (
-            <Line
-              x1={padding}
-              y1={getY(0)}
-              x2={width - padding}
-              y2={getY(0)}
-              stroke={colors.border}
-              strokeWidth="1"
-              strokeDasharray="4,4"
-            />
-          )}
-
-          {playerSet.players.map((player, playerIndex) => {
-            const scores = cumulativeScores[player];
-            const pathData = scores.map((s, i) =>
-              `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(s)}`
-            ).join(' ');
-
-            return (
-              <React.Fragment key={player}>
-                <Path
-                  d={pathData}
-                  stroke={getPlayerColor(playerIndex)}
-                  strokeWidth="3"
-                  fill="none"
-                />
-                {/* Final Score Circle */}
-                <Circle
-                  cx={getX(scores.length - 1)}
-                  cy={getY(scores[scores.length - 1])}
-                  r="4"
-                  fill={getPlayerColor(playerIndex)}
-                />
-              </React.Fragment>
-            );
-          })}
-        </Svg>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 10 }}>
-          {playerSet.players.map((player, index) => (
-            <View key={player} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: getPlayerColor(index), marginRight: 4 }} />
-              <Text style={{ fontSize: 10, color: colors.textSecondary }}>{player}</Text>
-            </View>
-          ))}
-        </View>
+      <View style={{ marginVertical: 20, padding: 5, backgroundColor: colors.surface, borderRadius: 12, alignSelf: 'stretch' }}>
+        <SparkChart 
+          series={series} 
+          showZeroLine={true} 
+          height={220} 
+        />
       </View>
     );
   };

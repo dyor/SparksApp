@@ -457,7 +457,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     }, [goal, daysToShow, stats.daysInYear, currentYear, stats.forecastForYear]);
 
     return (
-      <View style={{ marginVertical: 20, padding: 10, backgroundColor: colors.surface, borderRadius: 12 }}>
+      <View style={{ marginVertical: 20, padding: 5, backgroundColor: colors.surface, borderRadius: 12, alignSelf: 'stretch' }}>
         <SparkChart series={series} showZeroLine={false} height={220} />
       </View>
     );
