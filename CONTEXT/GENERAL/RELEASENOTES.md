@@ -4,6 +4,32 @@ This document tracks new features, sparks, and major work items between releases
 
 ## Next Release
 
+## Version 1.0.28 released Jan 14, 2026
+
+### Major Work Items
+
+Improved Dream Catcher spark to store dream interpreation so it can be read later. Improved Golf Brain's charts to prevent the chart from going outside the chart area. Fix a bug in submitting feedback on Android. 
+
+- **Dream Catcher Spark Enhancements**: 
+    - Fixed dream interpretation saving and accessibility from history.
+    - Improved UI navigation to allow viewing interpretations without re-generating them and returning to editing without data loss.
+    - Resolved Android scrolling issues for long interpretations using `nestedScrollEnabled`.
+- **New Common Charting Capability (`SparkChart`)**:
+    - Implemented a unified charting component using `react-native-svg` for better performance and consistency.
+    - Supports multiple series, customizable line styles (dashed/solid), and interactive touch-based tooltips.
+    - Migrated Goal Tracker, Card Score, and Golf Brain sparks to use the new standardized charts.
+- **Firebase Initialization & Stability**:
+    - Resolved critical "Firebase not initialized" errors across iOS and Android production builds.
+    - Standardized on Firebase Web SDK for Firestore to avoid gRPC dependency issues while maintaining native @react-native-firebase/app for base initialization.
+    - Added a robust retry mechanism with exponential backoff for service initialization.
+    - Improved error propagation to provide clear, actionable alerts to users.
+- **Build & Dependency Optimizations**:
+    - Fixed `patch-package` missing dependency causing build failures.
+    - Resolved TypeScript errors in `react-native-screens` Fabric components to ensure smooth New Architecture compatibility.
+    - Synchronized versions across `package.json`, `app.json`, and native configurations.
+
+---
+
 ## Version 1.0.26 released Jan 11, 2026
 
 ### Major Work Items

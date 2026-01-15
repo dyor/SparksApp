@@ -48,6 +48,8 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
   // History
   const [dreamHistory, setDreamHistory] = useState<DreamEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [viewingFromHistory, setViewingFromHistory] = useState(false);
+  const [isEditingInterpretation, setIsEditingInterpretation] = useState(false);
 
   // Playback
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -293,6 +295,8 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
     setTranscription('');
     setGeminiInterpretation(null);
     setCurrentDream(null);
+    setViewingFromHistory(false);
+    setIsEditingInterpretation(false);
     if (sound) {
       sound.unloadAsync();
       setSound(null);
@@ -315,6 +319,28 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const renderMarkdown = (text: string) => {
+    if (!text) return null;
+
+    // Simple markdown parsing for bold text **text**
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return (
+      <Text style={[styles.interpretationText, { color: colors.text }]}>
+        {parts.map((part, index) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={index} style={{ fontWeight: 'bold' }}>
+                {part.slice(2, -2)}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
   };
 
   // Settings view
@@ -408,6 +434,8 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
                   } else {
                     setRecordingState('transcribed');
                   }
+                  setViewingFromHistory(true);
+                  setIsEditingInterpretation(false);
                   setShowHistory(false);
                 }}
               >
@@ -436,18 +464,36 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
   // Main recording view
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {viewingFromHistory && (
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => {
+              setViewingFromHistory(false);
+              setShowHistory(true);
+              resetState();
+            }}
+            style={styles.backButton}
+          >
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>← List</Text>
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Interpretation</Text>
+          <View style={{ width: 60 }} />
+        </View>
+      )}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}
-        <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>🌙 Dream Catcher</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Record your dream when you wake up
-          </Text>
-        </View>
+        {!viewingFromHistory && (
+          <View style={styles.titleContainer}>
+            <Text style={[styles.title, { color: colors.text }]}>🌙 Dream Catcher</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Record your dream when you wake up
+            </Text>
+          </View>
+        )}
 
         {/* Recording Button */}
         {recordingState === 'idle' && (
@@ -598,26 +644,60 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
         {/* Interpreted State */}
         {recordingState === 'interpreted' && geminiInterpretation && (
           <View style={styles.interpretedContainer}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {/* <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Dream Interpretation
-            </Text>
-            <ScrollView
+            </Text> */}
+
+            <View
               style={[
                 styles.interpretationBox,
-                { backgroundColor: colors.surface, borderColor: colors.border },
+                { backgroundColor: colors.surface, borderColor: colors.border, maxHeight: undefined },
               ]}
-              nestedScrollEnabled={true}
             >
-              <Text style={[styles.interpretationText, { color: colors.text }]}>
-                {geminiInterpretation}
-              </Text>
-            </ScrollView>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-              onPress={saveDream}
-            >
-              <Text style={styles.actionButtonText}>💾 Save Dream</Text>
-            </TouchableOpacity>
+              {isEditingInterpretation ? (
+                <TextInput
+                  style={[
+                    styles.transcriptionInput,
+                    {
+                      backgroundColor: 'transparent',
+                      borderWidth: 0,
+                      color: colors.text,
+                      minHeight: 200,
+                      padding: 0,
+                    },
+                  ]}
+                  multiline
+                  scrollEnabled={false}
+                  value={geminiInterpretation}
+                  onChangeText={setGeminiInterpretation}
+                  placeholder="Edit your interpretation..."
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus={true}
+                />
+              ) : (
+                renderMarkdown(geminiInterpretation)
+              )}
+            </View>
+
+            {!isEditingInterpretation ? (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.primary, marginBottom: 12 }]}
+                onPress={() => setIsEditingInterpretation(true)}
+              >
+                <Text style={styles.actionButtonText}>📝 Edit Interpretation</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#4CAF50', marginBottom: 12 }]}
+                onPress={async () => {
+                  await saveDream();
+                  setIsEditingInterpretation(false);
+                }}
+              >
+                <Text style={styles.actionButtonText}>💾 Save Interpretation</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[styles.secondaryButton, { borderColor: colors.border }]}
               onPress={() => {
@@ -625,7 +705,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
               }}
             >
               <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                Back to Edit
+                ✨ Re-Interpret Dream
               </Text>
             </TouchableOpacity>
           </View>
@@ -781,7 +861,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   interpretationBox: {
-    borderWidth: 2,
+    borderWidth: 0,
     borderRadius: 12,
     padding: 16,
     maxHeight: 400,

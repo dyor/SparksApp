@@ -122,7 +122,7 @@ echo ""
 echo "📝 Updating RELEASENOTES.md..."
 node -e "
   const fs = require('fs');
-  const path = './RELEASENOTES.md';
+  const path = './CONTEXT/GENERAL/RELEASENOTES.md';
   
   if (!fs.existsSync(path)) {
     console.log('⚠️  RELEASENOTES.md not found, skipping update');
@@ -257,7 +257,7 @@ if [[ "$PLATFORM" == "all" || "$PLATFORM" == "android" ]]; then
   echo "2. Click: 'Create New Release'"
   echo "3. Click: 'Add from Library' (select the build that was just submitted)"
   echo "4. Add release notes describing what's new in version ${NEW_VERSION}"
-  echo "   📋 See RELEASENOTES.md for details about version ${NEW_VERSION}"
+  echo "   📋 See CONTEXT/GENERAL/RELEASENOTES.md for details about version ${NEW_VERSION}"
   echo "5. Click: 'Review Release'"
   echo "6. Click: 'Start Rollout to Production'"
   echo ""
@@ -272,7 +272,7 @@ if [[ "$PLATFORM" == "all" || "$PLATFORM" == "ios" ]]; then
   echo "4. Click: '+' Next to iOS App"
   echo "5. Select the new build (version ${NEW_VERSION}) about halfway down the page"
   echo "6. Add 'What's New' release notes"
-  echo "   📋 See RELEASENOTES.md for details about version ${NEW_VERSION}"
+  echo "   📋 See CONTEXT/GENERAL/RELEASENOTES.md for details about version ${NEW_VERSION}"
   echo "7. Click: 'Save' then 'Submit for Review'"
   echo ""
 fi
@@ -284,6 +284,6 @@ echo ""
 echo "Monitor build status at: https://expo.dev/accounts/mattdyor/projects/sparks-app/builds"
 echo ""
 echo -e "${BLUE}📋 Release Notes:${NC}"
-echo "   Check RELEASENOTES.md for details about version ${NEW_VERSION}"
-echo "   File location: $(pwd)/RELEASENOTES.md"
+echo "   Check CONTEXT/GENERAL/RELEASENOTES.md for details about version ${NEW_VERSION}"
+echo "   File location: $(pwd)/CONTEXT/GENERAL/RELEASENOTES.md"
 echo ""

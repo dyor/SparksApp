@@ -28,17 +28,12 @@ try {
   isWebFirebaseAvailable = false;
 }
 
-try {
-  // Check Native SDK module availability
-  const { FirebaseService: native } = require('./FirebaseService');
-  isNativeFirebaseAvailable = native.isModuleAvailable() && !isExpoGo();
-  console.log('🔥 Native Firebase available:', isNativeFirebaseAvailable, '(isExpoGo:', isExpoGo(), ')');
-} catch (error) {
-  isNativeFirebaseAvailable = false;
-}
+// NOTE: We do not use @react-native-firebase/firestore to avoid gRPC dependency issues.
+// All Firestore operations use the Firebase Web SDK.
+isNativeFirebaseAvailable = false;
 
-const isFirebaseAvailable = isWebFirebaseAvailable || isNativeFirebaseAvailable;
-const useNativeFirebase = (Platform.OS === 'android' || Platform.OS === 'ios') && isNativeFirebaseAvailable;
+const isFirebaseAvailable = isWebFirebaseAvailable;
+const useNativeFirebase = false;
 
 // Service factory that uses real Firebase in development builds, falls back to mock if needed
 export class ServiceFactory {
@@ -92,22 +87,37 @@ export class ServiceFactory {
         // First ensure Firebase is initialized
         await this.ensureFirebaseInitialized();
 
-        // Get the Firestore database from WebFirebaseService
-        const { getFirestore } = require('firebase/firestore');
-        const { getFirebaseApp } = require('./firebaseConfig');
-
-        // Initialize Firebase if not already done
-        const app = getFirebaseApp();
-        if (!app) {
-          throw new Error('Failed to initialize Firebase app');
+        if (useNativeFirebase) {
+          // If using Native Firebase, use the native db for SimpleAnalyticsService
+          const nativeDb = (NativeFirebaseService as any).db;
+          if (nativeDb) {
+            await SimpleAnalyticsService.initialize(nativeDb, true);
+            this.analyticsServiceInitialized = true;
+            console.log('✅ Analytics initialized with Native Firebase');
+            return;
+          }
         }
 
-        const db = getFirestore(app);
-        await SimpleAnalyticsService.initialize(db);
-        this.analyticsServiceInitialized = true;
+        // Fallback to Web SDK if Native is not available or not initialized
+        if (isWebFirebaseAvailable) {
+          const { getFirebaseApp } = require('./firebaseConfig');
+          const app = getFirebaseApp();
+          
+          if (app) {
+            const { getFirestore } = require('firebase/firestore');
+            const db = getFirestore(app);
+            await SimpleAnalyticsService.initialize(db, false);
+            this.analyticsServiceInitialized = true;
+            console.log('✅ Analytics initialized with Web Firebase');
+          } else {
+            console.warn('⚠️ Analytics initialization skipped: Web Firebase app not available');
+            // Don't throw here to avoid blocking other services
+          }
+        }
       } catch (error) {
         console.error('❌ Failed to initialize Analytics service:', error);
-        throw error; // Rethrow to inform the caller
+        // Don't rethrow for analytics to prevent blocking core app functionality
+        // throw error; 
       }
     }
   }

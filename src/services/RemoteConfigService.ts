@@ -134,6 +134,38 @@ export class RemoteConfigService {
     }
 
     /**
+     * Get Web Firebase configuration from Remote Config
+     * Useful for initializing Web SDK in native environments
+     */
+    static getWebFirebaseConfig(): any | null {
+        if (!this._remoteConfig) {
+            return null;
+        }
+
+        try {
+            let configJson: string | null = null;
+            if (Platform.OS === 'web') {
+                const { getValue } = require("firebase/remote-config");
+                configJson = getValue(this._remoteConfig, 'web_firebase_config').asString();
+            } else {
+                configJson = this._remoteConfig.getValue('web_firebase_config').asString();
+            }
+
+            if (configJson && configJson.trim() !== '' && configJson !== '{}') {
+                try {
+                    return JSON.parse(configJson);
+                } catch (e) {
+                    console.error('❌ Failed to parse web_firebase_config JSON:', e);
+                    return null;
+                }
+            }
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
      * Ensure Remote Config is initialized
      */
     static async ensureInitialized(): Promise<void> {

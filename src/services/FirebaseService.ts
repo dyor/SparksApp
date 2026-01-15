@@ -13,19 +13,11 @@ import { MockFirebaseService } from './MockFirebaseService';
 let firestore: any = null;
 let isFirebaseAvailable = false;
 
+// NOTE: We do not use @react-native-firebase/firestore to avoid gRPC dependency issues.
+// All Firestore operations use the Firebase Web SDK.
 const loadFirestore = () => {
-  try {
-    // Try to require firestore
-    const firebaseModule = require('@react-native-firebase/firestore');
-    firestore = firebaseModule.default;
-    isFirebaseAvailable = true;
-    console.log('✅ Native Firebase Firestore module is available');
-    return true;
-  } catch (error) {
-    console.log('⚠️ Native Firebase Firestore not available:', (error as any).message);
-    isFirebaseAvailable = false;
-    return false;
-  }
+  isFirebaseAvailable = false;
+  return false;
 };
 
 // Initial load attempt

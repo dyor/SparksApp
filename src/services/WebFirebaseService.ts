@@ -52,7 +52,9 @@ export class WebFirebaseService {
       // Initialize Firebase if not already initialized
       const app = getFirebaseApp();
       if (!app) {
-        throw new Error("Failed to initialize Firebase app");
+        console.warn("⚠️ WebFirebaseService: Web Firebase app not available.");
+        this._initialized = true; // Mark as initialized to avoid repeat attempts
+        return;
       }
 
       // Initialize Firestore

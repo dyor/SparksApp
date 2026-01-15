@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, Firestore } from "firebase/firestore";
+import { RemoteConfigService } from "./RemoteConfigService";
 
 /**
  * Shared Firebase configuration object
@@ -19,11 +20,8 @@ export const firebaseConfig = {
  * Validates Firebase configuration
  * @returns true if config is valid, false otherwise
  */
-export function validateFirebaseConfig(): boolean {
-  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.warn(
-      "⚠️ Firebase configuration is missing. Please set EXPO_PUBLIC_FIREBASE_* environment variables in your .env file."
-    );
+export function validateFirebaseConfig(config: any = firebaseConfig): boolean {
+  if (!config.apiKey || !config.projectId) {
     return false;
   }
   return true;
@@ -36,14 +34,27 @@ export function validateFirebaseConfig(): boolean {
  */
 export function getFirebaseApp(): FirebaseApp | undefined {
   try {
-    if (getApps().length === 0) {
-      if (!validateFirebaseConfig()) {
-        return undefined;
-      }
-      return initializeApp(firebaseConfig);
-    } else {
+    if (getApps().length > 0) {
       return getApp();
     }
+
+    // 1. Try Remote Config first (allows overriding broken/stale build-time env vars)
+    const remoteConfig = RemoteConfigService.getWebFirebaseConfig();
+    if (remoteConfig && validateFirebaseConfig(remoteConfig)) {
+      console.log("🔥 Initializing Firebase with Remote Config (Primary)");
+      return initializeApp(remoteConfig);
+    }
+
+    // 2. Fallback to environment variables (standard build-time config)
+    if (validateFirebaseConfig(firebaseConfig)) {
+      console.log("🔥 Initializing Firebase with env variables (Fallback)");
+      return initializeApp(firebaseConfig);
+    }
+
+    console.warn(
+      "⚠️ Firebase configuration is missing. Web SDK features will be disabled."
+    );
+    return undefined;
   } catch (error) {
     console.error("❌ Error initializing Firebase:", error);
     return undefined;

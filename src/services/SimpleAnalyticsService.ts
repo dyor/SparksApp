@@ -1,6 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
 
 // Simple analytics service that just logs to Firestore
 export class SimpleAnalyticsService {
@@ -8,17 +6,14 @@ export class SimpleAnalyticsService {
   private static deviceId: string | null = null;
   private static userId: string | null = null;
   private static isInitialized: boolean = false;
+  private static isNative: boolean = false;
 
-  static async initialize(firestoreDb?: any): Promise<void> {
-    console.log('🚀 SimpleAnalyticsService.initialize() called');
+  static async initialize(firestoreDb: any, isNative: boolean = false): Promise<void> {
+    console.log(`🚀 SimpleAnalyticsService.initialize() called (Native: ${isNative})`);
 
     try {
-      if (firestoreDb) {
-        this.db = firestoreDb;
-      } else {
-        console.log('⚠️ SimpleAnalyticsService.initialize() called without Firestore DB - using fallback');
-      }
-
+      this.db = firestoreDb;
+      this.isNative = isNative;
       this.deviceId = await this.getOrCreateDeviceId();
       this.isInitialized = true;
       console.log('✅ Simple Analytics initialized with deviceId:', this.deviceId);
@@ -29,12 +24,16 @@ export class SimpleAnalyticsService {
   }
 
   private static async getOrCreateDeviceId(): Promise<string> {
-    let deviceId = await AsyncStorage.getItem('analytics_device_id');
-    if (!deviceId) {
-      deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      await AsyncStorage.setItem('analytics_device_id', deviceId);
+    try {
+      let deviceId = await AsyncStorage.getItem('analytics_device_id');
+      if (!deviceId) {
+        deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await AsyncStorage.setItem('analytics_device_id', deviceId);
+      }
+      return deviceId;
+    } catch (error) {
+      return `temp_device_${Date.now()}`;
     }
-    return deviceId;
   }
 
   static setUserId(userId: string | null): void {
@@ -49,17 +48,22 @@ export class SimpleAnalyticsService {
     }
 
     try {
-      const eventData = {
+      const eventData: any = {
         eventType,
         sparkId,
         sparkName: sparkName || sparkId,
         deviceId: this.deviceId,
         userId: this.userId,
-        timestamp: serverTimestamp(),
         ...additionalData
       };
 
-      await addDoc(collection(this.db, 'analytics'), eventData);
+      // Always use Web Firestore for analytics to avoid gRPC issues with native Firestore
+      const { collection, addDoc, serverTimestamp } = require('firebase/firestore');
+      await addDoc(collection(this.db, 'analytics'), {
+        ...eventData,
+        timestamp: serverTimestamp()
+      });
+      
       console.log(`📊 [Analytics] ${eventType}: ${sparkName || sparkId}`);
     } catch (error) {
       console.error(`❌ Error logging ${eventType}:`, error);

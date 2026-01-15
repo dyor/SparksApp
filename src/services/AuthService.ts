@@ -135,7 +135,9 @@ class AuthService {
       // Set up auth state listener
       const app = getFirebaseApp();
       if (!app) {
-        throw new Error("Failed to initialize Firebase app");
+        console.warn("⚠️ AuthService: Web Firebase app not available. Auth will be disabled.");
+        this._initialized = true;
+        return;
       }
 
       let auth;

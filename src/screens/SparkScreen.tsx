@@ -59,6 +59,20 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const [sparkDarkMode, setSparkDarkMode] = useState(false);
   const insets = useSafeAreaInsets();
 
+  const handleStateChange = React.useCallback((state: any) => {
+    // Handle spark state changes
+    console.log("Spark state changed:", state);
+    // Handle dark mode for final-clock spark
+    if (sparkId === "final-clock" && state.darkMode !== undefined) {
+      setSparkDarkMode((prev) => {
+        if (prev !== state.darkMode) {
+          return state.darkMode;
+        }
+        return prev;
+      });
+    }
+  }, [sparkId]);
+
   // Reset dark mode when leaving the spark
   useEffect(() => {
     return () => {
@@ -335,14 +349,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
                 setShowSparkSettings(false);
                 setSettingsFocus(undefined);
               },
-              onStateChange: (state: any) => {
-                // Handle spark state changes
-                console.log("Spark state changed:", state);
-                // Handle dark mode for final-clock spark
-                if (sparkId === "final-clock" && state.darkMode !== undefined) {
-                  setSparkDarkMode(state.darkMode);
-                }
-              },
+              onStateChange: handleStateChange,
               onComplete: (result: any) => {
                 // Handle spark completion
                 console.log("Spark completed:", result);
