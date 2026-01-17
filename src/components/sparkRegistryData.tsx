@@ -38,6 +38,7 @@ import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
 import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
+import { IdeasSpark } from "../sparks/IdeasSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -497,6 +498,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: GoalTrackerSpark,
+  },
+  ideas: {
+    metadata: {
+      id: "ideas",
+      title: "Ideas",
+      description: "Capture and organize your ideas with markdown support",
+      icon: "💡",
+      category: "productivity",
+      createdAt: "2026-01-17T00:00:00.000Z",
+      rating: 4.5,
+    },
+    component: IdeasSpark,
   },
 };
 
