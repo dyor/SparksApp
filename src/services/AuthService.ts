@@ -78,6 +78,8 @@ export interface UserProfile {
 
 class AuthService {
   private static _initialized: boolean = false;
+  private static _webClientId: string | null = null;
+  private static _iosClientId: string | null = null;
   private static authStateListeners: Array<(user: User | null) => void> = [];
 
   /**
@@ -97,22 +99,43 @@ class AuthService {
 
       // Configure Google Sign-In
       // Determine effective Web Client ID
-      // PRIORITY 1: Remote Config JSON (Full Override)
+      // PRIORITY 1: Dedicated Google Client ID Keys from Remote Config
       await RemoteConfigService.ensureInitialized();
-      const webConfig = RemoteConfigService.getWebFirebaseConfig();
-      let webClientId = webConfig?.appId;
+      let webClientId = RemoteConfigService.getGoogleWebClientId();
+      let iosClientId = RemoteConfigService.getGoogleIosClientId();
 
+      // PRIORITY 2: Remote Config JSON Web Config
       if (!webClientId) {
-        // PRIORITY 2: Individual Remote Config Keys
-        webClientId = RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID') || 
-                      RemoteConfigService.getString('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+        const webConfig = RemoteConfigService.getWebFirebaseConfig();
+        // Fallback to appId ONLY if it doesn't look like a Firebase App ID (starts with 1:)
+        const potentialId = webConfig?.appId;
+        if (potentialId && !potentialId.startsWith('1:')) {
+          webClientId = potentialId;
+        }
       }
 
+      // PRIORITY 3: Environment Variables
       if (!webClientId) {
-        // PRIORITY 3: Environment Variables (Build-time Fallback)
-        webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-                      process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+        webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
       }
+
+      if (!iosClientId) {
+        iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+      }
+
+      // Fallback for older configurations that might have put it in FIREBASE_APP_ID
+      if (!webClientId) {
+        webClientId = RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID') ||
+          process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+      }
+
+      console.log("[AuthService] Resolved IDs:", {
+        webClientId: webClientId ? `${webClientId.substring(0, 10)}...` : "MISSING",
+        iosClientId: iosClientId ? `${iosClientId.substring(0, 10)}...` : "MISSING",
+      });
+
+      this._webClientId = webClientId;
+      this._iosClientId = iosClientId;
 
       if (!webClientId) {
         console.warn(
@@ -139,6 +162,7 @@ class AuthService {
 
       GoogleSignin.configure({
         webClientId: webClientId, // Required for iOS and Android
+        iosClientId: iosClientId || undefined, // Optional, but recommended for iOS
         offlineAccess: true, // If you want to access Google API on behalf of the user
         scopes: ["profile", "email"],
       });
@@ -157,8 +181,8 @@ class AuthService {
           Platform.OS === "web"
             ? browserLocalPersistence
             : getReactNativePersistence
-            ? getReactNativePersistence(AsyncStorage)
-            : browserLocalPersistence;
+              ? getReactNativePersistence(AsyncStorage)
+              : browserLocalPersistence;
 
         auth = initializeAuth(app, {
           persistence: persistence,
@@ -212,14 +236,11 @@ class AuthService {
       );
     }
 
-    const webClientId =
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
-      RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID');
+    const webClientId = this._webClientId;
 
     if (!webClientId) {
       throw new Error(
-        "Google Sign-In not configured. Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in environment or Remote Config."
+        "Google Sign-In not configured. Please ensure EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set in environment or Remote Config."
       );
     }
 

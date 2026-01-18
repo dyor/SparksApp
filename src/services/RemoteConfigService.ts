@@ -66,7 +66,7 @@ export class RemoteConfigService {
                 console.log(`⚠️ Failed to initialize Remote Config (${Platform.OS}):`, error.message);
                 // We still mark as initialized so we don't block the app, 
                 // but _remoteConfig will be null
-                this._initialized = true; 
+                this._initialized = true;
             } finally {
                 this._initializing = null;
             }
@@ -148,6 +148,27 @@ export class RemoteConfigService {
      */
     static getGeminiApiKey(): string | null {
         return this.getString('gemini_api_key');
+    }
+
+    /**
+     * Get Google Web Client ID from Remote Config
+     */
+    static getGoogleWebClientId(): string | null {
+        return this.getString('google_web_client_id');
+    }
+
+    /**
+     * Get Google iOS Client ID from Remote Config
+     */
+    static getGoogleIosClientId(): string | null {
+        return this.getString('google_ios_client_id');
+    }
+
+    /**
+     * Get Google Android Client ID from Remote Config
+     */
+    static getGoogleAndroidClientId(): string | null {
+        return this.getString('google_android_client_id');
     }
 
     /**
