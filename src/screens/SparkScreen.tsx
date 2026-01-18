@@ -253,16 +253,6 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleAdd = () => {
-    // If this is Golf Brain, open the Course Selection screen to start a new round
-    if (sparkId === "golf-brain") {
-      console.log(
-        "SparkScreen: + pressed - open Course Selection for new round"
-      );
-      HapticFeedback.light();
-      setOpenCourseSelectionSignal((s) => s + 1);
-      return;
-    }
-
     HapticFeedback.success();
     addSparkToUser(sparkId);
   };

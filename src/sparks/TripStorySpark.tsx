@@ -13,7 +13,6 @@ import {
   Linking,
   Share,
   Animated,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -3491,9 +3490,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     return (
       // dyor: controls the outer scroll view
       <View style={[styles.tripDetailContainer, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
-        {/* this is just a little shim layer to prevent bleed */}
-        <View style={[styles.statusBarBackground, { backgroundColor: colors.surface }]} />
+        {/* Content removed to fix Android 15 edge-to-edge warning */}
+        {/* shim layer removed for edge-to-edge support */}
         <View style={[styles.stickyTripTitleContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.tripTitleRow}>
             <TouchableOpacity

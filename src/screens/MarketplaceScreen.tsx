@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MarketplaceStackParamList } from '../types/navigation';
 import { getAllSparks } from '../components/SparkRegistry';
@@ -16,7 +17,8 @@ interface Props {
 export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   const allSparks = getAllSparks();
   const { colors } = useTheme();
-  const styles = React.useMemo(() => getStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = React.useMemo(() => getStyles(colors, insets), [colors, insets]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
 
@@ -253,14 +255,14 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
     padding: 24,
-    paddingTop: 60, // Additional spacing for iOS Dynamic Island
+    paddingTop: Math.max(insets.top, 20), // Use dynamic top inset
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

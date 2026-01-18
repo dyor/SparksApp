@@ -105,7 +105,7 @@ Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in
 
 ---
 
-## Next Release
+## Version 1.0.32
 
 ### New Sparks
 - (Add new sparks here)
@@ -120,4 +120,30 @@ Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in
 - (Previous release notes)
 
 ---
+
+## Version 1.0.34 released Jan 16, 2026
+
+### Major Work Items
+
+Migrated away from deprecated Android APIs to fully support Android 15 edge-to-edge requirements.
+
+- **Resolved Deprecated Edge-to-Edge APIs**:
+    - Replaced legacy `StatusBar` with the modern `SystemBars` component from `react-native-edge-to-edge`, migrating away from deprecated `setStatusBarColor` and `setNavigationBarColor` calls.
+    - Cleaned up native `styles.xml` to remove hardcoded `statusBarColor`, allowing the system to handle transparency as mandated by Android 15 (SDK 35).
+    - Removed manual status bar shims and legacy color overrides in `TripStorySpark` to ensure seamless rendering around display cutouts.
+- **Enhanced Android 15 Compatibility**: 
+    - Verified and optimized window display parameters to avoid deprecated `LAYOUT_IN_DISPLAY_CUTOUT_MODE` warnings.
+    - Improved app stability on devices targeting SDK 35.
+
+---
+
+## Version 1.0.33 released Jan 16, 2026
+
+
+### New Sparks
+- (Add new sparks here)
+
+### Major Work Items
+- (Add major work items here as they're completed)
+
 

@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useSparkStore } from "./src/store";
 import "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { SystemBars } from "react-native-edge-to-edge";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import { AppNavigator } from "./src/navigation/AppNavigator";
@@ -276,7 +276,7 @@ function AppContent() {
   return (
     <>
       <AppNavigator />
-      <StatusBar style={preferences.theme === "dark" ? "light" : "dark"} />
+      <SystemBars style={preferences.theme === "dark" ? "light" : "dark"} />
     </>
   );
 }

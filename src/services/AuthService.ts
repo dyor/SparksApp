@@ -96,17 +96,22 @@ class AuthService {
       await ServiceFactory.ensureFirebaseInitialized();
 
       // Configure Google Sign-In
-      // Use EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID if set, otherwise fall back to EXPO_PUBLIC_FIREBASE_APP_ID or Remote Config
-      let webClientId =
-        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-        process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+      // Determine effective Web Client ID
+      // PRIORITY 1: Remote Config JSON (Full Override)
+      await RemoteConfigService.ensureInitialized();
+      const webConfig = RemoteConfigService.getWebFirebaseConfig();
+      let webClientId = webConfig?.appId;
 
       if (!webClientId) {
-        // Fallback to Remote Config
-        webClientId = RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID');
-        if (webClientId) {
-          console.log("🔑 [AuthService] Using client ID from Remote Config");
-        }
+        // PRIORITY 2: Individual Remote Config Keys
+        webClientId = RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID') || 
+                      RemoteConfigService.getString('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+      }
+
+      if (!webClientId) {
+        // PRIORITY 3: Environment Variables (Build-time Fallback)
+        webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+                      process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
       }
 
       if (!webClientId) {

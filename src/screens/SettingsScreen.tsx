@@ -886,7 +886,7 @@ const createStyles = (colors: any, insets: { top: number }) => StyleSheet.create
   header: {
     alignItems: 'center',
     marginBottom: 30,
-    paddingTop: Math.max(insets.top + 20, 40),
+    paddingTop: Math.max(insets.top, 20), // Consistent dynamic top inset
   },
   title: {
     fontSize: 28,
