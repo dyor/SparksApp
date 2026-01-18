@@ -83,6 +83,7 @@ const PackingListSettings: React.FC<{
     setPackingItems([...packingItems, newPackingItem]);
     setCountInputs({ ...countInputs, [newId]: count.toString() });
     setNewItem({ item: '', count: '1' });
+    console.log('[PackingListSettings] Added item. Current items count:', packingItems.length + 1);
     HapticFeedback.success();
   };
 
@@ -102,7 +103,7 @@ const PackingListSettings: React.FC<{
     if (field === 'count') {
       // Update the string input value (allow empty)
       setCountInputs({ ...countInputs, [id]: value });
-      
+
       // Only validate and update the actual count if we have a valid number
       if (value.trim() !== '') {
         const parsedValue = parseInt(value);
@@ -208,6 +209,7 @@ const PackingListSettings: React.FC<{
       return;
     }
 
+    console.log('[PackingListSettings] saving validated items count:', validatedItems.length);
     onSave(validatedItems);
     onClose();
   };
@@ -319,45 +321,66 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
   onStateChange,
   onComplete
 }) => {
-  const { getSparkData, setSparkData } = useSparkStore();
+  const getSparkData = useSparkStore(state => state.getSparkData);
+  const setSparkData = useSparkStore(state => state.setSparkData);
+  const isHydrated = useSparkStore(state => state.isHydrated);
   const { colors } = useTheme();
 
   const [items, setItems] = useState<PackingItem[]>(defaultItems);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  console.log(`[PackingListSpark] Render: items count = ${items.length}, dataLoaded = ${dataLoaded}`);
 
   // Load saved data on mount
   useEffect(() => {
-    const savedData = getSparkData('packing-list');
-    if (savedData.items) {
-      setItems(savedData.items);
-    }
-  }, [getSparkData]);
+    if (!isHydrated) return;
 
-  // Save data whenever items change
-  useEffect(() => {
+    const savedData = getSparkData('packing-list');
+    console.log('[PackingListSpark] Loading data from store:', savedData);
+    if (savedData.items) {
+      console.log('[PackingListSpark] Found items in store, updating state:', savedData.items.length);
+      setItems(savedData.items);
+    } else {
+      console.log('[PackingListSpark] No items in store, using defaults');
+    }
+    setDataLoaded(true);
+  }, [getSparkData, isHydrated]);
+
+  // Handle explicit save to store
+  const saveToStore = (newItems: PackingItem[]) => {
+    console.log('[PackingListSpark] saveToStore called with count:', newItems.length);
     setSparkData('packing-list', {
-      items,
+      items: newItems,
       lastUpdated: new Date().toISOString(),
     });
-  }, [items, setSparkData]);
+  };
 
   const toggleItemPacked = (id: number) => {
-    setItems(items.map(item => {
+    console.log('[PackingListSpark] Toggling item:', id);
+    const newItems = items.map(item => {
       if (item.id === id) {
         const newPacked = !item.packed;
         HapticFeedback.light();
         return { ...item, packed: newPacked };
       }
       return item;
-    }));
+    });
+    setItems(newItems);
+    saveToStore(newItems);
   };
 
   const uncheckAll = () => {
-    setItems(items.map(item => ({ ...item, packed: false })));
+    console.log('[PackingListSpark] Unchecking all');
+    const newItems = items.map(item => ({ ...item, packed: false }));
+    setItems(newItems);
+    saveToStore(newItems);
     HapticFeedback.medium();
   };
 
   const saveCustomItems = (newItems: PackingItem[]) => {
+    console.log('[PackingListSpark] saveCustomItems (from settings) called with count:', newItems.length);
     setItems(newItems);
+    saveToStore(newItems);
     HapticFeedback.success();
   };
 

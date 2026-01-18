@@ -26,6 +26,7 @@ import {
 import { AISettingsNote } from '../components/AISettingsNote';
 import { HapticFeedback } from '../utils/haptics';
 import { StarRating } from '../components/StarRating';
+import { Audio } from 'expo-av';
 
 interface Recipe {
     id: string;
@@ -41,6 +42,9 @@ interface Recipe {
 
 interface RecAIpeData {
     recipes: Recipe[];
+    settings?: {
+        silentAlarms: boolean;
+    };
 }
 
 const STARTER_RECIPE: Recipe = {
@@ -81,6 +85,8 @@ Cool: Let the cookies cool on the baking sheets for 5 minutes before transferrin
     rating: 5,
 };
 
+const timerRegex = /\{\{(.*?)\}\}/g;
+
 export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
     const { colors } = useTheme();
     const { getSparkData, setSparkData } = useSparkStore();
@@ -97,8 +103,16 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
     const [dataLoaded, setDataLoaded] = useState(false);
 
     const isHydrated = useSparkStore(state => state.isHydrated);
-
     const insets = useSafeAreaInsets();
+
+    const parseDuration = (dText: string): number => {
+        // Simple parser for "20 minutes", "1 hour", "5 mins", etc.
+        const num = parseInt(dText.match(/\d+/)?.[0] || '0');
+        if (dText.toLowerCase().includes('hour')) return num * 3600;
+        if (dText.toLowerCase().includes('min')) return num * 60;
+        if (dText.toLowerCase().includes('sec')) return num;
+        return num * 60; // Default to minutes
+    };
 
     // Check API key availability
     useEffect(() => {
@@ -116,7 +130,7 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
         const saved = getSparkData('recaipe') as any;
         if (saved?.recipes && saved.recipes.length > 0) {
             console.log(`📦 RecAIpeSpark: Loading ${saved.recipes.length} recipes`);
-            setData({ recipes: saved.recipes });
+            setData({ recipes: saved.recipes, settings: saved.settings });
             // Restore previous state
             if (saved.lastMode) {
                 setMode(saved.lastMode);
@@ -156,12 +170,13 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
         if (data.recipes.length > 0) {
             const dataWithState = {
                 recipes: data.recipes,
+                settings: data.settings,
                 lastMode: mode,
                 lastRecipeId: selectedRecipe?.id,
             };
             setSparkData('recaipe', dataWithState);
         }
-    }, [mode, selectedRecipe?.id, data.recipes, dataLoaded]);
+    }, [mode, selectedRecipe?.id, data.recipes, data.settings, dataLoaded]);
 
     // AI Generation
     const generateRecipe = async (prompt: string, currentRecipe?: string) => {
@@ -174,7 +189,8 @@ ${currentRecipe}
 
 The user wants this change: "${prompt}"
 
-Generate the updated recipe using the SAME format as before. Keep the same structure and only modify what's needed for the requested change.`
+Generate the updated recipe using the SAME format as before. Keep the same structure and only modify what's needed for the requested change.
+IMPORTANT: Wrap all time durations (e.g. "bake for 20 minutes", "let rest for 1 hour") in double curly braces like {{20 minutes}} or {{1 hour}}.`
                 : `You are a professional chef creating recipes. Generate a recipe based on this description:
 
 "${prompt}"
@@ -184,7 +200,7 @@ IMPORTANT FORMATTING RULES:
 2. In the 'Ingredients' section, each ingredient must be on a single line.
 3. In the 'Instructions' section, the first time an ingredient is mentioned, include its quantity in parentheses immediately following the ingredient name.
 4. Write instructions as clear paragraphs, with each sentence as its own separate paragraph. Each instruction step should be broken down into individual sentences, making it easy to follow step-by-step and easy to check off when complete.
-5. Include cooking temperature and time where applicable.
+5. Include cooking temperature and time where applicable. IMPORTANT: Wrap all durations (e.g. "bake for 20 minutes", "let rest for 1 hour") in double curly braces like {{20 minutes}} or {{1 hour}}.
 6. Start with a recipe title on the first line.
 
 Example format:
@@ -533,6 +549,166 @@ Generate the recipe now:`;
         },
     });
 
+    const InstructionStep: React.FC<{
+        text: string;
+        isChecked: boolean;
+        onToggle: () => void;
+        isSilent?: boolean;
+        colors: any;
+    }> = ({ text, isChecked, onToggle, isSilent, colors }) => {
+        const [timerActive, setTimerActive] = useState(false);
+        const [timeLeft, setTimeLeft] = useState(0); // in seconds
+        const [totalTime, setTotalTime] = useState(0);
+        const [isFinished, setIsFinished] = useState(false);
+        const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+        // Extraction: Find the duration in the {{...}} syntax
+        const match = timerRegex.exec(text);
+        timerRegex.lastIndex = 0; // Reset regex to avoid skipping matches on re-renders
+        const durationText = match ? match[1] : null;
+        const cleanText = text.replace(timerRegex, (m, g) => g);
+
+        useEffect(() => {
+            return () => {
+                if (sound) {
+                    sound.unloadAsync();
+                }
+            };
+        }, [sound]);
+
+        const playAlarm = async () => {
+            if (isSilent) return;
+            try {
+                const { sound: alarmSound } = await Audio.Sound.createAsync(
+                    { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
+                    { shouldPlay: true }
+                );
+                setSound(alarmSound);
+            } catch (error) {
+                console.log('Error playing sound:', error);
+            }
+        };
+
+        useEffect(() => {
+            let interval: NodeJS.Timeout;
+            if (timerActive && timeLeft > 0) {
+                interval = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev <= 1) {
+                            setTimerActive(false);
+                            setIsFinished(true);
+                            playAlarm();
+                            HapticFeedback.success();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+            }
+            return () => clearInterval(interval);
+        }, [timerActive, timeLeft, isSilent]);
+
+        const startTimer = () => {
+            if (!durationText) return;
+            const seconds = parseDuration(durationText);
+            setTotalTime(seconds);
+            setTimeLeft(seconds);
+            setTimerActive(true);
+            setIsFinished(false);
+            HapticFeedback.light();
+        };
+
+        const formatTime = (seconds: number) => {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        };
+
+        const progress = totalTime > 0 ? (totalTime - timeLeft) / totalTime : 0;
+
+        return (
+            <View style={{ marginBottom: 16 }}>
+                <TouchableOpacity style={styles.checkboxRow} onPress={onToggle}>
+                    <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+                        {isChecked && <Text style={styles.checkboxCheck}>✓</Text>}
+                    </View>
+                    <Text style={[styles.checkboxText, isChecked && styles.checkboxTextStrike]}>
+                        {cleanText}
+                    </Text>
+                </TouchableOpacity>
+
+                {durationText && !isChecked && (
+                    <View style={{ marginLeft: 36, marginTop: 4 }}>
+                        {!timerActive && !isFinished ? (
+                            <TouchableOpacity
+                                style={[styles.button, { paddingVertical: 8, marginTop: 0, width: 160 }]}
+                                onPress={startTimer}
+                            >
+                                <Text style={[styles.buttonText, { fontSize: 13 }]}>Start {durationText} Timer</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={{
+                                backgroundColor: isFinished ? colors.primary + '20' : colors.surface,
+                                padding: 10,
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: isFinished ? colors.primary : colors.border,
+                            }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 18, fontWeight: '700', color: isFinished ? colors.primary : colors.text }}>
+                                        {isFinished ? 'FINISHED!' : formatTime(timeLeft)}
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        {isFinished ? (
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setIsFinished(false);
+                                                    if (sound) sound.stopAsync();
+                                                }}
+                                                style={{ backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}
+                                            >
+                                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Dismiss</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <>
+                                                <TouchableOpacity
+                                                    onPress={() => setTimeLeft(prev => prev + 60)}
+                                                    style={{ backgroundColor: colors.border, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                                                >
+                                                    <Text style={{ fontSize: 12 }}>+1m</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => setTimerActive(!timerActive)}
+                                                    style={{ backgroundColor: colors.border, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                                                >
+                                                    <Text style={{ fontSize: 12 }}>{timerActive ? 'Pause' : 'Resume'}</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setTimerActive(false);
+                                                        setTimeLeft(0);
+                                                    }}
+                                                    style={{ backgroundColor: colors.error + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                                                >
+                                                    <Text style={{ color: colors.error, fontSize: 12 }}>Cancel</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
+                                {!isFinished && (
+                                    <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                                        <View style={{ height: '100%', backgroundColor: colors.primary, width: `${(1 - progress) * 100}%` }} />
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
+            </View>
+        );
+    };
+
     // Settings Screen
     if (showSettings) {
         return (
@@ -564,6 +740,50 @@ Generate the recipe now:`;
                                     ? '✅ API key configured'
                                     : '❌ API key not configured'}
                         </Text>
+
+                        <View style={{ marginTop: 24 }}>
+                            <Text style={{ fontSize: 16, color: colors.text, marginBottom: 12, fontWeight: '600' }}>
+                                Timer Settings
+                            </Text>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: colors.surface,
+                                padding: 16,
+                                borderRadius: 12
+                            }}>
+                                <View>
+                                    <Text style={{ fontSize: 16, color: colors.text }}>Silent Alarms</Text>
+                                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>Haptics only, no sound chime</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        const newSettings = { ...data.settings, silentAlarms: !data.settings?.silentAlarms };
+                                        setData({ ...data, settings: newSettings });
+                                        setSparkData('recaipe', { ...data, settings: newSettings });
+                                        HapticFeedback.light();
+                                    }}
+                                    style={{
+                                        width: 50,
+                                        height: 28,
+                                        borderRadius: 14,
+                                        backgroundColor: data.settings?.silentAlarms ? colors.primary : colors.border,
+                                        padding: 2,
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <View style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: 12,
+                                        backgroundColor: '#fff',
+                                        alignSelf: data.settings?.silentAlarms ? 'flex-end' : 'flex-start',
+                                        elevation: 2,
+                                    }} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
 
                     <SettingsFeedbackSection sparkName="RecAIpe" sparkId="recaipe" />
@@ -1009,10 +1229,13 @@ Generate the recipe now:`;
                         const isChecked = selectedRecipe.cookingChecked.includes(i);
 
                         return (
-                            <TouchableOpacity
+                            <InstructionStep
                                 key={i}
-                                style={styles.checkboxRow}
-                                onPress={() => {
+                                text={instruction}
+                                isChecked={isChecked}
+                                isSilent={data.settings?.silentAlarms}
+                                colors={colors}
+                                onToggle={() => {
                                     const newChecked = isChecked
                                         ? selectedRecipe.cookingChecked.filter(idx => idx !== i)
                                         : [...selectedRecipe.cookingChecked, i];
@@ -1023,14 +1246,7 @@ Generate the recipe now:`;
                                     });
                                     HapticFeedback.selection();
                                 }}
-                            >
-                                <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-                                    {isChecked && <Text style={styles.checkboxCheck}>✓</Text>}
-                                </View>
-                                <Text style={[styles.checkboxText, isChecked && styles.checkboxTextStrike]}>
-                                    {instruction}
-                                </Text>
-                            </TouchableOpacity>
+                            />
                         );
                     })}
 

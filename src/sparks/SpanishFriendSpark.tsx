@@ -144,6 +144,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
   const { colors } = useTheme();
   const [audioSessionSet, setAudioSessionSet] = useState(false);
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const greetingTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [conversationMode, setConversationMode] = useState<'1-friend' | '2-friends'>('1-friend');
   const [userName, setUserName] = useState<string>('');
   const [showNameInput, setShowNameInput] = useState(false);
@@ -242,6 +243,13 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
   useEffect(() => {
     setupAudioSession();
     loadStoredName();
+
+    return () => {
+      if (greetingTimerRef.current) {
+        clearTimeout(greetingTimerRef.current);
+      }
+      Speech.stop();
+    };
   }, []);
 
   // Check for name and play first phrase after loading is complete
@@ -251,11 +259,15 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
         setShowNameInput(true);
       } else {
         // Auto-play first phrase when component loads and name is set
-        setTimeout(() => {
+        if (greetingTimerRef.current) {
+          clearTimeout(greetingTimerRef.current);
+        }
+        greetingTimerRef.current = setTimeout(() => {
           const firstPhrase = getConversation()[0];
           if (conversationMode === '2-friends' || firstPhrase.speaker === 'friend1') {
             speakSpanish(firstPhrase.spanish, firstPhrase.speaker as 'friend1' | 'friend2');
           }
+          greetingTimerRef.current = null;
         }, 500);
       }
     }
@@ -526,7 +538,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
         conversationMode={conversationMode}
         userName={userName}
         onSave={handleSettingsSave}
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -591,8 +603,8 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
                 <Text style={styles.modalSubmitText}>Comenzar</Text>
               </TouchableOpacity>
               {onCloseSettings && (
-                <TouchableOpacity 
-                  style={[styles.modalCloseButton, { borderColor: colors.border }]} 
+                <TouchableOpacity
+                  style={[styles.modalCloseButton, { borderColor: colors.border }]}
                   onPress={() => {
                     HapticFeedback.light();
                     onCloseSettings();

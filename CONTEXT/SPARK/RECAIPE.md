@@ -379,3 +379,91 @@ This plain text format is:
 - Simple to parse programmatically
 - Matches the AI output format
 - No JSON or complex markup needed
+
+Implementation Plan: Contextual Recipe Timers
+
+1. Data & Prompt Engineering
+To enable the app to "know" when a timer is needed, we must update the AI's output format.
+
+System Prompt Update: Modify the GeminiService instructions to wrap time durations in a specific syntax.
+
+Instruction: "Identify any durations (e.g., 'bake for 20 minutes', 'let rest for 1 hour') and wrap them in double curly braces like this: {{20 minutes}}."
+
+Regex Pattern: The app will use const timerRegex = /\{\{(.*?)\}\}/g; to scan instruction text during rendering.
+
+2. Component Architecture
+We will move away from a static text display in Cook Mode to a dynamic row that can host a timer state.
+
+A. The InstructionStep Component
+A new sub-component that handles:
+
+Text Parsing: Separating the instruction text from the {{time}} variable.
+
+State Management: Tracking if a timer is active for this specific step.
+
+Local Countdown: Using a useEffect interval to decrement time.
+
+B. The TimerUI Element
+A compact, inline UI that appears directly under the instruction text:
+
+Idle State: A button labeled "Start [Time] Timer".
+
+Active State: Shows MM:SS remaining with a progress bar.
+
+Controls: "Pause", "+1 Min", and "Cancel".
+
+Finished State: Pulsing highlight and "Dismiss" button.
+
+3. New Features & Logic
+Multiple Timer Support
+Each timer is encapsulated within its own InstructionStep component.
+
+Users can start a timer for "Bake" and simultaneously start a timer for "Prep Side Dish" without them interfering.
+
+Timers will persist even if the user scrolls, as the state is held in the component tree of the ScrollView.
+
+Alarm & Sound Logic
+Sound Integration: Use react-native-sound or expo-av to trigger a "Ding" or "Chime" upon completion.
+
+Settings Toggle: Add a new boolean to the Spark Settings: silentAlarms.
+
+true: Uses Haptic Feedback and a screen flash only.
+
+false: Plays the chime + Haptics.
+
+Manual Overrides
+An "+1 Min" button will be available on any active timer. This updates the local timeLeft state by 60 seconds without resetting the interval.
+
+4. Proposed Updates to Code Structure
+Updated Schema
+Add a settings object to the RecAIpeData interface:
+
+TypeScript
+interface RecAIpeData {
+    recipes: Recipe[];
+    settings: {
+        silentAlarms: boolean;
+    };
+}
+Render Logic Update
+In the Cook Mode section of RecAIpeSpark.tsx, the mapping logic will be updated:
+
+TypeScript
+{instructions.map((instruction, i) => (
+    <View key={i}>
+        <InstructionStep 
+            text={instruction} 
+            isChecked={selectedRecipe.cookingChecked.includes(i)}
+            onToggle={() => toggleStep(i)}
+            isSilent={data.settings.silentAlarms}
+        />
+    </View>
+))}
+5. Next Steps for Antigravity
+Refactor Prompt: Update the systemPrompt in RecAIpeSpark.tsx to include the {{duration}} requirement.
+
+Build InstructionStep: Create the component with internal useState for the countdown.
+
+Add Assets: Include a short, high-quality "Timer Finished" audio file.
+
+Update Settings UI: Add the "Silent Alarms" toggle to the existing SettingsScreen block.

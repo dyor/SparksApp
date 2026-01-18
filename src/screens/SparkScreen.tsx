@@ -50,12 +50,11 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const { colors } = useTheme();
 
-  const [showSparkSettings, setShowSparkSettings] = useState(false);
+  const showSparkSettings = (route.params as any)?.showSettings || false;
   const [settingsFocus, setSettingsFocus] = useState<string | undefined>(
     undefined
   );
   const [openCourseSelectionSignal, setOpenCourseSelectionSignal] = useState(0);
-  const [showQuickSwitch, setShowQuickSwitch] = useState(false);
   const [sparkDarkMode, setSparkDarkMode] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -238,85 +237,28 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       setCurrentSparkId(null);
       // Reset dark mode when leaving spark
       setSparkDarkMode(false);
+      // Global safety: stop any ongoing speech when navigating between sparks
+      import("expo-speech").then((Speech) => {
+        Speech.stop();
+      });
     };
   }, [sparkId, spark, setCurrentSparkId, updateSparkProgress, addRecentSpark]);
 
   const handleClose = () => {
     HapticFeedback.light();
-    // Reset dark mode when navigating away
-    setSparkDarkMode(false);
-    // Always navigate to the Home screen (MySparks list)
-    // This ensures we don't go back to Marketplace/Discover if we came from there
     (navigation as any).navigate("MySparks", {
       screen: "MySparksList",
     });
   };
 
   const handleAdd = () => {
-    // If this is Golf Brain, open the Course Selection screen to start a new round
-    if (sparkId === "golf-brain") {
-      console.log(
-        "SparkScreen: + pressed - open Course Selection for new round"
-      );
-      HapticFeedback.light();
-      setOpenCourseSelectionSignal((s) => s + 1);
-      return;
-    }
-
     HapticFeedback.success();
     addSparkToUser(sparkId);
   };
 
   const handleSettings = () => {
-    console.log("SparkScreen: handleSettings invoked for", sparkId);
     HapticFeedback.light();
-    // If this is Golf Brain, open settings focused on Courses (add/revise)
-    if (sparkId === "golf-brain") {
-      setSettingsFocus("courses");
-    }
-    setShowSparkSettings(true);
-  };
-
-  const handleQuickSwitch = () => {
-    console.log("QuickSwitch: Opening modal");
-    console.log("QuickSwitch: Current sparkId:", sparkId);
-    console.log("QuickSwitch: All recent sparks:", recentSparks);
-    console.log(
-      "QuickSwitch: Filtered recent sparks:",
-      recentSparks.filter((id) => id !== sparkId)
-    );
-    HapticFeedback.light();
-    setShowQuickSwitch(true);
-  };
-
-  const handleSelectSpark = (selectedSparkId: string) => {
-    console.log("QuickSwitch: Selected spark ID:", selectedSparkId);
-    console.log("QuickSwitch: Current spark ID:", sparkId);
-    console.log("QuickSwitch: Available sparks:", recentSparks);
-
-    if (selectedSparkId !== sparkId) {
-      // Verify the spark exists before navigating
-      const targetSpark = getSparkById(selectedSparkId);
-      console.log("QuickSwitch: Target spark found:", targetSpark);
-
-      if (targetSpark) {
-        (navigation as any).replace("Spark", { sparkId: selectedSparkId });
-      } else {
-        console.error("QuickSwitch: Spark not found:", selectedSparkId);
-      }
-    }
-  };
-
-  const handleRecentSparkPress = () => {
-    if (recentSparks.length > 1) {
-      const previousSpark = recentSparks.find((id) => id !== sparkId);
-      if (previousSpark) {
-        HapticFeedback.light();
-        (navigation as any).replace("Spark", { sparkId: previousSpark });
-      }
-    } else {
-      handleQuickSwitch();
-    }
+    navigation.setParams({ showSettings: true } as any);
   };
 
   if (!spark) {
@@ -346,7 +288,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
               settingsInitialTab: settingsFocus,
               openCourseSelectionSignal: openCourseSelectionSignal,
               onCloseSettings: () => {
-                setShowSparkSettings(false);
+                navigation.setParams({ showSettings: false } as any);
                 setSettingsFocus(undefined);
               },
               onStateChange: handleStateChange,
@@ -362,73 +304,6 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         </SparkErrorBoundary>
       </View>
-
-      {!showSparkSettings && (
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleClose}>
-            <Text style={[styles.buttonIcon, styles.closeIcon]}>🏠</Text>
-            <Text style={[styles.buttonLabel, styles.closeLabel]}>Home</Text>
-          </TouchableOpacity>
-
-          {/* Recent Spark Quick Access */}
-          {recentSparks.length > 1 && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleRecentSparkPress}
-            >
-              <Text style={[styles.buttonIcon, styles.recentSparkIcon]}>
-                {recentSparks.find((id) => id !== sparkId)
-                  ? getSparkById(recentSparks.find((id) => id !== sparkId)!)
-                    ?.metadata.icon || "⚡️"
-                  : "⚡️"}
-              </Text>
-              <Text style={[styles.buttonLabel, styles.recentSparkLabel]}>
-                Recent
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Quick Switch Button */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleQuickSwitch}
-          >
-            <Text style={[styles.buttonIcon, styles.quickSwitchIcon]}>∞</Text>
-            <Text style={[styles.buttonLabel, styles.quickSwitchLabel]}>
-              Switch
-            </Text>
-          </TouchableOpacity>
-
-          {!isInUserCollection && (
-            <TouchableOpacity style={styles.actionButton} onPress={handleAdd}>
-              <Text style={[styles.buttonIcon, styles.addIcon]}>➕</Text>
-              <Text style={[styles.buttonLabel, styles.addLabel]}>Add</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleSettings}
-          >
-            <View style={{ position: "relative" }}>
-              <Text style={[styles.buttonIcon, styles.settingsIcon]}>⚙️</Text>
-              <NotificationBadge sparkId={sparkId} size="small" />
-            </View>
-            <Text style={[styles.buttonLabel, styles.settingsLabel]}>
-              Settings
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Quick Switch Modal */}
-      <QuickSwitchModal
-        visible={showQuickSwitch}
-        onClose={() => setShowQuickSwitch(false)}
-        recentSparks={recentSparks.filter((id) => id !== sparkId)}
-        onSelectSpark={handleSelectSpark}
-        navigation={navigation}
-      />
     </SafeAreaView>
   );
 };

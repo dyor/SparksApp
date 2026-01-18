@@ -64,6 +64,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   const isHydrated = useSparkStore(state => state.isHydrated);
 
@@ -99,6 +100,11 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
       showSubscription.remove();
       hideSubscription.remove();
     };
+  }, []);
+
+  // Check for API key
+  useEffect(() => {
+    GeminiService.getApiKey().then(key => setHasApiKey(!!key)).catch(() => setHasApiKey(false));
   }, []);
 
   // Load history on mount
@@ -353,7 +359,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
               other Sparks. Powered by Gemini AI.
             </Text>
             <Text style={{ fontSize: 14, color: colors.textSecondary }}>
-              {GeminiService.getApiKey()
+              {hasApiKey
                 ? "✅ Gemini API Key Configured"
                 : "❌ Missing API Key"}
             </Text>
@@ -481,7 +487,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
                 >
                   {errorMessage}
                 </Text>
-              ) : null}{" "}
+              ) : null}
             </View>
           )}
 

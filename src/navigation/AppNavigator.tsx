@@ -26,6 +26,8 @@ import { useAppStore } from "../store";
 import { QuickSwitchModal } from "../components/QuickSwitchModal";
 import { getSparkById } from "../components/SparkRegistry";
 import { HapticFeedback } from "../utils/haptics";
+import { NotificationBadge } from "../components/NotificationBadge";
+import { useSparkStore } from "../store/sparkStore";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const MySparksStack = createNativeStackNavigator<MySparkStackParamList>();
@@ -88,10 +90,6 @@ const MySparksStackNavigator = () => {
           headerBackTitle: "Back",
           headerShown: false,
         })}
-        listeners={{
-          focus: () => setTabBarVisible?.(false),
-          blur: () => setTabBarVisible?.(true),
-        }}
       />
     </MySparksStack.Navigator>
   );
@@ -132,10 +130,6 @@ const MarketplaceStackNavigator = () => {
           headerBackTitle: "Back",
           headerShown: false,
         })}
-        listeners={{
-          focus: () => setTabBarVisible?.(false),
-          blur: () => setTabBarVisible?.(true),
-        }}
       />
     </MarketplaceStack.Navigator>
   );
@@ -151,6 +145,8 @@ const CustomTabBar: React.FC<
   const [adminUnreadCount, setAdminUnreadCount] = React.useState(0);
   const isNavigatingRef = React.useRef(false);
   const insets = useSafeAreaInsets();
+  const userSparkIds = useSparkStore(state => state.userSparkIds);
+  const addSparkToUser = useSparkStore(state => state.addSparkToUser);
 
   // Check for admin unread counts (feedback, reviews, submissions)
   React.useEffect(() => {
@@ -204,26 +200,34 @@ const CustomTabBar: React.FC<
     return null;
   }
 
-  // Check if we're currently on a Spark screen
-  const isOnSparkScreen = () => {
-    for (const route of state.routes) {
-      const routeState = route.state;
-      if (
-        routeState &&
-        routeState.routes &&
-        routeState.routes.length > 0 &&
-        typeof routeState.index === "number"
-      ) {
-        const focusedRoute = routeState.routes[routeState.index];
-        if (focusedRoute && focusedRoute.name === "Spark") {
-          return true;
-        }
+  // Check if we're currently on a Spark screen and get its params
+  const getActiveSparkInfo = () => {
+    const activeRoute = state.routes[state.index];
+    if (!activeRoute) return null;
+
+    const routeState = activeRoute.state;
+    if (
+      routeState &&
+      routeState.routes &&
+      routeState.routes.length > 0 &&
+      typeof routeState.index === "number"
+    ) {
+      const focusedRoute = routeState.routes[routeState.index];
+      if (focusedRoute && focusedRoute.name === "Spark") {
+        return {
+          tabName: activeRoute.name,
+          sparkId: (focusedRoute.params as any)?.sparkId,
+          showSettings: (focusedRoute.params as any)?.showSettings || false,
+        };
       }
     }
-    return false;
+    return null;
   };
 
-  const onSparkScreen = isOnSparkScreen();
+  const sparkInfo = getActiveSparkInfo();
+  const onSparkScreen = !!sparkInfo;
+  const sparkId = sparkInfo?.sparkId;
+  const isSparkSettingsOpen = sparkInfo?.showSettings || false;
 
   // Check if we're on a Spark screen within a specific tab's stack
   const isOnSparkScreenInTab = (tabName: string) => {
@@ -246,31 +250,9 @@ const CustomTabBar: React.FC<
   const getMostRecentSpark = () => {
     if (recentSparks.length === 0) return null;
 
-    if (onSparkScreen) {
-      // Get current spark ID from navigation state
-      let currentSparkId: string | null = null;
-      for (const route of state.routes) {
-        const routeState = route.state;
-        if (
-          routeState &&
-          routeState.routes &&
-          routeState.routes.length > 0 &&
-          typeof routeState.index === "number"
-        ) {
-          const focusedRoute = routeState.routes[routeState.index];
-          if (
-            focusedRoute &&
-            focusedRoute.name === "Spark" &&
-            focusedRoute.params
-          ) {
-            currentSparkId = (focusedRoute.params as any).sparkId;
-            break;
-          }
-        }
-      }
-
+    if (onSparkScreen && sparkId) {
       // Return the most recent spark that's not the current one
-      const otherSparks = recentSparks.filter((id) => id !== currentSparkId);
+      const otherSparks = recentSparks.filter((id) => id !== sparkId);
       return otherSparks.length > 0 ? otherSparks[0] : null;
     }
 
@@ -352,7 +334,42 @@ const CustomTabBar: React.FC<
       fontSize: 12,
       color: colors.primary,
     },
+    sparkActionIcon: {
+      fontSize: 22,
+      marginBottom: 4,
+    },
+    sparkActionLabel: {
+      fontSize: 11,
+      fontWeight: '500',
+    }
   });
+
+  const handleToggleSparkSettings = () => {
+    if (!sparkInfo) return;
+    HapticFeedback.light();
+    navigation.navigate(sparkInfo.tabName, {
+      screen: 'Spark',
+      params: {
+        sparkId: sparkInfo.sparkId,
+        showSettings: !sparkInfo.showSettings
+      }
+    });
+  };
+
+  const handleHomePress = () => {
+    HapticFeedback.light();
+    navigation.navigate('MySparks', { screen: 'MySparksList' });
+  };
+
+  const handleRecentPress = () => {
+    if (mostRecentSpark) {
+      HapticFeedback.light();
+      navigation.navigate('MySparks', {
+        screen: 'Spark',
+        params: { sparkId: mostRecentSpark }
+      });
+    }
+  };
 
   return (
     <>
@@ -626,6 +643,62 @@ const CustomTabBar: React.FC<
             }
           };
 
+          // RENDER SPARK BUTTONS IF ON SPARK SCREEN
+          if (onSparkScreen && index === 0) {
+            const isInCollection = sparkId ? userSparkIds.includes(sparkId) : true;
+            const recentSparkMeta = mostRecentSpark ? getSparkById(mostRecentSpark) : null;
+
+            return (
+              <View key="spark-actions" style={{ flexDirection: 'row', flex: 1 }}>
+                {/* Home */}
+                <TouchableOpacity style={styles.tab} onPress={handleHomePress}>
+                  <Text style={[styles.sparkActionIcon, { color: colors.textSecondary }]}>🏠</Text>
+                  <Text style={[styles.sparkActionLabel, { color: colors.textSecondary }]}>Home</Text>
+                </TouchableOpacity>
+
+                {/* Recent */}
+                {mostRecentSpark && (
+                  <TouchableOpacity style={styles.tab} onPress={handleRecentPress}>
+                    <Text style={styles.sparkActionIcon}>{recentSparkMeta?.metadata.icon || '⚡️'}</Text>
+                    <Text style={[styles.sparkActionLabel, { color: colors.textSecondary }]}>Recent</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Switch */}
+                <TouchableOpacity style={styles.tab} onPress={handleQuickSwitch}>
+                  <Text style={[styles.sparkActionIcon, { color: colors.primary }]}>∞</Text>
+                  <Text style={[styles.sparkActionLabel, { color: colors.primary }]}>Switch</Text>
+                </TouchableOpacity>
+
+                {/* Add (conditional) */}
+                {!isInCollection && (
+                  <TouchableOpacity
+                    style={styles.tab}
+                    onPress={() => {
+                      HapticFeedback.success();
+                      addSparkToUser(sparkId!);
+                    }}
+                  >
+                    <Text style={styles.sparkActionIcon}>➕</Text>
+                    <Text style={[styles.sparkActionLabel, { color: colors.textSecondary }]}>Add</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Settings */}
+                <TouchableOpacity style={styles.tab} onPress={handleToggleSparkSettings}>
+                  <View style={{ position: 'relative' }}>
+                    <Text style={[styles.sparkActionIcon, { color: isSparkSettingsOpen ? colors.primary : colors.textSecondary }]}>⚙️</Text>
+                    {sparkId && <NotificationBadge sparkId={sparkId} size="small" />}
+                  </View>
+                  <Text style={[styles.sparkActionLabel, { color: isSparkSettingsOpen ? colors.primary : colors.textSecondary }]}>Settings</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // Don't render other tabs if on spark screen (we replaced the whole bar in the first iteration)
+          if (onSparkScreen) return null;
+
           // Determine icon and label - keep them static, no dynamic changing
           let icon =
             route.name === "MySparks"
@@ -642,8 +715,8 @@ const CustomTabBar: React.FC<
 
           return (
             <React.Fragment key={route.key}>
-              {/* Quick Switch Button - show before Settings tab if there are recent sparks */}
-              {route.name === "Settings" && recentSparks.length >= 1 && (
+              {/* Quick Switch Button - show before Settings tab */}
+              {route.name === "Settings" && (
                 <TouchableOpacity
                   accessibilityRole="button"
                   onPress={handleQuickSwitch}

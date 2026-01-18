@@ -7,6 +7,7 @@ import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { NotificationBadge } from '../components/NotificationBadge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SparkSelectionNavigationProp = StackNavigationProp<MySparkStackParamList, 'MySparksList'>;
 
@@ -20,7 +21,8 @@ interface Props {
 export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
   const { getUserSparks } = useSparkStore();
   const { colors } = useTheme();
-  const styles = React.useMemo(() => getStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = React.useMemo(() => getStyles(colors, insets), [colors, insets]);
   const userSparkIds = getUserSparks();
 
   // Filter to only show user's sparks
@@ -102,14 +104,14 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
     padding: 24,
-    paddingTop: 60, // Additional spacing for iOS Dynamic Island
+    paddingTop: Math.max(insets.top, 20), // Use dynamic top inset
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

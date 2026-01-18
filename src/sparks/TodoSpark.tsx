@@ -755,12 +755,12 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     },
     cancelButtonText: {
       color: colors.text,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
     },
     saveButtonText: {
       color: '#fff',
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
     },
     deleteButton: {
@@ -773,7 +773,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     },
     deleteButtonText: {
       color: '#fff',
-      fontSize: 20,
+      fontSize: 14,
       fontWeight: 'bold',
     },
     toggleButton: {
