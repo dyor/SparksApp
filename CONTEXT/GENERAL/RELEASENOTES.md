@@ -2,6 +2,23 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
+## Version 1.0.35 released Jan 19, 2026
+
+### Major Work Items
+
+Big upgrades to the Soundboard Spark including precision trimming, visual playback feedback, and instant-play performance optimizations. Improvements to RecAIpe spark including embedded timers to keep your cooking on track. 
+
+- **Soundboard Spark Enhancements**:
+    - **Precision Audio Trimming**: Implemented a new trimming interface with discrete head and tail controls, allowing users to cut off tenths of a second from the beginning or end of recordings.
+    - **Visual Playback Head**: Added a dynamic indicator ball that moves along the trimming line during preview, providing real-time visual feedback of the current audio position.
+    - **Instant Playback (Pre-loading)**: Engineered a sound pre-loading system that warms up all audio clips upon Spark entry, enabling near-zero latency transitions between sounds.
+    - **Settings UI Fix**: Resolved a bug where "Your Sounds" count would stubbornly show as 0 even when recordings were present.
+- **Infrastructure & Deployment**:
+    - **Fixed Production Deployment**: Corrected a path resolution error in `deploy-production.sh` that caused version synchronization to fail.
+    - **Version Synchronization**: Aligned `app.json`, `package.json`, and native build configurations to ensure build consistency across all environments.
+
+---
+
 ## Version 1.0.29 released Jan 15, 2026
 
 ### Major Work Items

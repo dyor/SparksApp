@@ -88,15 +88,17 @@ const SoundboardSettings: React.FC<{
   onClose: () => void;
 }> = ({ soundChips, onSave, onClose }) => {
   const { colors } = useTheme();
-  const [editingSoundChips, setEditingSoundChips] = useState<SoundChip[]>([]);
+  const [editingSoundChips, setEditingSoundChips] = useState<SoundChip[]>(soundChips);
   const [shareSelectionVisible, setShareSelectionVisible] = useState(false);
-  const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
+  const [selectedShareId, setSelectedShareId] = useState<string | null>(soundChips[0]?.id || null);
+  const hasInitializedRef = useRef(soundChips.length > 0);
 
-  // Sync editingSoundChips when soundChips prop changes (handles hydration delay)
+  // Still sync if we started empty but now have chips (handles hydration delay)
   useEffect(() => {
-    if (soundChips.length > 0 && editingSoundChips.length === 0) {
+    if (!hasInitializedRef.current && soundChips.length > 0) {
       setEditingSoundChips([...soundChips]);
       setSelectedShareId(soundChips[0]?.id || null);
+      hasInitializedRef.current = true;
     }
   }, [soundChips]);
 
@@ -114,16 +116,17 @@ const SoundboardSettings: React.FC<{
             style: 'destructive',
             onPress: async () => {
               try {
-                // Delete the file
-                await FileSystem.deleteAsync(chipToDelete.filePath, { idempotent: true });
+                // Delete the file - IMPORTANT: Convert to absolute URI
+                const absolutePath = toAbsoluteUri(chipToDelete.filePath);
+                await FileSystem.deleteAsync(absolutePath, { idempotent: true });
 
-                // Remove from array
-                setEditingSoundChips(editingSoundChips.filter(chip => chip.id !== id));
+                // Remove from array using functional update to avoid stale closures
+                setEditingSoundChips(prev => prev.filter(c => c.id !== id));
                 HapticFeedback.medium();
               } catch (error) {
                 console.error('Failed to delete sound file:', error);
                 // Still remove from array even if file deletion fails
-                setEditingSoundChips(editingSoundChips.filter(chip => chip.id !== id));
+                setEditingSoundChips(prev => prev.filter(c => c.id !== id));
                 HapticFeedback.medium();
               }
             },
@@ -373,6 +376,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [newSoundName, setNewSoundName] = useState('');
   const [trimStart, setTrimStart] = useState(0); // in milliseconds
   const [trimEnd, setTrimEnd] = useState(0);     // in milliseconds
+  const [previewPosition, setPreviewPosition] = useState(0); // in milliseconds
 
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const recordingRef = useRef<NodeJS.Timeout | null>(null);
@@ -703,18 +707,24 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: recordedUri },
-          { positionMillis: trimStart, shouldPlay: true }
+          {
+            positionMillis: trimStart,
+            shouldPlay: true,
+            progressUpdateIntervalMillis: 50, // Update every 50ms (20fps) instead of the default 500ms
+          }
         );
         setSound(newSound);
 
         newSound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded) {
+            setPreviewPosition(status.positionMillis);
             if (status.positionMillis >= trimEnd) {
               newSound.stopAsync();
             }
             if (status.didJustFinish) {
               // Reset for next play
               newSound.setPositionAsync(trimStart);
+              setPreviewPosition(trimStart);
             }
           }
         });
@@ -777,6 +787,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       setRecordedUri(null);
       setNewSoundName('');
       setRecordedDuration(0);
+      setPreviewPosition(0);
 
       HapticFeedback.success();
     } catch (error) {
@@ -790,6 +801,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     setRecordedUri(null);
     setNewSoundName('');
     setRecordedDuration(0);
+    setPreviewPosition(0);
     if (sound) {
       const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
       if (isPreloaded) {
@@ -824,13 +836,14 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       });
 
       setSoundChips(migrated);
-      hasLoadedRef.current = true;
-
       if (JSON.stringify(migrated) !== JSON.stringify(savedData.soundChips)) {
-        console.log('📦 SoundboardSpark: Migrating paths to relative format...');
         setSparkData('soundboard', { ...savedData, soundChips: migrated });
       }
     }
+
+    // Crucial: mark as loaded even if no saved data exists, 
+    // otherwise new users can't save their first sounds!
+    hasLoadedRef.current = true;
     setDataLoaded(true);
 
     // Ensure soundboard directory exists immediately
@@ -1242,6 +1255,24 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
                       borderRadius: 2,
                       left: `${(trimStart / (recordedDuration * 1000)) * 100}%`,
                       right: `${100 - (trimEnd / (recordedDuration * 1000)) * 100}%`
+                    }}
+                  />
+                  {/* Playhead Ball */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.primary,
+                      left: `${(previewPosition / (recordedDuration * 1000)) * 100}%`,
+                      top: -4,
+                      marginLeft: -6,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 2,
+                      elevation: 2,
                     }}
                   />
                 </View>

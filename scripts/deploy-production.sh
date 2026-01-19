@@ -44,10 +44,10 @@ else
   echo "Ensuring google-services.json path is configured in app.json..."
   node -e "
     const fs = require('fs');
-    const appJson = require('../app.json');
+    const appJson = require('./app.json');
     if (!appJson.expo.android.googleServicesFile) {
       appJson.expo.android.googleServicesFile = './google-services.json';
-      fs.writeFileSync('../app.json', JSON.stringify(appJson, null, 2) + '\n');
+      fs.writeFileSync('./app.json', JSON.stringify(appJson, null, 2) + '\n');
       console.log('✓ Added googleServicesFile to Android config');
     }
   "
