@@ -155,27 +155,27 @@ const IdeasSettings: React.FC<{
 const getThemeColors = (mode: "light" | "dark") =>
   mode === "light"
     ? {
-        background: "#F2F2F7",
-        surface: "#FFFFFF",
-        text: "#000000",
-        textSecondary: "#8E8E93",
-        border: "#C6C6C8",
-        primary: "#007AFF",
-        error: "#FF3B30",
-        danger: "#FF3B30",
-        success: "#34C759",
-      }
+      background: "#F2F2F7",
+      surface: "#FFFFFF",
+      text: "#000000",
+      textSecondary: "#8E8E93",
+      border: "#C6C6C8",
+      primary: "#007AFF",
+      error: "#FF3B30",
+      danger: "#FF3B30",
+      success: "#34C759",
+    }
     : {
-        background: "#000000",
-        surface: "#1C1C1E",
-        text: "#FFFFFF",
-        textSecondary: "#8E8E93",
-        border: "#38383A",
-        primary: "#0A84FF",
-        error: "#FF453A",
-        danger: "#FF453A",
-        success: "#32D74B",
-      };
+      background: "#000000",
+      surface: "#1C1C1E",
+      text: "#FFFFFF",
+      textSecondary: "#8E8E93",
+      border: "#38383A",
+      primary: "#0A84FF",
+      error: "#FF453A",
+      danger: "#FF453A",
+      success: "#32D74B",
+    };
 
 export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   showSettings = false,
@@ -199,6 +199,7 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   const [sortBy, setSortBy] = useState<"date" | "alpha">("date");
   const [isCondensedMode, setIsCondensedMode] = useState(false); // Default is 4 lines (false)
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Edit Mode State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -215,14 +216,36 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
     if (savedData.localThemeMode) {
       setLocalThemeMode(savedData.localThemeMode);
     }
+    if (savedData.sortBy) {
+      setSortBy(savedData.sortBy);
+    }
+    if (savedData.isCondensedMode !== undefined) {
+      setIsCondensedMode(savedData.isCondensedMode);
+    }
+    setDataLoaded(true);
   }, [getSparkData, isHydrated]);
 
   // Persistence
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isHydrated || !dataLoaded) return;
     const savedData = getSparkData("ideas");
-    setSparkData("ideas", { ...savedData, ideas, localThemeMode });
-  }, [ideas, localThemeMode, setSparkData, getSparkData, isHydrated]);
+    setSparkData("ideas", {
+      ...savedData,
+      ideas,
+      localThemeMode,
+      sortBy,
+      isCondensedMode,
+    });
+  }, [
+    ideas,
+    localThemeMode,
+    sortBy,
+    isCondensedMode,
+    setSparkData,
+    getSparkData,
+    isHydrated,
+    dataLoaded,
+  ]);
 
   useEffect(() => {
     ServiceFactory.getAnalyticsService().trackSparkOpen("ideas", "Ideas");

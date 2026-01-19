@@ -189,6 +189,7 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [showFinancials, setShowFinancials] = useState(false);
   const [currentDecisions, setCurrentDecisions] = useState<Decision[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Load saved data
   useEffect(() => {
@@ -208,17 +209,19 @@ export const BusinessSpark: React.FC<BusinessSparkProps> = ({
       };
       setGameState(loadedState);
     }
+    setDataLoaded(true);
   }, [getSparkData]);
 
   // Save data whenever game state changes
   useEffect(() => {
+    if (!dataLoaded) return;
     setSparkData('business-sim', { gameState });
     onStateChange?.({
       day: gameState.day,
       cash: gameState.cash,
       netWorth: calculateNetWorth(gameState)
     });
-  }, [gameState]); // Removed setSparkData and onStateChange from dependencies
+  }, [gameState, dataLoaded]); // Removed setSparkData and onStateChange from dependencies
 
   const calculateNetWorth = (state: GameState): number => {
     const printerValue = (state.printers || []).length * 200; // Depreciated value (50% of $400)

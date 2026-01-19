@@ -1101,6 +1101,7 @@ export const ScorecardSpark: React.FC<{ showSettings?: boolean, onCloseSettings?
     const [rounds, setRounds] = useState<Round[]>([]);
     const [scores, setScores] = useState<Score[]>([]);
     const [showHelp, setShowHelp] = useState(false);
+    const [dataLoaded, setDataLoaded] = useState(false);
 
     // Derived State
     const colors = Colors[colorMode];
@@ -1137,12 +1138,14 @@ export const ScorecardSpark: React.FC<{ showSettings?: boolean, onCloseSettings?
             setRounds(cleanRounds);
             setScores(cleanScores);
         }
+        setDataLoaded(true);
     }, [getSparkData]);
 
     // Save Changes
     useEffect(() => {
+        if (!dataLoaded) return;
         setSparkData('scorecard', { courses, rounds, scores });
-    }, [courses, rounds, scores, setSparkData]);
+    }, [courses, rounds, scores, setSparkData, dataLoaded]);
 
     useEffect(() => {
         ServiceFactory.getAnalyticsService().trackSparkOpen('scorecard', 'Scorecard');

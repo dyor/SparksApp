@@ -44,6 +44,8 @@ export const SkinsSpark: React.FC<SkinsSparkProps> = ({
     currentHole: 1,
   });
 
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   // Load saved state
   useEffect(() => {
     const savedData = getSparkData('skins');
@@ -52,12 +54,14 @@ export const SkinsSpark: React.FC<SkinsSparkProps> = ({
       if (savedData.gameState) setGameState(savedData.gameState);
       // Restore setup state if needed, but mainly game state is important
     }
+    setDataLoaded(true);
   }, []);
 
   // Save state
   useEffect(() => {
+    if (!dataLoaded) return;
     setSparkData('skins', { mode, gameState });
-  }, [mode, gameState]);
+  }, [mode, gameState, dataLoaded]);
 
   const handleStartGame = () => {
     const activeNames = names.slice(0, playerCount).map((n, i) => n.trim() || `Player ${i + 1}`);
