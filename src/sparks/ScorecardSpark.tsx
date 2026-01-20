@@ -342,11 +342,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
     return (
         <View style={{ flex: 1 }}>
-            <View style={[styles.header, { justifyContent: 'space-between' }]}>
+            <View style={styles.header}>
                 <Text style={styles.title}>Scorecards</Text>
-                <TouchableOpacity onPress={() => setCurrentView('courses')}>
-                    <Ionicons name="settings-outline" size={24} color={colors.text} />
-                </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.newRoundButton} onPress={() => setCurrentView('courses')}>

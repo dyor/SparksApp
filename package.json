@@ -66,6 +66,7 @@
     "expo-task-manager": "~13.1.6",
     "firebase": "^12.4.0",
     "jest-expo": "~53.0.13",
+    "lamejs": "^1.2.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.6",

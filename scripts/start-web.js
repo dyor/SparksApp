@@ -11,8 +11,10 @@ const net = require("net");
 
 // Set environment variables to disable all interactive prompts
 process.env.EXPO_NO_GIT_STATUS = "1";
-process.env.CI = "true";
 process.env.EXPO_NO_TELEMETRY = "1";
+process.env.EXPO_BROWSER = "microsoft-edge";
+process.env.CHOKIDAR_USEPOLLING = "1"; // Critical for Windows/Codespaces watcher
+process.env.CI = "1"; // Avoid interactive prompts
 
 /**
  * Check if a port is available
@@ -103,7 +105,9 @@ async function main() {
   console.log("");
 
   // Start Expo with the determined port
-  // Avoid passing flags that some Expo versions reject in Codespaces
+  // Use environment variables instead of flags for better compatibility
+  process.env.EXPO_NO_BROWSER = "1";
+
   const expoArgs = [
     "expo",
     "start",
@@ -112,11 +116,6 @@ async function main() {
     port.toString(),
     "--clear",
   ];
-
-  // If not running in CI, keep --no-open to avoid opening a browser locally
-  if (!process.env.CI) {
-    expoArgs.push("--no-open");
-  }
 
   const expoProcess = spawn("npx", expoArgs, {
     stdio: "inherit",

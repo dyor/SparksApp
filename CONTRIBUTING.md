@@ -1,3 +1,13 @@
+
+
+
+
+
+
+
+
+
+
 # Contributing to SparksApp
 
 Thank you for your interest in contributing to Sparks! We welcome contributions from the community to help make this project better.

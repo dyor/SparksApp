@@ -40,6 +40,7 @@ import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
+import MusicMakerSpark from "../sparks/MusicMakerSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -523,6 +524,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: IdeasSpark,
+  },
+  "music-maker": {
+    metadata: {
+      id: "music-maker",
+      title: "Music Maker",
+      description: "Guitar tuner and AI vocal song analyzer",
+      icon: "🎸",
+      category: "media",
+      createdAt: "2026-01-19T00:00:00.000Z",
+      rating: 4.8,
+    },
+    component: MusicMakerSpark,
   },
 };
 

@@ -49,6 +49,10 @@ export const SettingsScreen: React.FC = () => {
   const [unreadReviewsCount, setUnreadReviewsCount] = useState(0);
   const [unreadSubmissionsCount, setUnreadSubmissionsCount] = useState(0);
 
+  // Help modal state
+  const [showGeneralHelp, setShowGeneralHelp] = useState(false);
+  const [showHandicapHelp, setShowHandicapHelp] = useState(false);
+
   // Refresh unread counts periodically for admins
   useEffect(() => {
     if (!isAdmin) return;
@@ -280,6 +284,28 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.subtitle}>
             Customize your Sparks experience • v{Constants.expoConfig?.version || '1.0.0'}
           </Text>
+        </View>
+
+        {/* Help & Instructions Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ℹ️ Help & Instructions</Text>
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+            Learn more about how to use SparksApp and how golf statistics are calculated.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowGeneralHelp(true)}
+          >
+            <Text style={styles.actionButtonText}>📖 General App Help</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { marginTop: 12 }]}
+            onPress={() => setShowHandicapHelp(true)}
+          >
+            <Text style={styles.actionButtonText}>⛳ Handicap Calculation</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.feedbackSection}>
@@ -873,6 +899,57 @@ export const SettingsScreen: React.FC = () => {
             }
           }}
         />
+
+        {/* General Help Modal */}
+        <Modal visible={showGeneralHelp} transparent animationType="fade">
+          <View style={styles.modalOverlayCenter}>
+            <View style={styles.helpCard}>
+              <Text style={styles.helpCardTitle}>Help & Voice Commands</Text>
+              <ScrollView>
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary }]}>Voice Commands:</Text>
+                <Text style={styles.helpDescription}>• Use the microphone button in Sparks that support voice (like Scorecard) and say only the numbers.</Text>
+                <Text style={styles.helpDescription}>• Next Hole: Say "[strokes] [putts]" (e.g., "5 1")</Text>
+                <Text style={styles.helpDescription}>• Specific Hole: Say "[hole] [strokes] [putts]" (e.g., "1 4 2")</Text>
+                <Text style={styles.helpDescription}>• Examples: "5-1", "5:1", and "5 and 1" all parse correctly.</Text>
+
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary, marginTop: 12 }]}>Scoring Info:</Text>
+                <Text style={styles.helpDescription}>• BEGIN: Set your tee time or it will be inferred from Hole 1 completion.</Text>
+                <Text style={styles.helpDescription}>• NET: Shows score relative to par and your handicap. Red means under par.</Text>
+                <Text style={styles.helpDescription}>• PACE: Minutes ahead (+) or behind (-) the target pace for the course.</Text>
+              </ScrollView>
+              <TouchableOpacity style={styles.closeHelpButton} onPress={() => setShowGeneralHelp(false)}>
+                <Text style={styles.closeHelpButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Handicap Help Modal */}
+        <Modal visible={showHandicapHelp} transparent animationType="fade">
+          <View style={styles.modalOverlayCenter}>
+            <View style={styles.helpCard}>
+              <Text style={styles.helpCardTitle}>Handicap Calculation</Text>
+              <ScrollView>
+                <Text style={styles.helpDescription}>SparksApp uses a calculation based on the World Handicap System (WHS).</Text>
+
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary, marginTop: 12 }]}>1. Adjusted Gross Score</Text>
+                <Text style={styles.helpDescription}>Your score on any hole is capped at a "Net Double Bogey" (Par + 2 + strokes received on that hole) to prevent one bad hole from over-inflating your handicap.</Text>
+
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary, marginTop: 12 }]}>2. Score Differential</Text>
+                <Text style={styles.helpDescription}>Calculated for each round: `(Adjusted Gross Score - Course Rating) * (113 / Slope Rating)`. This represents your performance regardless of the course difficulty.</Text>
+
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary, marginTop: 12 }]}>3. Handicap Index</Text>
+                <Text style={styles.helpDescription}>We average your best Differentials. For a full record of 20 rounds, the best 8 are used. For fewer rounds, we use a sliding scale (e.g., best 1 of your first 3, best 3 of your first 6).</Text>
+
+                <Text style={[styles.helpDescription, { fontWeight: 'bold', color: colors.primary, marginTop: 12 }]}>4. Course Handicap</Text>
+                <Text style={styles.helpDescription}>When you play, your "Course Handicap" is: `(Index * (Slope / 113)) + (Rating - Par)`. This is the number of strokes you receive on that specific course.</Text>
+              </ScrollView>
+              <TouchableOpacity style={styles.closeHelpButton} onPress={() => setShowHandicapHelp(false)}>
+                <Text style={styles.closeHelpButtonText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SettingsScrollView>
     </View>
   );
@@ -1138,5 +1215,40 @@ const createStyles = (colors: any, insets: { top: number }) => StyleSheet.create
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlayCenter: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  helpCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  helpCardTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  helpDescription: {
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  closeHelpButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  closeHelpButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
