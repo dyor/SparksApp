@@ -59,4 +59,19 @@ config.server = {
     },
 };
 
+// Add a transformer to handle import.meta on web
+config.transformer = {
+    ...config.transformer,
+    getTransformOptions: async () => ({
+        transform: {
+            experimentalImportSupport: false,
+            inlineRequires: false,
+        },
+    }),
+};
+
+// Custom transformer to strip import.meta on web
+const transformerPath = config.transformer.babelTransformerPath || require.resolve('metro-react-native-babel-transformer');
+config.transformer.babelTransformerPath = path.resolve(__dirname, 'scripts/web-transformer.js');
+
 module.exports = config;

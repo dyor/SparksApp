@@ -34,8 +34,13 @@ export class RemoteConfigService {
                     // Dynamic import to avoid top-level browser checks
                     const { getRemoteConfig } = await import("firebase/remote-config");
 
-                    // Get Firebase app instance
-                    const { getApp } = require("firebase/app");
+                    // Get Firebase app instance safely
+                    const { getApp, getApps } = require("firebase/app");
+                    const apps = getApps();
+                    if (apps.length === 0) {
+                        console.log('⏳ Remote Config waiting for Firebase app initialization...');
+                        return; // Will retry or fail gracefully
+                    }
                     const app = getApp();
 
                     // Initialize Remote Config

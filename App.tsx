@@ -26,19 +26,24 @@ console.log("🚀 [App.tsx] JS Bundle executing...");
 // Initialize Firebase
 try {
   // Use native Firebase if available, otherwise fallback to web/mock
-  let firebase;
-  try {
-    firebase = require("@react-native-firebase/app").default;
-  } catch (e) {
-    // If native firebase is not available, we'll let ServiceFactory handle it
-    console.log(
-      "ℹ️ Native Firebase not available, relying on web SDK fallback"
-    );
-  }
+  // ONLY on native platforms. Web uses the JS SDK via ServiceFactory.
+  if (Platform.OS !== 'web') {
+    let firebase;
+    try {
+      firebase = require("@react-native-firebase/app").default;
+    } catch (e) {
+      // If native firebase is not available, we'll let ServiceFactory handle it
+      console.log(
+        "ℹ️ Native Firebase not available, relying on web SDK fallback"
+      );
+    }
 
-  if (firebase && !firebase.apps.length) {
-    firebase.initializeApp();
-    console.log("✅ Native Firebase initialized");
+    if (firebase && !firebase.apps.length) {
+      firebase.initializeApp();
+      console.log("✅ Native Firebase initialized");
+    }
+  } else {
+    console.log("ℹ️ Web platform detected, skipping native Firebase initialization");
   }
 } catch (error) {
   console.log("⚠️ Firebase initialization status:", (error as Error).message);

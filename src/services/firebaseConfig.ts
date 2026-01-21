@@ -57,23 +57,16 @@ export async function getFirebaseApp(): Promise<FirebaseApp | undefined> {
   }
 
   try {
-    // Ensure Remote Config is initialized and fetched before we try to use it
-    await RemoteConfigService.ensureInitialized();
-    await RemoteConfigService.fetchAndActivate();
-
-    // 1. Try full JSON config from Remote Config
-    const remoteConfigJson = RemoteConfigService.getWebFirebaseConfig();
-    if (remoteConfigJson && validateFirebaseConfig(remoteConfigJson)) {
-      console.log("🔥 Initializing Firebase with Remote Config JSON");
-      return initializeApp(remoteConfigJson);
-    }
-
-    // 2. Try individual overrides or env variables
+    // 1. Check for valid environment defaults as immediate fallback
     const effectiveConfig = getEffectiveFirebaseConfig();
     if (validateFirebaseConfig(effectiveConfig)) {
       console.log("🔥 Initializing Firebase with effective configuration (Remote Overrides + Env)");
       return initializeApp(effectiveConfig);
     }
+
+    // 2. If env defaults are missing, try Remote Config (which may be circular)
+    // Non-blocking initialization of Remote Config
+    RemoteConfigService.ensureInitialized().catch(e => console.log("RemoteConfig init wait:", e.message));
 
     console.warn(
       "⚠️ Firebase configuration is missing. Web SDK features will be disabled."
