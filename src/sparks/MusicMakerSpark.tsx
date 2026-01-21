@@ -62,6 +62,32 @@ const VolumeControl: React.FC<{
     </View>
 );
 
+const RhythmParamControl: React.FC<{
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    onChange: (val: number) => void;
+    color: string;
+    format?: (v: number) => string;
+}> = ({ label, value, min, max, step, onChange, color, format }) => (
+    <View style={styles.paramControl}>
+        <Text style={styles.paramLabel}>{label}</Text>
+        <View style={styles.paramRow}>
+            <TouchableOpacity onPress={() => onChange(Math.max(min, value - step))}>
+                <Ionicons name="remove-circle-outline" size={20} color={color} />
+            </TouchableOpacity>
+            <Text style={[styles.paramValue, { color }]}>
+                {format ? format(value) : value.toFixed(2)}
+            </Text>
+            <TouchableOpacity onPress={() => onChange(Math.min(max, value + step))}>
+                <Ionicons name="add-circle-outline" size={20} color={color} />
+            </TouchableOpacity>
+        </View>
+    </View>
+);
+
 const MusicMakerSpark: React.FC<{
     showSettings?: boolean;
     onCloseSettings?: () => void;
@@ -99,11 +125,17 @@ const MusicMakerSpark: React.FC<{
     // Playback Options
     const [playWithChords, setPlayWithChords] = useState(Platform.OS === 'web');
     const [selectedRhythm, setSelectedRhythm] = useState('D D D U');
+    const [selectedDrumPattern, setSelectedDrumPattern] = useState('Basic Rock');
     const [playWithDrums, setPlayWithDrums] = useState(false);
     const [playIntro, setPlayIntro] = useState(false);
     const [patternRepeats, setPatternRepeats] = useState(1); // 1-4 times per bar
     const [isMixerExpanded, setIsMixerExpanded] = useState(false);
 
+
+    // State for advanced rhythm
+    const [swing, setSwing] = useState(0); // 0 to 0.5
+    const [humanize, setHumanize] = useState(0.02); // 0 to 0.1
+    const [accentAmount, setAccentAmount] = useState(1.2); // 0.8 to 1.5
 
     // Volume Levels (0.0 - 1.0)
     const [voiceVolume, setVoiceVolume] = useState(1.0);
@@ -528,10 +560,10 @@ const MusicMakerSpark: React.FC<{
                 if (playWithDrums && selectedSong.bpm) {
                     const beatDuration = 60 / selectedSong.bpm;
                     const finalTime = introDuration + selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
-                    const pattern = DRUM_PATTERNS['Basic Rock'];
+                    const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
 
                     for (let t = introDuration; t < finalTime; t += (beatDuration * 4)) {
-                        pattern.forEach(note => {
+                        pattern.forEach((note: any) => {
                             const time = t + note.time * beatDuration;
 
                             const osc = ctx.createOscillator();
@@ -579,28 +611,46 @@ const MusicMakerSpark: React.FC<{
                             for (let repeat = 0; repeat < patternRepeats; repeat++) {
                                 const repeatOffset = (barDuration / patternRepeats) * repeat;
 
-                                freqs.forEach((freq, i) => {
-                                    const osc = ctx.createOscillator();
-                                    const gain = ctx.createGain();
+                                rhythm.strums.forEach((strum, strumIdx) => {
+                                    const strumTimeFactor = barDuration / patternRepeats;
 
-                                    osc.type = 'triangle';
-                                    osc.frequency.value = freq;
+                                    // Apply Swing
+                                    let adjustedStrumTime = strum.time * strumTimeFactor;
+                                    const isOffBeat = (strum.time * 8) % 2 !== 0; // Simple off-beat check for 8ths
+                                    if (isOffBeat) {
+                                        adjustedStrumTime += swing * (strumTimeFactor / 8);
+                                    }
 
-                                    gain.gain.setValueAtTime(0, 0);
-
-                                    const strum = rhythm.strums[i % rhythm.strums.length];
-                                    const strumTime = strum.time * (barDuration / patternRepeats);
-                                    const startTime = introDuration + line.startTime + repeatOffset + strumTime;
+                                    // Apply Humanize
+                                    const jitter = (Math.random() - 0.5) * humanize * beatDuration;
+                                    const startTime = introDuration + line.startTime + repeatOffset + adjustedStrumTime + jitter;
                                     const duration = 1.5;
 
-                                    gain.gain.linearRampToValueAtTime(0.1 * chordVolume, startTime + 0.02);
-                                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                                    // Apply Accent
+                                    const volumeMult = strum.accent ? accentAmount : (1 / (accentAmount || 1));
 
-                                    osc.connect(gain);
-                                    gain.connect(ctx.destination);
+                                    freqs.forEach((freq, i) => {
+                                        const osc = ctx.createOscillator();
+                                        const gain = ctx.createGain();
 
-                                    osc.start(startTime);
-                                    osc.stop(startTime + duration);
+                                        osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
+                                        osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
+
+                                        gain.gain.setValueAtTime(0, 0);
+
+                                        // Strumming effect: delay higher strings slightly
+                                        const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
+                                        const finalStart = startTime + stringDelay;
+
+                                        gain.gain.linearRampToValueAtTime(0.1 * chordVolume * volumeMult, finalStart + 0.02);
+                                        gain.gain.exponentialRampToValueAtTime(0.001, finalStart + duration);
+
+                                        osc.connect(gain);
+                                        gain.connect(ctx.destination);
+
+                                        osc.start(finalStart);
+                                        osc.stop(finalStart + duration);
+                                    });
                                 });
                             }
                         }
@@ -765,19 +815,39 @@ Generated by Sparks App
                             for (let repeat = 0; repeat < patternRepeats; repeat++) {
                                 const repeatOffset = (barDuration / patternRepeats) * repeat;
 
-                                freqs.forEach((freq, i) => {
-                                    const osc = ctx.createOscillator();
-                                    const gain = ctx.createGain();
-                                    osc.type = 'triangle'; osc.frequency.value = freq;
+                                rhythm.strums.forEach((strum, strumIdx) => {
+                                    const strumTimeFactor = barDuration / patternRepeats;
 
-                                    const strum = rhythm.strums[i % rhythm.strums.length];
-                                    const t = startTime + introDelay + line.startTime + repeatOffset + (strum.time * (barDuration / patternRepeats));
+                                    // Apply Swing
+                                    let adjustedStrumTime = strum.time * strumTimeFactor;
+                                    const isOffBeat = (strum.time * 8) % 2 !== 0;
+                                    if (isOffBeat) {
+                                        adjustedStrumTime += swing * (strumTimeFactor / 8);
+                                    }
 
-                                    gain.gain.setValueAtTime(0, t);
-                                    gain.gain.linearRampToValueAtTime(0.1 * chordVolume, t + 0.02);
-                                    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
-                                    osc.connect(gain); gain.connect(ctx.destination);
-                                    osc.start(t); osc.stop(t + 2);
+                                    // Apply Humanize
+                                    const jitter = (Math.random() - 0.5) * humanize * beatDuration;
+                                    const t = startTime + introDelay + line.startTime + repeatOffset + adjustedStrumTime + jitter;
+
+                                    // Apply Accent
+                                    const volumeMult = strum.accent ? accentAmount : (1 / (accentAmount || 1));
+
+                                    freqs.forEach((freq, i) => {
+                                        const osc = ctx.createOscillator();
+                                        const gain = ctx.createGain();
+                                        osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
+                                        osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
+
+                                        // Strumming effect
+                                        const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
+                                        const finalT = t + stringDelay;
+
+                                        gain.gain.setValueAtTime(0, finalT);
+                                        gain.gain.linearRampToValueAtTime(0.1 * chordVolume * volumeMult, finalT + 0.02);
+                                        gain.gain.exponentialRampToValueAtTime(0.001, finalT + 1.5);
+                                        osc.connect(gain); gain.connect(ctx.destination);
+                                        osc.start(finalT); osc.stop(finalT + 2);
+                                    });
                                 });
                             }
                         }
@@ -787,9 +857,9 @@ Generated by Sparks App
                 if (playWithDrums && selectedSong.bpm) {
                     const beatDuration = 60 / selectedSong.bpm;
                     const totalDuration = selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
-                    const pattern = DRUM_PATTERNS['Basic Rock'];
+                    const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
                     for (let t = 0; t < totalDuration; t += (beatDuration * 4)) {
-                        pattern.forEach(note => {
+                        pattern.forEach((note: any) => {
                             const noteStart = startTime + introDelay + t + note.time * beatDuration;
                             const osc = ctx.createOscillator();
                             const gain = ctx.createGain();
@@ -987,6 +1057,34 @@ Generated by Sparks App
 
                                 {isMixerExpanded && (
                                     <View style={styles.mixerContent}>
+                                        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>RHYTHM CONTROLS</Text>
+                                        <View style={styles.rhythmParamsRow}>
+                                            <RhythmParamControl
+                                                label="Swing"
+                                                value={swing}
+                                                min={0} max={0.5} step={0.05}
+                                                onChange={setSwing}
+                                                color={colors.primary}
+                                                format={(v) => `${(v * 100).toFixed(0)}%`}
+                                            />
+                                            <RhythmParamControl
+                                                label="Humanize"
+                                                value={humanize}
+                                                min={0} max={0.1} step={0.01}
+                                                onChange={setHumanize}
+                                                color={colors.primary}
+                                                format={(v) => `${(v * 100).toFixed(0)}%`}
+                                            />
+                                            <RhythmParamControl
+                                                label="Accent"
+                                                value={accentAmount}
+                                                min={0.8} max={1.5} step={0.1}
+                                                onChange={setAccentAmount}
+                                                color={colors.primary}
+                                            />
+                                        </View>
+
+                                        <View style={styles.divider} />
                                         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>OPTIONS</Text>
                                         <View style={styles.toggleRow}>
                                             <View style={styles.toggleItem}>
@@ -998,13 +1096,25 @@ Generated by Sparks App
                                                 <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drums</Text>
                                             </View>
                                             <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{selectedRhythm}</Text>
-                                                <TouchableOpacity onPress={() => {
+                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drum Beat</Text>
+                                                <TouchableOpacity style={styles.patternNameBox} onPress={() => {
+                                                    const types = Object.keys(DRUM_PATTERNS);
+                                                    const idx = types.indexOf(selectedDrumPattern);
+                                                    setSelectedDrumPattern(types[(idx + 1) % types.length]);
+                                                }}>
+                                                    <Text style={[styles.patternName, { color: colors.primary }]}>{selectedDrumPattern}</Text>
+                                                    <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={styles.toggleItem}>
+                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{RHYTHM_PATTERNS[selectedRhythm]?.genre || 'Rhythm'}</Text>
+                                                <TouchableOpacity style={styles.patternNameBox} onPress={() => {
                                                     const types = Object.keys(RHYTHM_PATTERNS);
                                                     const idx = types.indexOf(selectedRhythm);
                                                     setSelectedRhythm(types[(idx + 1) % types.length]);
                                                 }}>
-                                                    <Ionicons name="swap-horizontal" size={20} color={colors.primary} />
+                                                    <Text style={[styles.patternName, { color: colors.primary }]}>{selectedRhythm}</Text>
+                                                    <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
                                                 </TouchableOpacity>
                                             </View>
                                             <View style={styles.toggleItem}>
@@ -1219,6 +1329,46 @@ const styles = StyleSheet.create({
     volumeSegment: {
         width: 8,
         borderRadius: 2,
+    },
+    rhythmParamsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 5,
+    },
+    paramControl: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    paramLabel: {
+        fontSize: 10,
+        color: '#888',
+        marginBottom: 2,
+    },
+    paramRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    paramValue: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        minWidth: 35,
+        textAlign: 'center',
+    },
+    patternNameBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 5,
+        marginTop: 2,
+    },
+    patternName: {
+        fontSize: 11,
+        fontWeight: 'bold',
     },
 });
 

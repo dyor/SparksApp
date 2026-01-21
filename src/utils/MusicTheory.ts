@@ -32,58 +32,127 @@ export const getChordFrequencies = (chordName: string): number[] => {
 
 export interface StrumPattern {
     name: string;
-    strums: { time: number; type: 'down' | 'up' }[]; // Strums per bar with timing and direction
+    genre: string;
+    strums: {
+        time: number; // 0 to 1 for a bar/pattern loop
+        type: 'down' | 'up' | 'bass'; // Added 'bass' for alt-bass patterns
+        accent?: boolean; // Default is false
+    }[];
 }
 
 export const RHYTHM_PATTERNS: Record<string, StrumPattern> = {
     'D D D U': {
         name: 'D D D U',
+        genre: 'Pop/Rock',
         strums: [
-            { time: 0, type: 'down' },
+            { time: 0, type: 'down', accent: true },
             { time: 0.25, type: 'down' },
-            { time: 0.5, type: 'down' },
+            { time: 0.5, type: 'down', accent: true },
             { time: 0.75, type: 'up' }
         ]
     },
     'D D U U D U': {
         name: 'D D U U D U',
+        genre: 'Folk',
         strums: [
-            { time: 0, type: 'down' },
-            { time: 0.167, type: 'down' },
-            { time: 0.333, type: 'up' },
-            { time: 0.5, type: 'up' },
-            { time: 0.667, type: 'down' },
-            { time: 0.833, type: 'up' }
-        ]
-    },
-    'D DU DU': {
-        name: 'D DU DU',
-        strums: [
-            { time: 0, type: 'down' },
-            { time: 0.333, type: 'down' },
-            { time: 0.417, type: 'up' },
-            { time: 0.667, type: 'down' },
-            { time: 0.75, type: 'up' }
-        ]
-    },
-    'D DU UDU': {
-        name: 'D DU UDU',
-        strums: [
-            { time: 0, type: 'down' },
+            { time: 0, type: 'down', accent: true },
             { time: 0.25, type: 'down' },
-            { time: 0.333, type: 'up' },
-            { time: 0.5, type: 'up' },
-            { time: 0.583, type: 'down' },
-            { time: 0.667, type: 'up' }
+            { time: 0.375, type: 'up' },
+            { time: 0.625, type: 'up' },
+            { time: 0.75, type: 'down', accent: true },
+            { time: 0.875, type: 'up' }
         ]
     },
+    'Driving 8ths': {
+        name: 'Driving 8ths',
+        genre: 'Rock',
+        strums: [
+            { time: 0, type: 'down', accent: true },
+            { time: 0.125, type: 'down' },
+            { time: 0.25, type: 'down', accent: true },
+            { time: 0.375, type: 'down' },
+            { time: 0.5, type: 'down', accent: true },
+            { time: 0.625, type: 'down' },
+            { time: 0.75, type: 'down', accent: true },
+            { time: 0.875, type: 'down' }
+        ]
+    },
+    'Shuffle': {
+        name: 'Shuffle',
+        genre: 'Blues',
+        strums: [
+            { time: 0, type: 'down', accent: true },
+            { time: 0.166, type: 'up' },
+            { time: 0.25, type: 'down', accent: true },
+            { time: 0.416, type: 'up' },
+            { time: 0.5, type: 'down', accent: true },
+            { time: 0.666, type: 'up' },
+            { time: 0.75, type: 'down', accent: true },
+            { time: 0.916, type: 'up' }
+        ]
+    },
+    'Reggae Skank': {
+        name: 'Reggae Skank',
+        genre: 'Reggae',
+        strums: [
+            { time: 0.125, type: 'down', accent: true },
+            { time: 0.375, type: 'down', accent: true },
+            { time: 0.625, type: 'down', accent: true },
+            { time: 0.875, type: 'down', accent: true }
+        ]
+    },
+    'Waltz': {
+        name: 'Waltz',
+        genre: 'Country',
+        strums: [
+            { time: 0, type: 'bass', accent: true },
+            { time: 0.333, type: 'down' },
+            { time: 0.666, type: 'down' }
+        ]
+    },
+    'Alt-Bass Folk': {
+        name: 'Alt-Bass Folk',
+        genre: 'Folk/Country',
+        strums: [
+            { time: 0, type: 'bass', accent: true },
+            { time: 0.25, type: 'down' },
+            { time: 0.5, type: 'bass', accent: true },
+            { time: 0.75, type: 'down' },
+            { time: 0.875, type: 'up' }
+        ]
+    }
 };
 
 export const DRUM_PATTERNS = {
     'Basic Rock': [
         { type: 'kick', time: 0 },
         { type: 'snare', time: 1 },
-        { type: 'kick', time: 2 },
+        { type: 'kick', time: 1.5 },
+        { type: 'snare', time: 2 },
+        { type: 'kick', time: 2.5 },
         { type: 'snare', time: 3 },
+    ],
+    'Jazz Swing': [
+        { type: 'kick', time: 0 },
+        { type: 'hihat', time: 0.66 },
+        { type: 'hihat', time: 1 },
+        { type: 'snare', time: 1.66 },
+        { type: 'kick', time: 2 },
+        { type: 'hihat', time: 2.66 },
+        { type: 'hihat', time: 3 },
+        { type: 'snare', time: 3.66 },
+    ],
+    'Reggae': [
+        { type: 'kick', time: 1 },
+        { type: 'snare', time: 1 },
+        { type: 'kick', time: 3 },
+        { type: 'snare', time: 3 },
+        { type: 'hihat', time: 0 },
+        { type: 'hihat', time: 0.5 },
+        { type: 'hihat', time: 1.5 },
+        { type: 'hihat', time: 2 },
+        { type: 'hihat', time: 2.5 },
+        { type: 'hihat', time: 3.5 },
     ]
 };
+
