@@ -10,7 +10,10 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
@@ -38,6 +41,7 @@ interface Recipe {
     shoppingChecked: number[];
     cookingChecked: number[];
     rating?: number;
+    imageUrl?: string;
 }
 
 interface RecAIpeData {
@@ -46,6 +50,21 @@ interface RecAIpeData {
         silentAlarms: boolean;
     };
 }
+
+const RECIPE_DIR_NAME = 'recaipe_images/';
+
+const toAbsoluteUri = (relativeOrAbsolute: string): string => {
+    if (!relativeOrAbsolute) return '';
+    if (relativeOrAbsolute.startsWith('file://')) return relativeOrAbsolute;
+    if (relativeOrAbsolute.startsWith('http')) return relativeOrAbsolute;
+    return `${FileSystem.documentDirectory}${relativeOrAbsolute}`;
+};
+
+const toRelativePath = (uri: string): string => {
+    if (!uri) return '';
+    const idx = uri.lastIndexOf(RECIPE_DIR_NAME);
+    return idx !== -1 ? uri.substring(idx) : uri;
+};
 
 const STARTER_RECIPE: Recipe = {
     id: 'starter-1',
@@ -277,11 +296,62 @@ Generate the recipe now:`;
     };
 
     const updateRecipe = (updated: Recipe) => {
-        const newData = {
-            recipes: data.recipes.map(r => r.id === updated.id ? updated : r)
-        };
-        saveData(newData);
-        setSelectedRecipe(updated);
+        const newRecipes = data.recipes.map(r => r.id === updated.id ? updated : r);
+        saveData({ ...data, recipes: newRecipes });
+        if (selectedRecipe?.id === updated.id) {
+            setSelectedRecipe(updated);
+        }
+    };
+
+    const saveImagePermanently = async (tempUri: string, recipeId: string): Promise<string> => {
+        try {
+            const recipeDir = `${FileSystem.documentDirectory}${RECIPE_DIR_NAME}`;
+            await FileSystem.makeDirectoryAsync(recipeDir, { intermediates: true });
+
+            const fileExtension = tempUri.split('.').pop() || 'jpg';
+            const fileName = `${recipeId}_${Date.now()}.${fileExtension}`;
+            const permanentUri = `${recipeDir}${fileName}`;
+
+            await FileSystem.copyAsync({
+                from: tempUri,
+                to: permanentUri,
+            });
+
+            return permanentUri;
+        } catch (error) {
+            console.error('Failed to save image permanently:', error);
+            throw error;
+        }
+    };
+
+    const handleImageSelection = async (recipe: Recipe) => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission needed', 'Please grant permission to access your photos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets?.[0]) {
+                HapticFeedback.light();
+                const permanentUri = await saveImagePermanently(result.assets[0].uri, recipe.id);
+                updateRecipe({
+                    ...recipe,
+                    imageUrl: toRelativePath(permanentUri),
+                });
+                HapticFeedback.success();
+            }
+        } catch (error) {
+            console.error('Image picker error:', error);
+            Alert.alert('Error', 'Failed to pick image.');
+        }
     };
 
     const deleteRecipe = () => {
@@ -399,6 +469,66 @@ Generate the recipe now:`;
             fontSize: 18,
             fontWeight: '600',
             color: colors.text,
+            marginBottom: 4,
+        },
+        recipeThumbnail: {
+            width: 80,
+            height: 80,
+            borderRadius: 12,
+            marginLeft: 12,
+            backgroundColor: colors.border,
+        },
+        recipeThumbnailPlaceholder: {
+            width: 80,
+            height: 80,
+            borderRadius: 12,
+            marginLeft: 12,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        recipeHeroImage: {
+            width: '100%',
+            height: 240,
+            borderRadius: 20,
+            marginBottom: 20,
+            backgroundColor: colors.border,
+        },
+        recipeHeroPlaceholder: {
+            width: '100%',
+            height: 240,
+            borderRadius: 20,
+            marginBottom: 20,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        imageEditButton: {
+            position: 'absolute',
+            bottom: 30,
+            right: 10,
+            backgroundColor: colors.primary,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+            elevation: 5,
+        },
+        imageEditButtonText: {
+            fontSize: 20,
+            color: '#fff',
+        },
+        ratingContainer: {
+            marginBottom: 16,
         },
         emptyState: {
             alignItems: 'center',
@@ -838,15 +968,24 @@ Generate the recipe now:`;
                             >
                                 <View style={styles.recipeInfo}>
                                     <Text style={styles.recipeTitle}>{recipe.title}</Text>
-                                </View>
-                                {recipe.rating !== undefined && recipe.rating > 0 && (
                                     <StarRating
-                                        rating={recipe.rating}
+                                        rating={recipe.rating || 0}
                                         onRatingChange={() => { }}
                                         disabled
-                                        size={16}
+                                        size={14}
                                         showLabel={false}
                                     />
+                                </View>
+                                {recipe.imageUrl ? (
+                                    <Image
+                                        source={{ uri: toAbsoluteUri(recipe.imageUrl) }}
+                                        style={styles.recipeThumbnail}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <View style={styles.recipeThumbnailPlaceholder}>
+                                        <Text style={{ fontSize: 32 }}>🍳</Text>
+                                    </View>
                                 )}
                             </TouchableOpacity>
                         ))
@@ -1085,10 +1224,42 @@ Generate the recipe now:`;
                     <TouchableOpacity style={styles.backButton} onPress={() => setMode('list')}>
                         <Text style={styles.backButtonText}>←</Text>
                     </TouchableOpacity>
-                    <Text style={styles.title}>{selectedRecipe.title}</Text>
+                    <Text style={styles.title} numberOfLines={1}>{selectedRecipe.title}</Text>
                 </View>
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+                    <View style={{ position: 'relative' }}>
+                        {selectedRecipe.imageUrl ? (
+                            <Image
+                                source={{ uri: toAbsoluteUri(selectedRecipe.imageUrl) }}
+                                style={styles.recipeHeroImage}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <View style={styles.recipeHeroPlaceholder}>
+                                <Text style={{ fontSize: 64 }}>🍳</Text>
+                                <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Add a photo</Text>
+                            </View>
+                        )}
+                        <TouchableOpacity
+                            style={styles.imageEditButton}
+                            onPress={() => handleImageSelection(selectedRecipe)}
+                        >
+                            <Text style={styles.imageEditButtonText}>+</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.ratingContainer}>
+                        <StarRating
+                            rating={selectedRecipe.rating || 0}
+                            onRatingChange={(newRating) => {
+                                updateRecipe({ ...selectedRecipe, rating: newRating });
+                                HapticFeedback.success();
+                            }}
+                            size={28}
+                        />
+                    </View>
+
                     <Text style={styles.sectionTitle}>Ingredients</Text>
                     {getIngredientsList(selectedRecipe).map((item, i) => (
                         <View key={i} style={styles.ingredientItem}>

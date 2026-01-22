@@ -25,6 +25,7 @@ interface Event {
     date: string; // ISO date string (YYYY-MM-DD)
     type: 'annual' | 'one-time';
     category: 'birthday' | 'anniversary' | 'trip' | 'work' | 'party' | 'sports' | 'dinner' | 'other';
+    count?: number;
 }
 
 interface ComingUpSparkProps {
@@ -47,6 +48,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
     const [date, setDate] = useState(new Date());
     const [isAnnual, setIsAnnual] = useState(false);
     const [category, setCategory] = useState<Event['category']>('other');
+    const [count, setCount] = useState<string>('');
     const [showDatePicker, setShowDatePicker] = useState(false);
 
     // Helper to schedule notifications for an event
@@ -82,53 +84,72 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         }
     };
 
-    // Load data and handle rollover
+    // Rollover logic for annual events
+    const checkRollover = (currentEvents: Event[]) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let hasChanges = false;
+        const updatedEvents = [...currentEvents];
+
+        currentEvents.forEach((event, idx) => {
+            if (event.type === 'annual') {
+                const [year, month, day] = event.date.split('-').map(Number);
+                const eventDate = new Date(year, month - 1, day);
+                eventDate.setHours(0, 0, 0, 0);
+
+                if (eventDate < today) {
+                    hasChanges = true;
+
+                    // 1. Mark current as one-time
+                    updatedEvents[idx] = { ...event, type: 'one-time' };
+
+                    // 2. Advance to the next future occurrence
+                    let nextYear = year;
+                    let nextCount = event.count;
+                    let nextDateObj = new Date(eventDate);
+
+                    // Increment until we find the next occurrence today or in the future
+                    while (nextDateObj < today) {
+                        nextYear++;
+                        if (nextCount !== undefined) {
+                            nextCount++;
+                        }
+                        nextDateObj = new Date(nextYear, month - 1, day);
+                        nextDateObj.setHours(0, 0, 0, 0);
+                    }
+
+                    const nextYearDateStr = `${nextYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const newEvent: Event = {
+                        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        title: event.title,
+                        date: nextYearDateStr,
+                        type: 'annual',
+                        category: event.category,
+                        count: nextCount,
+                    };
+                    updatedEvents.push(newEvent);
+
+                    // 3. Schedule notifications for the new event
+                    scheduleEventNotifications(newEvent);
+                    console.log(`📡 Rollover: ${event.title} advanced from ${event.date} to ${nextYearDateStr} (Count: ${nextCount})`);
+                }
+            }
+        });
+
+        if (hasChanges) {
+            setEvents(updatedEvents);
+            setSparkData('coming-up', { events: updatedEvents });
+        } else {
+            setEvents(currentEvents);
+        }
+    };
+
+    // Load data and handle rollover on mount
     useEffect(() => {
         const data = getSparkData('coming-up');
         if (data?.events) {
-            const storedEvents: Event[] = data.events;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            let hasChanges = false;
-            const updatedEvents = [...storedEvents];
-
-            // Rollover logic for annual events
-            storedEvents.forEach((event, idx) => {
-                if (event.type === 'annual') {
-                    const [year, month, day] = event.date.split('-').map(Number);
-                    const eventDate = new Date(year, month - 1, day);
-                    eventDate.setHours(0, 0, 0, 0);
-
-                    if (eventDate < today) {
-                        // 1. Mark current as one-time (it has passed)
-                        updatedEvents[idx] = { ...event, type: 'one-time' };
-
-                        // 2. Create new annual event for next year
-                        const nextYearDate = `${year + 1}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const newEvent: Event = {
-                            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                            title: event.title,
-                            date: nextYearDate,
-                            type: 'annual',
-                            category: event.category,
-                        };
-                        updatedEvents.push(newEvent);
-
-                        // 3. Schedule notifications for the new event
-                        scheduleEventNotifications(newEvent);
-                        hasChanges = true;
-                        console.log(`📡 Rollover: ${event.title} moved from ${event.date} to ${nextYearDate}`);
-                    }
-                }
-            });
-
-            if (hasChanges) {
-                setEvents(updatedEvents);
-                setSparkData('coming-up', { events: updatedEvents });
-            } else {
-                setEvents(storedEvents);
-            }
+            checkRollover(data.events);
         }
         setDataLoaded(true);
     }, [getSparkData, setSparkData]);
@@ -208,10 +229,18 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         const eventDate = `${year}-${month}-${day}`;
 
         if (editingEvent) {
-            const updatedEvent: Event = { ...editingEvent, title: title.trim(), date: eventDate, type: isAnnual ? 'annual' : 'one-time', category };
+            const updatedEvent: Event = {
+                ...editingEvent,
+                title: title.trim(),
+                date: eventDate,
+                type: isAnnual ? 'annual' : 'one-time',
+                category,
+                count: count.trim() ? parseInt(count) : undefined,
+            };
             const updatedEvents = events.map(e => e.id === editingEvent.id ? updatedEvent : e);
             setEvents(updatedEvents);
             scheduleEventNotifications(updatedEvent);
+            checkRollover(updatedEvents);
         } else {
             const newEvent: Event = {
                 id: Date.now().toString(),
@@ -219,9 +248,11 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                 date: eventDate,
                 type: isAnnual ? 'annual' : 'one-time',
                 category,
+                count: count.trim() ? parseInt(count) : undefined,
             };
             setEvents([...events, newEvent]);
             scheduleEventNotifications(newEvent);
+            checkRollover([...events, newEvent]);
         }
 
         handleCloseModal();
@@ -253,6 +284,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         setDate(new Date());
         setIsAnnual(false);
         setCategory('other');
+        setCount('');
     };
 
     const openAddModal = () => {
@@ -261,6 +293,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         setDate(new Date());
         setIsAnnual(false);
         setCategory('other');
+        setCount('');
         setShowAddModal(true);
         HapticFeedback.light();
     };
@@ -275,6 +308,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
 
         setIsAnnual(event.type === 'annual');
         setCategory(event.category);
+        setCount(event.count !== undefined ? event.count.toString() : '');
         setShowAddModal(true);
         HapticFeedback.light();
     };
@@ -493,10 +527,10 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         },
         datePickerContainer: {
             marginTop: 10,
-            backgroundColor: Platform.OS === 'ios' ? '#1a1a1a' : colors.surface, // Dark dark grey for iOS calendar visibility
+            backgroundColor: colors.surface,
             borderRadius: 12,
             overflow: 'hidden',
-            borderWidth: Platform.OS === 'ios' ? 0 : 1,
+            borderWidth: 1,
             borderColor: colors.border,
             // Ensure proper contrast for iOS calendar
             ...(Platform.OS === 'ios' && {
@@ -700,7 +734,9 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                                 </View>
 
                                 <View style={styles.eventInfo}>
-                                    <Text style={styles.eventTitle}>{event.title}</Text>
+                                    <Text style={styles.eventTitle}>
+                                        {event.title}{event.count !== undefined ? ` (#${event.count})` : ''}
+                                    </Text>
                                     <View style={styles.badgeRow}>
                                         <View style={styles.proximityBadge}>
                                             <Text style={[styles.proximityText, { color: proximityColor }]}>
@@ -819,6 +855,23 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                                 </TouchableOpacity>
                             </View>
                         </View>
+
+                        {isAnnual && (
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Number (Optional - e.g. Birth Year / Anniversary #)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Enter number..."
+                                    placeholderTextColor={colors.textSecondary}
+                                    value={count}
+                                    onChangeText={(text) => setCount(text.replace(/[^0-9]/g, ''))}
+                                    keyboardType="number-pad"
+                                />
+                                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                                    This will increment each year automatically.
+                                </Text>
+                            </View>
+                        )}
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Category</Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -1289,61 +1289,72 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           )}
         </ScrollView>
       ) : (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={activitiesText}
-              onChangeText={setActivitiesText}
-              placeholder="08:30, 30, Breakfast&#10;09:00, 30, Drive to Work&#10;10:30, 30, Meeting with Dave"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              autoFocus
-            />
-            <Text style={styles.helpText}>
-              Format: HH:MM, duration (minutes), Activity Name{'\n'}
-              One activity per line
-            </Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        >
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.inputContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: colors.secondary,
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    gap: 8,
+                    maxHeight: 56, // Keep it compact at the top
+                  }
+                ]}
+                onPress={handleScanSchedule}
+                disabled={isScanning}
+              >
+                <Text style={{ fontSize: 18 }}>📸</Text>
+                <Text style={[styles.buttonText, { color: colors.background }]}>
+                  {isScanning ? 'Scanning...' : 'Scan Schedule'}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  backgroundColor: colors.secondary,
-                  marginTop: 12,
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  gap: 8
-                }
-              ]}
-              onPress={handleScanSchedule}
-              disabled={isScanning}
-            >
-              <Text style={{ fontSize: 18 }}>📸</Text>
-              <Text style={[styles.buttonText, { color: colors.background }]}>
-                {isScanning ? 'Scanning...' : 'Scan Schedule'}
+              <TextInput
+                style={styles.textInput}
+                value={activitiesText}
+                onChangeText={setActivitiesText}
+                placeholder="08:30, 30, Breakfast&#10;09:00, 30, Drive to Work&#10;10:30, 30, Meeting with Dave"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                autoFocus
+              />
+              <Text style={styles.helpText}>
+                Format: HH:MM, duration (minutes), Activity Name{'\n'}
+                One activity per line
               </Text>
-            </TouchableOpacity>
 
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: colors.border }]}
-                onPress={() => {
-                  setIsEditing(false);
-                  setActivitiesText(getSparkData('minute-minder').activitiesText || '');
-                }}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton]}
-                onPress={handleSaveActivities}
-              >
-                <Text style={styles.buttonText}>Save</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: colors.border }]}
+                  onPress={() => {
+                    setIsEditing(false);
+                    setActivitiesText(getSparkData('minute-minder').activitiesText || '');
+                  }}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={handleSaveActivities}
+                >
+                  <Text style={styles.buttonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       {/* Flame animation during final 10 seconds - positioned absolutely over everything */}

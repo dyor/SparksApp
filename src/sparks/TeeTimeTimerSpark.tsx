@@ -713,8 +713,8 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   const getSparkData = useSparkStore(state => state.getSparkData);
   const setSparkData = useSparkStore(state => state.setSparkData);
   const isHydrated = useSparkStore(state => state.isHydrated);
-  
-  const { colors } = useTheme();
+
+  const { colors, isDarkMode } = useTheme();
 
   const [activities, setActivities] = useState<Activity[]>(defaultActivities);
   const [timerState, setTimerState] = useState<TimerState>({
@@ -744,14 +744,14 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     console.log('🔄 TeeTimeTimerSpark: Loading data, isHydrated:', isHydrated);
     try {
       const savedData = getSparkData('tee-time-timer') as any;
-      
+
       if (savedData?.activities && savedData.activities.length > 0) {
         console.log(`📦 TeeTimeTimerSpark: Loading ${savedData.activities.length} activities`);
         setActivities(savedData.activities);
       } else {
         console.log('📦 TeeTimeTimerSpark: No activities found, using defaults');
       }
-      
+
       // Load saved timer state
       if (savedData?.timerState) {
         const savedTimerState = savedData.timerState;
@@ -763,7 +763,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
         });
         console.log('📦 TeeTimeTimerSpark: Loaded timer state');
       }
-      
+
       setDataLoaded(true);
     } catch (error) {
       console.error('❌ TeeTimeTimerSpark: Failed to load spark data:', error);
@@ -797,7 +797,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
         },
         lastUsed: new Date().toISOString(),
       });
-      
+
       onStateChange?.({
         activityCount: activities.length,
         isActive: timerState.isActive,
@@ -1124,6 +1124,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       currentActivityIndex: 0,
       completedActivities: new Set(),
     });
+    setShowTimePicker(true);
     HapticFeedback.medium();
   };
 
@@ -1233,17 +1234,16 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       letterSpacing: 0.3,
     },
     timePickerWrapper: {
-      backgroundColor: colors.background,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 24,
       width: '100%',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border + '60',
+      justifyContent: 'center',
+      marginBottom: 24,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
     timePicker: {
       width: '100%',
+      height: 120, // Give it more height if needed, though 'default' usually dictates it
     },
     startButton: {
       backgroundColor: colors.primary,
@@ -1446,6 +1446,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
                   mode="time"
                   display="default"
                   onChange={handleTimePickerChange}
+                  themeVariant={isDarkMode ? 'dark' : 'light'}
                   style={styles.timePicker}
                 />
               </View>
