@@ -115,5 +115,38 @@ export const MusicMakerService = {
     detectPitch: async (uri: string): Promise<number> => {
         // Mocking pitch detection for the UI demonstration
         return 440 + (Math.random() * 10 - 5);
+    },
+
+    /**
+     * Generates a complete song structure from a text description.
+     */
+    generateAISong: async (userPrompt: string): Promise<Omit<MusicAnalysisResult, 'vocalUri'>> => {
+        const prompt = `
+            ${userPrompt}
+
+            Write a song based on the user's request. 
+            Provide:
+            1. A creative song title.
+            2. The key and BPM.
+            3. Lyrics with chords and melodic notes for each line.
+
+            Return strictly JSON:
+            {
+                "songName": "String",
+                "key": "String",
+                "bpm": Number,
+                "lyrics": [
+                    { "text": "String", "chords": "String", "notes": "String", "startTime": Number }
+                ]
+            }
+        `;
+
+        try {
+            const result = await GeminiService.generateJSON<any>(prompt);
+            return result;
+        } catch (error) {
+            console.error('AI Song Generation Failed:', error);
+            throw error;
+        }
     }
 };
