@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Svg, Path, Circle, Line } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
@@ -42,6 +43,9 @@ interface Goal {
   entries: GoalEntry[];
   createdAt: string;
   updatedAt: string;
+  startDate?: string; // YYYY-MM-DD format, defaults to today
+  endDate?: string;   // YYYY-MM-DD format, defaults to startDate + 12 months
+  durationLabel?: string; // e.g., "year", "6 months"
 }
 
 interface GoalTrackerData {
@@ -79,6 +83,16 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
   const [editEntryDate, setEditEntryDate] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const confettiRef = React.useRef<any>(null);
+
+  // Date picker state for new goal
+  const [newGoalStartDate, setNewGoalStartDate] = useState(() => new Date());
+  const [newGoalEndDate, setNewGoalEndDate] = useState(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + 12);
+    return date;
+  });
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   // Save data wrapper
   const saveData = (newData: GoalTrackerData) => {
@@ -140,6 +154,9 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       entries: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      startDate: formatDateString(newGoalStartDate),
+      endDate: formatDateString(newGoalEndDate),
+      durationLabel: calculateDurationLabel(newGoalStartDate, newGoalEndDate),
     };
 
     saveData({
@@ -151,6 +168,12 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
 
     setNewGoalName('');
     setNewGoalTarget('');
+    setNewGoalStartDate(new Date());
+    setNewGoalEndDate(() => {
+      const date = new Date();
+      date.setMonth(date.getMonth() + 12);
+      return date;
+    });
     setShowAddGoalModal(false);
     setCurrentScreen('goal-detail');
     HapticFeedback.success();
@@ -364,42 +387,85 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     return `${year}-${month}-${day}`;
   };
 
+  // Helper to get effective start date (with backward compatibility)
+  const getGoalStartDate = (goal: Goal): Date => {
+    if (goal.startDate) {
+      return parseLocalDate(goal.startDate);
+    }
+    // Backward compatibility: default to start of current year
+    return new Date(new Date().getFullYear(), 0, 1);
+  };
+
+  // Helper to get effective end date (with backward compatibility)
+  const getGoalEndDate = (goal: Goal): Date => {
+    if (goal.endDate) {
+      return parseLocalDate(goal.endDate);
+    }
+    // Backward compatibility: default to end of current year
+    return new Date(new Date().getFullYear(), 11, 31);
+  };
+
+  // Calculate human-readable duration label
+  const calculateDurationLabel = (startDate: Date, endDate: Date): string => {
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = Math.round(diffDays / 30.44); // Average days per month
+
+    // If it's approximately a year (11-13 months), call it "year"
+    if (diffMonths >= 11 && diffMonths <= 13) {
+      return 'year';
+    }
+
+    // Otherwise, return "X months"
+    return `${diffMonths} month${diffMonths !== 1 ? 's' : ''}`;
+  };
+
   // Calculate statistics for a goal
   const calculateStats = (goal: Goal) => {
     const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    // Days since start of year (including today) - so Jan 1 = 1, Jan 2 = 2, etc.
-    const daysSinceStartOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const daysInYear = (new Date(now.getFullYear(), 11, 31).getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24) + 1;
+    now.setHours(0, 0, 0, 0);
 
-    // Actual count up to today
+    const goalStartDate = getGoalStartDate(goal);
+    goalStartDate.setHours(0, 0, 0, 0);
+
+    const goalEndDate = getGoalEndDate(goal);
+    goalEndDate.setHours(0, 0, 0, 0);
+
+    // Days since start of goal (including today)
+    const daysSinceStart = Math.max(0, Math.floor((now.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    // Total days in goal period
+    const totalDays = Math.floor((goalEndDate.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Actual count up to today (within goal date range)
     const todayStr = formatDateString(now);
     const actualCount = goal.entries.filter(e => {
       const entryDate = parseLocalDate(e.date);
       const todayDate = parseLocalDate(todayStr);
-      return entryDate <= todayDate && entryDate.getFullYear() === now.getFullYear();
+      return entryDate >= goalStartDate && entryDate <= todayDate && entryDate <= goalEndDate;
     }).length;
 
-    // Forecast for entire year (based on current pace)
-    // If we have 2 entries in 2 days, pace is 1 per day, so forecast is 365
-    const currentPace = daysSinceStartOfYear > 0 ? (actualCount / daysSinceStartOfYear) : 0;
-    const forecastForYear = Math.floor(currentPace * daysInYear);
+    // Forecast for entire goal period (based on current pace)
+    const currentPace = daysSinceStart > 0 ? (actualCount / daysSinceStart) : 0;
+    const forecastForPeriod = Math.floor(currentPace * totalDays);
 
     // Determine forecast color: green if hitting/exceeding goal, red if missing, black if exact
     let forecastColor = '#000000'; // black for exact match
-    if (forecastForYear > goal.targetPerYear) {
+    if (forecastForPeriod > goal.targetPerYear) {
       forecastColor = '#34C759'; // green for exceeding
-    } else if (forecastForYear < goal.targetPerYear) {
+    } else if (forecastForPeriod < goal.targetPerYear) {
       forecastColor = '#FF3B30'; // red for missing
     }
 
     return {
       actualCount,
       targetPerYear: goal.targetPerYear,
-      forecastForYear,
+      forecastForYear: forecastForPeriod, // Keep name for compatibility but it's now for the period
       forecastColor,
-      daysSinceStartOfYear,
-      daysInYear,
+      daysSinceStartOfYear: daysSinceStart, // Keep name for compatibility
+      daysInYear: totalDays, // Keep name for compatibility
+      goalStartDate,
+      goalEndDate,
     };
   };
 
@@ -420,15 +486,15 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
 
     const series: ChartSeries[] = useMemo(() => {
       const dataPoints: Array<{ day: number; actual: number; target: number }> = [];
-      
+
       for (let day = 0; day < daysToShow; day++) {
-        const dayDate = new Date(currentYear, 0, 1);
+        const dayDate = new Date(stats.goalStartDate);
         dayDate.setDate(dayDate.getDate() + day);
-        
+
         const targetValue = 1 + ((goal.targetPerYear - 1) * (day + 1) / stats.daysInYear);
         const actualValue = goal.entries.filter(e => {
           const entryDate = parseLocalDate(e.date);
-          return entryDate <= dayDate && entryDate.getFullYear() === currentYear;
+          return entryDate >= stats.goalStartDate && entryDate <= dayDate && entryDate <= stats.goalEndDate;
         }).length;
 
         dataPoints.push({ day, actual: actualValue, target: targetValue });
@@ -454,7 +520,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           strokeWidth: 3,
         }
       ];
-    }, [goal, daysToShow, stats.daysInYear, currentYear, stats.forecastForYear]);
+    }, [goal, daysToShow, stats.daysInYear, stats.forecastForYear, stats.goalStartDate, stats.goalEndDate]);
 
     return (
       <View style={{ marginVertical: 20, padding: 5, backgroundColor: colors.surface, borderRadius: 12, alignSelf: 'stretch' }}>
@@ -761,8 +827,8 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       backgroundColor: colors.surface,
       borderRadius: 16,
       padding: 24,
-      width: '90%',
-      maxWidth: 400,
+      width: '95%',
+      maxWidth: 500,
     },
     modalTitle: {
       fontSize: 20,
@@ -786,6 +852,35 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       color: colors.text,
       marginBottom: 8,
     },
+    dateButton: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    dateButtonText: {
+      fontSize: 16,
+      color: colors.text,
+    },
+    datePickerContainer: {
+      marginBottom: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      overflow: 'hidden',
+      alignSelf: 'stretch',
+      width: '100%',
+    },
+    button: {
+      backgroundColor: colors.primary,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
   });
 
   // Settings screen
@@ -807,10 +902,10 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                 <View key={goal.id} style={styles.goalCard}>
                   <Text style={styles.goalName}>{goal.name}</Text>
                   <Text style={styles.goalStats}>
-                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
+                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per {goal.durationLabel || 'year'})
                   </Text>
                   <Text style={[styles.goalStats, { color: stats.forecastColor }]}>
-                    Forecast: {stats.forecastForYear} for the year
+                    Forecast: {stats.forecastForYear} for the {goal.durationLabel || 'year'}
                   </Text>
                   <View style={styles.goalActions}>
                     <TouchableOpacity
@@ -862,6 +957,9 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
 
           <View style={styles.goalDetailHeader}>
             <Text style={styles.goalDetailTitle}>{currentGoal.name}</Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 16, textAlign: 'center' }}>
+              {stats.goalStartDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {stats.goalEndDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.actualCount}</Text>
@@ -995,10 +1093,10 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                 >
                   <Text style={styles.goalName}>{goal.name}</Text>
                   <Text style={styles.goalStats}>
-                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per year)
+                    {stats.actualCount} / {stats.targetPerYear} (goal: {goal.targetPerYear} per {goal.durationLabel || 'year'})
                   </Text>
                   <Text style={[styles.goalStats, { color: stats.forecastColor, marginBottom: 0 }]}>
-                    Forecast: {stats.forecastForYear} for the year
+                    Forecast: {stats.forecastForYear} for the {goal.durationLabel || 'year'}
                   </Text>
                 </TouchableOpacity>
 
@@ -1041,7 +1139,9 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
               onChangeText={setNewGoalName}
               autoCapitalize="words"
             />
-            <Text style={styles.inputLabel}>Target Per Year</Text>
+            <Text style={styles.inputLabel}>
+              Target Per {calculateDurationLabel(newGoalStartDate, newGoalEndDate).charAt(0).toUpperCase() + calculateDurationLabel(newGoalStartDate, newGoalEndDate).slice(1)}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 100"
@@ -1050,6 +1150,86 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
               onChangeText={setNewGoalTarget}
               keyboardType="numeric"
             />
+
+            <Text style={styles.inputLabel}>Start Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowStartDatePicker(!showStartDatePicker)}
+            >
+              <Text style={styles.dateButtonText}>
+                {newGoalStartDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+              </Text>
+              <Text>📅</Text>
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={newGoalStartDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android') {
+                      setShowStartDatePicker(false);
+                    }
+                    if (selectedDate) {
+                      setNewGoalStartDate(selectedDate);
+                      // Auto-adjust end date if it's before the new start date
+                      if (selectedDate > newGoalEndDate) {
+                        const newEndDate = new Date(selectedDate);
+                        newEndDate.setMonth(newEndDate.getMonth() + 12);
+                        setNewGoalEndDate(newEndDate);
+                      }
+                    }
+                  }}
+                />
+              </View>
+            )}
+            {showStartDatePicker && Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.button, { marginTop: 10 }]}
+                onPress={() => setShowStartDatePicker(false)}
+              >
+                <Text style={styles.buttonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.inputLabel}>End Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowEndDatePicker(!showEndDatePicker)}
+            >
+              <Text style={styles.dateButtonText}>
+                {newGoalEndDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+              </Text>
+              <Text>📅</Text>
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={newGoalEndDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android') {
+                      setShowEndDatePicker(false);
+                    }
+                    if (selectedDate) setNewGoalEndDate(selectedDate);
+                  }}
+                />
+              </View>
+            )}
+            {showEndDatePicker && Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.button, { marginTop: 10 }]}
+                onPress={() => setShowEndDatePicker(false)}
+              >
+                <Text style={styles.buttonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={[styles.inputLabel, { fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginTop: 8 }]}>
+              Default: 12 months from start date
+            </Text>
             <SaveCancelButtons
               onSave={handleAddGoal}
               onCancel={() => {
