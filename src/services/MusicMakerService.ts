@@ -124,12 +124,22 @@ export const MusicMakerService = {
         const prompt = `
             ${userPrompt}
 
-            Write a song based on the user's request. 
-            Provide:
+            Write a song based on the user's request. Provide:
             1. A creative song title.
             2. The key and BPM.
             3. Lyrics with chords and melodic notes for each line.
-
+            4. A startTime in seconds for each line. 
+            
+            CRITICAL TIMING RULES:
+            - Each lyric line should start at the beginning of a musical bar.
+            - Calculate startTime using: (bar_index * 4 * 60 / BPM).
+            - For example, at 120 BPM:
+                Line 1 (Bar 0): 0s
+                Line 2 (Bar 1): 2s
+                Line 3 (Bar 2): 4s
+                Line 4 (Bar 3): 6s
+            - Keep timings tight. Do NOT add large gaps between lines.
+            
             Return strictly JSON:
             {
                 "songName": "String",

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard, TextInput, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1097,6 +1097,17 @@ const createStyles = (colors: any, insets: { top: number }) => StyleSheet.create
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  actionButtonSmall: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  actionButtonTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sparkCardContent: {
     flexDirection: 'row',
