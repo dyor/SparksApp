@@ -16,6 +16,7 @@ export interface RecordedSwing {
   uri: string;
   holeNumber: number;
   shotNumber: number;
+  type: "shot" | "putt";
   club: string;
   timestamp: number;
 }
@@ -23,6 +24,7 @@ export interface RecordedSwing {
 export interface RecordSwingProps {
   holeNumber: number;
   shotNumber: number;
+  type: "shot" | "putt";
   club: string;
   countdownSeconds?: number;
   durationSeconds?: number;
@@ -39,6 +41,7 @@ export interface RecordSwingProps {
 export const RecordSwing: React.FC<RecordSwingProps> = ({
   holeNumber,
   shotNumber,
+  type,
   club,
   countdownSeconds = 5,
   durationSeconds = 30,
@@ -242,6 +245,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         uri,
         holeNumber,
         shotNumber,
+        type,
         club,
         timestamp: Date.now(),
       };

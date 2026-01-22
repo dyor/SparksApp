@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import * as Speech from 'expo-speech';
 import { setAudioModeAsync } from 'expo-audio';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
+import { useSparkStore } from '../store';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -14,8 +14,12 @@ import {
   SaveCancelButtons,
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
+import { CelebrationOverlay, CelebrationOverlayRef } from '../components/CelebrationOverlay';
 
-const STORAGE_KEY = 'spanish_friend_user_name';
+interface SpanishFriendData {
+  conversationMode: '1-friend' | '2-friends';
+  userName: string;
+}
 
 interface SpanishFriendSettingsProps {
   conversationMode: '1-friend' | '2-friends';
@@ -34,12 +38,9 @@ const SpanishFriendSettings: React.FC<SpanishFriendSettingsProps> = ({
   const [editingMode, setEditingMode] = useState<'1-friend' | '2-friends'>(conversationMode);
   const [editingName, setEditingName] = useState(userName);
 
-  const handleSave = async () => {
-    const name = editingName.trim();
-    if (name) {
-      onSave(editingMode, name);
-      onClose();
-    }
+  const handleSave = () => {
+    onSave(editingMode, editingName.trim());
+    onClose();
   };
 
   const styles = StyleSheet.create({
@@ -142,6 +143,9 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
   onCloseSettings,
 }) => {
   const { colors } = useTheme();
+  const { getSparkData, setSparkData, isHydrated } = useSparkStore();
+
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [audioSessionSet, setAudioSessionSet] = useState(false);
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const greetingTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -149,29 +153,30 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
   const [userName, setUserName] = useState<string>('');
   const [showNameInput, setShowNameInput] = useState(false);
   const [nameInputText, setNameInputText] = useState('');
-  const [isLoadingName, setIsLoadingName] = useState(true);
+  const [isFinished, setIsFinished] = useState(false);
+  const celebrationRef = React.useRef<CelebrationOverlayRef>(null);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
-  // Storage functions for user name
-  const loadStoredName = async () => {
-    try {
-      const storedName = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedName) {
-        setUserName(storedName);
+  // Load data from useSparkStore
+  useEffect(() => {
+    if (isHydrated && !dataLoaded) {
+      const storedData = getSparkData<SpanishFriendData>('spanish-friend');
+      if (storedData) {
+        if (storedData.conversationMode) setConversationMode(storedData.conversationMode);
+        if (storedData.userName) setUserName(storedData.userName);
       }
-    } catch (error) {
-      console.error('Error loading stored name:', error);
-    } finally {
-      setIsLoadingName(false);
+      setDataLoaded(true);
     }
-  };
+  }, [isHydrated, dataLoaded]);
 
-  const saveNameToStorage = async (name: string) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, name);
-    } catch (error) {
-      console.error('Error saving name to storage:', error);
-    }
-  };
+  // Save data to useSparkStore
+  useEffect(() => {
+    if (!dataLoaded) return;
+    setSparkData('spanish-friend', {
+      conversationMode,
+      userName
+    });
+  }, [conversationMode, userName, dataLoaded]);
 
 
   // Beach planning conversation - function to get conversation with dynamic name
@@ -239,10 +244,9 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     }
   };
 
-  // Set up audio session and load stored name when component loads
+  // Set up audio session when component loads
   useEffect(() => {
     setupAudioSession();
-    loadStoredName();
 
     return () => {
       if (greetingTimerRef.current) {
@@ -254,7 +258,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
 
   // Check for name and play first phrase after loading is complete
   useEffect(() => {
-    if (!isLoadingName) {
+    if (dataLoaded) {
       if (!userName) {
         setShowNameInput(true);
       } else {
@@ -271,11 +275,28 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
         }, 500);
       }
     }
-  }, [userName, conversationMode, isLoadingName]);
+  }, [userName, conversationMode, dataLoaded]);
+
+  useEffect(() => {
+    if (isFinished) {
+      celebrationRef.current?.triggerConfetti();
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }).start();
+      HapticFeedback.success();
+    }
+  }, [isFinished]);
 
   const handleContinue = () => {
     const conversation = getConversation();
-    const nextIndex = (currentPhraseIndex + 1) % conversation.length;
+    if (currentPhraseIndex === conversation.length - 1) {
+      setIsFinished(true);
+      return;
+    }
+
+    const nextIndex = currentPhraseIndex + 1;
     setCurrentPhraseIndex(nextIndex);
     const nextPhrase = conversation[nextIndex];
 
@@ -288,6 +309,13 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       speakSpanish(nextPhrase.spanish, 'friend1');
     }
 
+    HapticFeedback.light();
+  };
+
+  const handleRestart = () => {
+    setCurrentPhraseIndex(0);
+    setIsFinished(false);
+    fadeAnim.setValue(0);
     HapticFeedback.light();
   };
 
@@ -318,20 +346,20 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     return currentPhrase.speaker === 'friend1'; // Only show repeat for phone's phrases in 1-friend mode
   };
 
-  const handleNameSubmit = async () => {
+  const handleNameSubmit = () => {
     if (nameInputText.trim()) {
       const newName = nameInputText.trim();
       setUserName(newName);
-      await saveNameToStorage(newName);
       setShowNameInput(false);
       setNameInputText('');
+      HapticFeedback.success();
     }
   };
 
-  const handleSettingsSave = async (newMode: '1-friend' | '2-friends', newName: string) => {
+  const handleSettingsSave = (newMode: '1-friend' | '2-friends', newName: string) => {
     setConversationMode(newMode);
     setUserName(newName);
-    await saveNameToStorage(newName);
+    HapticFeedback.success();
   };
 
 
@@ -530,6 +558,46 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       fontSize: 16,
       fontWeight: '500',
     },
+    celebrationOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surface + 'F0',
+      zIndex: 100,
+      padding: 40,
+    },
+    celebrationTitle: {
+      fontSize: 42,
+      fontWeight: 'bold',
+      color: colors.primary,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    celebrationText: {
+      fontSize: 20,
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 32,
+      lineHeight: 28,
+    },
+    restartButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 18,
+      paddingHorizontal: 40,
+      borderRadius: 16,
+      width: '100%',
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    restartButtonText: {
+      color: '#fff',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
   });
 
   if (showSettings) {
@@ -618,6 +686,20 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
         </KeyboardAvoidingView>
       </Modal>
 
+      {isFinished && (
+        <Animated.View style={[styles.celebrationOverlay, { opacity: fadeAnim }]}>
+          <Text style={styles.celebrationTitle}>¡Enhorabuena!</Text>
+          <Text style={styles.celebrationText}>
+            Has completado la conversación. {"\n"}
+            ¡Buen trabajo practicando tu español!
+          </Text>
+          <TouchableOpacity style={styles.restartButton} onPress={handleRestart}>
+            <Text style={styles.restartButtonText}>Volver a empezar</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      <CelebrationOverlay ref={celebrationRef} />
     </View>
   );
 };

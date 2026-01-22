@@ -1494,7 +1494,7 @@ const RoundSummaryScreen: React.FC<{
             const holeScore = round.holeScores?.find(hs => hs.holeNumber === holeNum);
             const holeHasFire = holeScore?.shots?.some(shot => shot.direction === "fire");
             const holeHasPoorShot = holeScore?.shots?.some(shot => shot.poorShot === true);
-            
+
             if (holeHasFire && holeHasPoorShot) return "🔥💩";
             if (holeHasFire) return "🔥";
             if (holeHasPoorShot) return "💩";
@@ -1544,9 +1544,9 @@ const RoundSummaryScreen: React.FC<{
                       Complete at least 2 holes to see score progression
                     </Text>
                   ) : (
-                    <SparkChart 
-                      series={grossSeries} 
-                      showZeroLine={true} 
+                    <SparkChart
+                      series={grossSeries}
+                      showZeroLine={true}
                       height={200}
                       showLegend={false}
                     />
@@ -1571,9 +1571,9 @@ const RoundSummaryScreen: React.FC<{
                         Complete at least 2 holes to see net score progression
                       </Text>
                     ) : (
-                      <SparkChart 
-                        series={netSeries} 
-                        showZeroLine={true} 
+                      <SparkChart
+                        series={netSeries}
+                        showZeroLine={true}
                         height={200}
                         showLegend={false}
                       />
@@ -4217,25 +4217,18 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
 
   const handleRecordingComplete = (swing: RecordedSwing) => {
     console.log("Recording completed:", swing);
-    // Find the shot to update
-    // We need to match based on hole and shot number
-    // swing.shotNumber is 1-based index
-
-    // Determine if it's a shot or putt based on index
-    // Note: RecordSwing is currently only passed for shots (shotInfo.isShot check in JSX)
-    // swing.shotNumber from RecordSwing corresponds to the visible shot number
-
-    // Iterate through shots to find the one matching the current index
-    const shotToUpdate = (shots || []).find(
+    // Find the shot or putt to update
+    const targetSource = swing.type === "shot" ? (shots || []) : (putts || []);
+    const itemToUpdate = targetSource.find(
       (s, i) => i + 1 === swing.shotNumber
     );
 
-    if (shotToUpdate) {
-      updateShot(shotToUpdate.id, "shot", "videoUri", swing.uri);
+    if (itemToUpdate) {
+      updateShot(itemToUpdate.id, swing.type, "videoUri", swing.uri);
       HapticFeedback.success();
     } else {
       console.warn(
-        "Could not find shot to update with recording for shot number:",
+        `Could not find ${swing.type} to update with recording for number:`,
         swing.shotNumber
       );
     }
@@ -5846,6 +5839,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
                           <RecordSwing
                             holeNumber={currentHole}
                             shotNumber={shotInfo.shotNumber}
+                            type={shotInfo.type as "shot" | "putt"}
                             club={shotInfo.shot.club || "Unknown"}
                             countdownSeconds={
                               data.settings.swingRecording.countdownSeconds

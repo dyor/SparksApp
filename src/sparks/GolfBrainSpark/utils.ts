@@ -140,3 +140,19 @@ export const DEFAULT_CLUBS = [
   "Putter",
 ];
 
+export const parseNumericList = (
+  input: string,
+  min: number,
+  max: number
+): number[] => {
+  if (!input || !input.trim()) return [];
+
+  // Replace commas with spaces to handle both formats
+  const normalizedInput = input.replace(/,/g, ' ');
+  return normalizedInput
+    .trim()
+    .split(/\s+/)
+    .map((item) => parseInt(item))
+    .filter((num) => !isNaN(num) && num >= min && num <= max);
+};
+

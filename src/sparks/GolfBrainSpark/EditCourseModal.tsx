@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, ScrollView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { Course, Hole } from './types';
+import { parseNumericList } from './utils';
 
 interface EditCourseModalProps {
   visible: boolean;
@@ -10,25 +11,25 @@ interface EditCourseModalProps {
   colors: any;
 }
 
-export const EditCourseModal: React.FC<EditCourseModalProps> = ({ 
-  visible, 
-  onClose, 
-  course, 
-  onUpdateCourse, 
-  colors 
+export const EditCourseModal: React.FC<EditCourseModalProps> = ({
+  visible,
+  onClose,
+  course,
+  onUpdateCourse,
+  colors
 }) => {
   const [courseName, setCourseName] = useState(course?.name || "");
   const [parList, setParList] = useState(
-    course?.holes?.map((h) => h.par).join(" ") || ""
+    course?.holes?.map((h) => h.par).join(", ") || ""
   );
   const [difficultyList, setDifficultyList] = useState(
-    course?.holes?.map((h) => h.strokeIndex).join(" ") || ""
+    course?.holes?.map((h) => h.strokeIndex).join(", ") || ""
   );
   const [distanceList, setDistanceList] = useState(
     course?.holes
       ?.filter((h) => h.distanceYards)
       .map((h) => h.distanceYards)
-      .join(" ") || ""
+      .join(", ") || ""
   );
 
   // Guard clause to prevent rendering if course is null
@@ -36,18 +37,6 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
     return null;
   }
 
-  const parseSpaceSeparatedList = (
-    input: string,
-    min: number,
-    max: number
-  ): number[] => {
-    if (!input.trim()) return [];
-    return input
-      .trim()
-      .split(/\s+/)
-      .map((item) => parseInt(item))
-      .filter((num) => !isNaN(num) && num >= min && num <= max);
-  };
 
   const handleUpdate = () => {
     if (!courseName.trim()) {
@@ -55,9 +44,9 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
       return;
     }
 
-    const pars = parseSpaceSeparatedList(parList, 3, 5);
-    const difficulties = parseSpaceSeparatedList(difficultyList, 1, 18);
-    const distances = parseSpaceSeparatedList(distanceList, 50, 600);
+    const pars = parseNumericList(parList, 3, 5);
+    const difficulties = parseNumericList(difficultyList, 1, 18);
+    const distances = parseNumericList(distanceList, 50, 600);
 
     // If no pars provided, default to 18 par 4s
     const finalPars = pars.length > 0 ? pars : Array(18).fill(4);
@@ -113,6 +102,14 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
       marginBottom: 20,
       textAlign: "center",
     },
+    keyboardView: {
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    scrollContent: {
+      paddingBottom: 20,
+    },
     input: {
       backgroundColor: colors.background,
       borderColor: colors.border,
@@ -167,77 +164,89 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Edit Course</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardView}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Course</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Course Name"
-            placeholderTextColor={colors.textSecondary}
-            value={courseName}
-            onChangeText={setCourseName}
-          />
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+              >
+                <TextInput
+                  style={styles.input}
+                  placeholder="Course Name"
+                  placeholderTextColor={colors.textSecondary}
+                  value={courseName}
+                  onChangeText={setCourseName}
+                />
 
-          <Text style={styles.fieldLabel}>Par List</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="4 4 3 5 4 4 3 4 5 4 4 3 5 4 4 3 4 5"
-            placeholderTextColor={colors.textSecondary}
-            value={parList}
-            onChangeText={setParList}
-            keyboardType="numeric"
-          />
-          <Text style={styles.helpText}>
-            Space-separated list of pars (3-5).
-          </Text>
+                <Text style={styles.fieldLabel}>Par List</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="4, 4, 3, 5..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={parList}
+                  onChangeText={setParList}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.helpText}>
+                  Comma or space-separated list of pars (3-5).
+                </Text>
 
-          <Text style={styles.fieldLabel}>Difficulty Index List</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18"
-            placeholderTextColor={colors.textSecondary}
-            value={difficultyList}
-            onChangeText={setDifficultyList}
-            keyboardType="numeric"
-          />
-          <Text style={styles.helpText}>
-            Space-separated list of difficulty indexes (1-18).
-          </Text>
+                <Text style={styles.fieldLabel}>Difficulty Index List</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1, 2, 3, 4..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={difficultyList}
+                  onChangeText={setDifficultyList}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.helpText}>
+                  Comma or space-separated list of difficulty indexes (1-18).
+                </Text>
 
-          <Text style={styles.fieldLabel}>Distance List</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="400 350 150 550 400 380 140 520 400 420 160 580 400 360 130 500 400 450"
-            placeholderTextColor={colors.textSecondary}
-            value={distanceList}
-            onChangeText={setDistanceList}
-            keyboardType="numeric"
-          />
-          <Text style={styles.helpText}>
-            Space-separated list of distances in yards (50-600).
-          </Text>
+                <Text style={styles.fieldLabel}>Distance List</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="400, 350, 150..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={distanceList}
+                  onChangeText={setDistanceList}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.helpText}>
+                  Comma or space-separated list of distances in yards (50-600).
+                </Text>
+              </ScrollView>
 
-          <View style={styles.buttons}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={[styles.buttonText, styles.cancelButtonText]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.updateButton]}
-              onPress={handleUpdate}
-            >
-              <Text style={[styles.buttonText, styles.updateButtonText]}>
-                Update
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.buttons}>
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={onClose}
+                >
+                  <Text style={[styles.buttonText, styles.cancelButtonText]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.updateButton]}
+                  onPress={handleUpdate}
+                >
+                  <Text style={[styles.buttonText, styles.updateButtonText]}>
+                    Update
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
