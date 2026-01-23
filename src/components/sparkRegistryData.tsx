@@ -40,6 +40,7 @@ import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
+import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -523,6 +524,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: IdeasSpark,
+  },
+  "business-spark": {
+    metadata: {
+      id: "business-spark",
+      title: "CFO Simulator",
+      description: "Learn accounting by running a 3D printing business",
+      icon: "💼",
+      category: "productivity",
+      createdAt: "2026-01-23T00:00:00.000Z",
+      rating: 5.0,
+      properties: ["AI"],
+    },
+    component: BusinessSpark,
   },
 };
 
