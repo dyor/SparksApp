@@ -31,7 +31,7 @@ import TripSurveySpark from "../sparks/TripSurveySpark";
 import RecAIpeSpark from "../sparks/RecAIpeSpark";
 import ShopSpark from "../sparks/ShopSpark";
 import { SparkStatsSpark } from "../sparks/SparkStatsSpark";
-import { BigDennySpark } from "../sparks/BigDennySpark";
+import { SkinsSpark } from "../sparks/SkinsSpark";
 import { SpeakSpark } from "../sparks/SpeakSpark";
 import FriendSpark from "../sparks/FriendSpark";
 import TripodSpark from "../sparks/TripodSpark";
@@ -398,17 +398,17 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: SparkStatsSpark,
   },
-  "big-denny": {
+  skins: {
     metadata: {
-      id: "big-denny",
+      id: "skins",
       title: "Skins",
-      description: "Track who wins holes on the course",
+      description: "Track who wins holes on the course with history carryover",
       icon: "⛳️💰",
       category: "golf",
       createdAt: "2025-12-08T00:00:00.000Z",
       rating: 4.5,
     },
-    component: BigDennySpark,
+    component: SkinsSpark,
   },
   recaipe: {
     metadata: {
@@ -500,7 +500,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: GoalTrackerSpark,
   },
-  "scorecard": {
+  scorecard: {
     metadata: {
       id: "scorecard",
       title: "Scorecard",
@@ -512,7 +512,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: ScorecardSpark,
   },
-  "ideas": {
+  ideas: {
     metadata: {
       id: "ideas",
       title: "Ideas",
