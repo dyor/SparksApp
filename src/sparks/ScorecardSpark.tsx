@@ -40,6 +40,9 @@ import {
   SettingsSection,
 } from "../components/SettingsComponents";
 import { ServiceFactory } from "../services/ServiceFactory";
+import { isExpoGo } from "../utils/expoGoDetection";
+
+
 
 // --- Types & Interfaces ---
 
@@ -126,6 +129,17 @@ interface ScoringViewProps {
   setColorMode: (mode: "light" | "dark") => void;
   colors: any;
   styles: any;
+  // Lifted voice state
+  currentTranscript: string;
+  setCurrentTranscript: (v: string) => void;
+  errorMessage: string | null;
+  setErrorMessage: (v: string | null) => void;
+  voiceLog: { text: string; parsed: string; timestamp: number }[];
+  setVoiceLog: React.Dispatch<
+    React.SetStateAction<{ text: string; parsed: string; timestamp: number }[]>
+  >;
+  isRecording: boolean;
+  setIsRecording: (v: boolean) => void;
 }
 
 interface SettingsViewProps {
@@ -389,10 +403,10 @@ const HoleRow = React.forwardRef<
             style={[
               styles.tableInput,
               parseInt(localPutts) >= parseInt(localStrokes) &&
-                parseInt(localStrokes) > 0 && {
-                  borderColor: colors.error,
-                  borderWidth: 2,
-                },
+              parseInt(localStrokes) > 0 && {
+                borderColor: colors.error,
+                borderWidth: 2,
+              },
             ]}
             value={localPutts}
             onChangeText={setLocalPutts}
@@ -435,9 +449,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const avgScore =
     finishedRounds.length > 0
       ? Math.round(
-          finishedRounds.reduce((sum, r) => sum + (r.total_strokes || 0), 0) /
-            finishedRounds.length,
-        )
+        finishedRounds.reduce((sum, r) => sum + (r.total_strokes || 0), 0) /
+        finishedRounds.length,
+      )
       : "--";
 
   return (
@@ -929,7 +943,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({
                       style={[
                         styles.genderOptionText,
                         genderPreference === "Men" &&
-                          styles.genderOptionTextActive,
+                        styles.genderOptionTextActive,
                       ]}
                     >
                       Men
@@ -939,7 +953,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({
                     style={[
                       styles.genderOption,
                       genderPreference === "Ladies" &&
-                        styles.genderOptionActive,
+                      styles.genderOptionActive,
                     ]}
                     onPress={() => setGenderPreference("Ladies")}
                   >
@@ -947,7 +961,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({
                       style={[
                         styles.genderOptionText,
                         genderPreference === "Ladies" &&
-                          styles.genderOptionTextActive,
+                        styles.genderOptionTextActive,
                       ]}
                     >
                       Ladies
@@ -1184,12 +1198,21 @@ const ScoringView: React.FC<ScoringViewProps> = ({
   setColorMode,
   colors,
   styles,
+  // Voice state
+  isRecording,
+  setIsRecording,
+  currentTranscript,
+  setCurrentTranscript,
+  errorMessage,
+  setErrorMessage,
+  voiceLog,
+  setVoiceLog,
 }) => {
   const round = rounds.find((r) => r.id === activeRoundId);
   const course = courses.find((c) => c.id === round?.course_id);
   const roundScores = scores.filter((s) => s.round_id === activeRoundId);
-  const [isRecording, setIsRecording] = useState(false);
   const speechTimeoutRef = useRef<any>(null);
+  const lastProcessedRef = useRef<{ text: string; time: number } | null>(null);
 
   if (!round || !course) return null;
 
@@ -1227,12 +1250,12 @@ const ScoringView: React.FC<ScoringViewProps> = ({
   const courseHandicap =
     currentHandicapIndex !== null
       ? HandicapService.calculateCourseHandicap(
-          currentHandicapIndex,
-          course.slope,
-          course.rating,
-          totals.par,
-          course.holes.length,
-        )
+        currentHandicapIndex,
+        course.slope,
+        course.rating,
+        totals.par,
+        course.holes.length,
+      )
       : 0;
   const indexText =
     currentHandicapIndex !== null
@@ -1300,24 +1323,91 @@ const ScoringView: React.FC<ScoringViewProps> = ({
       parseInt(scoreMap[h.hole_number].strokes) > 0,
   );
 
+  const numberMap: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    zero: 0,
+    none: 0,
+    first: 1,
+    second: 2,
+    third: 3,
+  };
+
   const parseVoice = (text: string) => {
-    // Extract all numbers from the text
-    const matches = text.match(/\d+/g);
-    if (!matches) return;
+    const lowerText = text.toLowerCase();
 
-    const nums = matches.map((m) => parseInt(m));
+    // Split by whitespace and common punctuation, but keep digits attached
+    const words = lowerText.split(/[\s,.:-]+/);
+    const nums: number[] = [];
 
-    if (nums.length === 3) {
-      // Specific Hole: [hole] [strokes] [putts]
-      const [h, s, p] = nums;
-      if (s > 0 && p >= s) {
-        Alert.alert(
-          "Invalid Input",
-          `Hole #${h}: Putts must be less than strokes (${s} vs ${p}).`,
+    for (const word of words) {
+      // 1. Try digit extraction first (handles "5", "5th")
+      const digitMatch = word.match(/\d+/);
+      if (digitMatch) {
+        nums.push(parseInt(digitMatch[0]));
+      }
+      // 2. Try word mapping if no digit found
+      else if (numberMap[word] !== undefined) {
+        nums.push(numberMap[word]);
+      }
+    }
+
+    if (nums.length === 0) {
+      if (lowerText.trim()) {
+        setVoiceLog((prev) =>
+          [
+            {
+              text: lowerText,
+              parsed: "None",
+              timestamp: Date.now(),
+            },
+            ...prev,
+          ].slice(0, 5),
         );
+      }
+      return;
+    }
+
+    // Deduplication: Check if the *content* (numbers) matches the last command
+    const commandKey = nums.join(",");
+    if (
+      lastProcessedRef.current &&
+      lastProcessedRef.current.text === commandKey &&
+      Date.now() - lastProcessedRef.current.time < 3000
+    ) {
+      return;
+    }
+    // Update ref with the KEY (numbers), not the raw text
+    lastProcessedRef.current = { text: commandKey, time: Date.now() };
+
+    if (nums.length >= 3) {
+      // Specific Hole: [hole] [strokes] [putts]
+      const [h, s, p] = nums.slice(-3);
+      if (h < 1 || h > course.holes.length) {
+        triggerError(`Invalid hole: ${h}`);
+        return;
+      }
+      if (s > 0 && p >= s) {
+        triggerError(`Hole ${h}: Putts (${p}) >= Strokes (${s})`);
         return;
       }
       saveHoleScore(activeRoundId!, h, s, p);
+      const msg = `Hole ${h}: ${s} with ${p}`;
+      setCurrentTranscript(msg);
+      setVoiceLog((prev) =>
+        [{ text: lowerText, parsed: msg, timestamp: Date.now() }, ...prev].slice(
+          0,
+          5,
+        ),
+      );
     } else if (nums.length === 2) {
       // Next Hole: [strokes] [putts]
       const nextHole = course.holes.find(
@@ -1326,22 +1416,66 @@ const ScoringView: React.FC<ScoringViewProps> = ({
       if (nextHole) {
         const [s, p] = nums;
         if (s > 0 && p >= s) {
-          Alert.alert(
-            "Invalid Input",
-            `Hole #${nextHole.hole_number}: Putts must be less than strokes (${s} vs ${p}).`,
+          triggerError(
+            `Hole ${nextHole.hole_number}: Putts (${p}) >= Strokes (${s})`,
           );
           return;
         }
         saveHoleScore(activeRoundId!, nextHole.hole_number, s, p);
+        const msg = `Hole ${nextHole.hole_number}: ${s} with ${p}`;
+        setCurrentTranscript(msg);
+        setVoiceLog((prev) =>
+          [
+            { text: lowerText, parsed: msg, timestamp: Date.now() },
+            ...prev,
+          ].slice(0, 5),
+        );
+      } else {
+        triggerError("No more holes left");
       }
+    } else {
+      if (nums.length > 0) {
+        triggerError(
+          `Incomplete: Heard ${nums.join(", ")} (Need strokes & putts)`,
+        );
+      } else {
+        triggerError(`Cannot Parse: "${lowerText}"`);
+      }
+      setVoiceLog((prev) =>
+        [
+          {
+            text: lowerText,
+            parsed: `Ignored: ${nums.join(", ")}`,
+            timestamp: Date.now(),
+          },
+          ...prev,
+        ].slice(0, 5),
+      );
+      setCurrentTranscript("");
     }
   };
 
+  const triggerError = (msg: string) => {
+    setErrorMessage(null);
+    // Small delay to ensure state clears if it was already set
+    setTimeout(() => {
+      setErrorMessage(msg);
+      HapticFeedback.error();
+      // Longer timeout for visibility (user requested "few seconds")
+      setTimeout(() => setErrorMessage(null), 4000);
+    }, 50);
+  };
+
   const handleToggleMic = async () => {
-    if (isRecording) ExpoSpeechRecognitionModule.stop();
-    else {
+    if (isRecording) {
+      ExpoSpeechRecognitionModule.stop();
+      setIsRecording(false);
+    } else {
       const res = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (res.granted) ExpoSpeechRecognitionModule.start({ lang: "en-US" });
+      if (res.granted) {
+        setIsRecording(true);
+        ExpoSpeechRecognitionModule.start({ lang: "en-US" });
+      }
     }
   };
 
@@ -1356,7 +1490,7 @@ const ScoringView: React.FC<ScoringViewProps> = ({
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: "center" }}>
           <Text style={styles.headerTitle}>{course.name}</Text>
-          <Text style={styles.helpText}>Ex: 5 2</Text>
+          <Text style={styles.helpText}>Ex: 5 and 2</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 15 }}>
           <TouchableOpacity onPress={() => setShowHelp(true)}>
@@ -1377,21 +1511,23 @@ const ScoringView: React.FC<ScoringViewProps> = ({
               color={colors.primary}
             />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleToggleMic}
-            style={[
-              styles.micButtonSmall,
-              isRecording && { backgroundColor: colors.danger },
-            ]}
-          >
-            <Ionicons
-              name={isRecording ? "mic" : "mic-outline"}
-              size={18}
-              color="#fff"
-            />
-          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Error Message Overlay */}
+      {errorMessage && (
+        <View
+          style={[
+            styles.activeVoiceBanner,
+            { backgroundColor: colors.danger + "20" },
+          ]}
+        >
+          <Ionicons name="warning" size={16} color={colors.danger} />
+          <Text style={[styles.voiceStatusText, { color: colors.danger }]}>
+            {errorMessage}
+          </Text>
+        </View>
+      )}
 
       {/* Sub-header Area */}
       <View style={styles.subHeader}>
@@ -1401,18 +1537,33 @@ const ScoringView: React.FC<ScoringViewProps> = ({
             {indexText}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.completeRoundHeaderButton,
-            !canComplete && { backgroundColor: "#cccccc", opacity: 70 },
-          ]}
-          onPress={() => markRoundComplete(activeRoundId!)}
-          disabled={!canComplete}
-        >
-          <Text style={styles.completeRoundHeaderButtonText}>
-            COMPLETE ROUND
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          <TouchableOpacity
+            style={[
+              styles.completeRoundHeaderButton,
+              !canComplete && { backgroundColor: "#cccccc", opacity: 0.7 },
+            ]}
+            onPress={() => markRoundComplete(activeRoundId!)}
+            disabled={!canComplete}
+          >
+            <Text style={styles.completeRoundHeaderButtonText}>
+              COMPLETE ROUND
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleToggleMic}
+            style={[
+              styles.micButtonSmall,
+              isRecording && { backgroundColor: colors.danger },
+            ]}
+          >
+            <Ionicons
+              name={isRecording ? "mic" : "mic-outline"}
+              size={24}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Consolidated Time Row */}
@@ -1439,9 +1590,9 @@ const ScoringView: React.FC<ScoringViewProps> = ({
             >
               {round.begin_time
                 ? new Date(round.begin_time).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
                 : "SET"}
             </Text>
           </TouchableOpacity>
@@ -1450,9 +1601,9 @@ const ScoringView: React.FC<ScoringViewProps> = ({
           End:{" "}
           {round.end_time
             ? new Date(round.end_time).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+              hour: "2-digit",
+              minute: "2-digit",
+            })
             : "--:--"}
         </Text>
       </View>
@@ -1722,6 +1873,14 @@ export const ScorecardSpark: React.FC<{
   const [showHelp, setShowHelp] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  // Lifted voice state for global overlay and Help access
+  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [voiceLog, setVoiceLog] = useState<
+    { text: string; parsed: string; timestamp: number }[]
+  >([]);
+  const [isRecording, setIsRecording] = useState(false);
+
   // Derived State
   const colors = Colors[colorMode];
   const styles = useMemo(() => getStyles(colors), [colors]);
@@ -1916,12 +2075,12 @@ export const ScorecardSpark: React.FC<{
     const courseHandicap =
       currentHandicapIndex !== null
         ? HandicapService.calculateCourseHandicap(
-            currentHandicapIndex,
-            course.slope,
-            course.rating,
-            totalPar,
-            course.holes.length,
-          )
+          currentHandicapIndex,
+          course.slope,
+          course.rating,
+          totalPar,
+          course.holes.length,
+        )
         : 0;
 
     const adjustedGross = HandicapService.calculateNetDoubleBogey(
@@ -1943,16 +2102,16 @@ export const ScorecardSpark: React.FC<{
       prev.map((r) =>
         r.id === roundId
           ? {
-              ...r,
-              is_completed: true,
-              total_strokes: totalStrokes,
-              total_putts: roundScores.reduce((sum, s) => sum + s.putts, 0),
-              handicap_used: currentHandicapIndex ?? undefined,
-              net_score: netScore,
-              handicap_differential: differential,
-              diff_type: course.holes.length === 9 ? "9" : "18",
-              end_time: r.end_time || Date.now(),
-            }
+            ...r,
+            is_completed: true,
+            total_strokes: totalStrokes,
+            total_putts: roundScores.reduce((sum, s) => sum + s.putts, 0),
+            handicap_used: currentHandicapIndex ?? undefined,
+            net_score: netScore,
+            handicap_differential: differential,
+            diff_type: course.holes.length === 9 ? "9" : "18",
+            end_time: r.end_time || Date.now(),
+          }
           : r,
       ),
     );
@@ -2011,6 +2170,15 @@ export const ScorecardSpark: React.FC<{
           setColorMode={setColorMode}
           colors={colors}
           styles={styles}
+          // Voice state passed down
+          currentTranscript={currentTranscript}
+          setCurrentTranscript={setCurrentTranscript}
+          errorMessage={errorMessage}
+          setErrorMessage={setErrorMessage}
+          voiceLog={voiceLog}
+          setVoiceLog={setVoiceLog}
+          isRecording={isRecording}
+          setIsRecording={setIsRecording}
         />
       )}
 
@@ -2515,12 +2683,26 @@ const getStyles = (colors: any) =>
     },
     closeHelpButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
     micButtonSmall: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 60,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: colors.primary,
       justifyContent: "center",
       alignItems: "center",
+    },
+    activeVoiceBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      marginHorizontal: 16,
+      marginTop: 8,
+      borderRadius: 12,
+      gap: 8,
+    },
+    voiceStatusText: {
+      fontSize: 14,
+      fontWeight: "600",
     },
     errorBanner: {
       flexDirection: "row",
