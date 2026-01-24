@@ -10,7 +10,10 @@ import {
   Modal,
   ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 import { useSparkStore } from "../store";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
@@ -30,6 +33,30 @@ interface Idea {
   text: string;
   timestamp: number;
 }
+
+// --- Helpers: Convert Custom Tags to Markdown or HTML ---
+const preprocessText = (text: string) => {
+  if (!text) return "";
+  return text
+    .replace(/<b\s+([\s\S]*?)\s+b>/g, "**$1**") // Bold: <b text b> -> **text**
+    .replace(/<i\s+([\s\S]*?)\s+i>/g, "*$1*") // Italic: <i text i> -> *text*
+    .replace(/<j\s+([\s\S]*?)\s+j>/g, "==$1==") // (Optional extra)
+    .replace(/<h\s+([\s\S]*?)\s+h>/g, "`$1`") // Highlight: <h text h> -> `text`
+    .replace(/<#\s+([\s\S]*?)\s+#>/g, "\n# $1\n"); // Header: <# text #> -> # text
+};
+
+const preprocessHtml = (text: string) => {
+  if (!text) return "";
+  return text
+    .replace(/<b\s+([\s\S]*?)\s+b>/g, "<strong>$1</strong>")
+    .replace(/<i\s+([\s\S]*?)\s+i>/g, "<em>$1</em>")
+    .replace(/<j\s+([\s\S]*?)\s+j>/g, "<u>$1</u>")
+    .replace(
+      /<h\s+([\s\S]*?)\s+h>/g,
+      '<span style="background-color: #fff176; padding: 0 4px; border-radius: 4px; font-weight: bold;">$1</span>',
+    )
+    .replace(/<#\s+([\s\S]*?)\s+#>/g, "<h2>$1</h2>");
+};
 
 interface IdeasSparkProps {
   showSettings?: boolean;
@@ -111,8 +138,51 @@ const IdeasSettings: React.FC<{
   onClose: () => void;
   currentTheme: "light" | "dark";
   onToggleTheme: () => void;
-}> = ({ onClose, currentTheme, onToggleTheme }) => {
+  ideas: Idea[];
+}> = ({ onClose, currentTheme, onToggleTheme, ideas }) => {
   const [helpVisible, setHelpVisible] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      if (ideas.length === 0) {
+        Alert.alert("No Ideas", "You don't have any ideas to export.");
+        return;
+      }
+
+      const content = ideas
+        .map((i) => {
+          const date = new Date(i.timestamp).toLocaleDateString();
+          return `--- ${date} ---\n${preprocessText(i.text)}\n`;
+        })
+        .join("\n");
+
+      const filename = `Sparks_Ideas_${Date.now()}.txt`;
+
+      if (Platform.OS === "web") {
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const fileUri = FileSystem.cacheDirectory + filename;
+      await FileSystem.writeAsStringAsync(fileUri, content);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert("Error", "Sharing is not available on this platform.");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      Alert.alert("Error", "Failed to export ideas.");
+    }
+  };
+
 
   return (
     <SettingsContainer>
@@ -140,6 +210,12 @@ const IdeasSettings: React.FC<{
             variant="secondary"
           />
         </SettingsSection>
+
+        <SettingsButton
+          title="Export as Text"
+          onPress={handleExport}
+          variant="outline"
+        />
 
         <SettingsButton title="Close" variant="secondary" onPress={onClose} />
         <HelpModal
@@ -194,8 +270,7 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   const colors = getThemeColors(localThemeMode);
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [newIdeaText, setNewIdeaText] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [unifiedInput, setUnifiedInput] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "alpha">("date");
   const [isCondensedMode, setIsCondensedMode] = useState(false); // Default is 4 lines (false)
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
@@ -205,6 +280,7 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [selection, setSelection] = useState({ start: 0, end: 0 }); // Track text selection
+  const [inputHeight, setInputHeight] = useState(44); // Track search box height
 
   // Initial Load
   useEffect(() => {
@@ -251,27 +327,18 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
     ServiceFactory.getAnalyticsService().trackSparkOpen("ideas", "Ideas");
   }, []);
 
-  // --- Helper: Convert Custom Tags to Markdown for rendering ---
-  const preprocessText = (text: string) => {
-    if (!text) return "";
-    return text
-      .replace(/<b\s+([\s\S]*?)\s+b>/g, "**$1**") // Bold: <b text b> -> **text**
-      .replace(/<i\s+([\s\S]*?)\s+i>/g, "*$1*") // Italic: <i text i> -> *text*
-      .replace(/<j\s+([\s\S]*?)\s+j>/g, "==$1==") // (Optional extra)
-      .replace(/<h\s+([\s\S]*?)\s+h>/g, "`$1`") // Highlight: <h text h> -> `text`
-      .replace(/<#\s+([\s\S]*?)\s+#>/g, "\n# $1\n"); // Header: <# text #> -> # text
-  };
 
   const addIdea = () => {
     if (editingId) return; // Disable adding while editing
-    if (!newIdeaText.trim()) return;
+    if (!unifiedInput.trim()) return;
     const newIdea: Idea = {
       id: Date.now().toString(),
-      text: newIdeaText.trim(),
+      text: unifiedInput.trim(),
       timestamp: Date.now(),
     };
     setIdeas((prev) => [newIdea, ...prev]);
-    setNewIdeaText("");
+    setUnifiedInput("");
+    setInputHeight(44);
     HapticFeedback.light();
   };
 
@@ -351,7 +418,7 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   };
 
   const filteredIdeas = ideas
-    .filter((i) => i.text.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter((i) => i.text.toLowerCase().includes(unifiedInput.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === "date") return b.timestamp - a.timestamp;
       return a.text.localeCompare(b.text);
@@ -373,11 +440,29 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
       backgroundColor: colors.background,
       borderRadius: 8,
     },
+    searchBarContainer: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 10,
+    },
     searchBar: {
       backgroundColor: colors.background,
       padding: 10,
       borderRadius: 8,
       color: colors.text,
+      flex: 1,
+      minHeight: 44,
+    },
+    addIconButton: {
+      backgroundColor: colors.primary,
+      width: 44,
+      height: 44,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    addIconButtonDisabled: {
+      backgroundColor: colors.border,
     },
 
     listContent: { padding: 16, paddingBottom: 100 },
@@ -457,6 +542,7 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
         onToggleTheme={() =>
           setLocalThemeMode((prev) => (prev === "light" ? "dark" : "light"))
         }
+        ideas={ideas}
       />
     );
   }
@@ -605,75 +691,84 @@ export const IdeasSpark: React.FC<IdeasSparkProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>💡 Ideas</Text>
-          <View style={styles.controls}>
-            <TouchableOpacity
-              onPress={() =>
-                setSortBy((prev) => (prev === "date" ? "alpha" : "date"))
-              }
-              style={styles.controlBtn}
-            >
-              <Text style={{ fontSize: 16, color: colors.text }}>
-                {sortBy === "date" ? "📅" : "AZ"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setIsCondensedMode(!isCondensedMode);
-                setExpandedIdeaId(null); // Reset any expanded ideas
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>💡 Ideas</Text>
+            <View style={styles.controls}>
+              <TouchableOpacity
+                onPress={() =>
+                  setSortBy((prev) => (prev === "date" ? "alpha" : "date"))
+                }
+                style={styles.controlBtn}
+              >
+                <Text style={{ fontSize: 16, color: colors.text }}>
+                  {sortBy === "date" ? "📅" : "AZ"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsCondensedMode(!isCondensedMode);
+                  setExpandedIdeaId(null); // Reset any expanded ideas
+                }}
+                style={styles.controlBtn}
+              >
+                <Text style={{ fontSize: 16, color: colors.text }}>
+                  {isCondensedMode ? "Expanded" : "Condensed"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.searchBarContainer}>
+            <TextInput
+              placeholder="Search or Enter new idea"
+              placeholderTextColor={colors.textSecondary}
+              value={unifiedInput}
+              onChangeText={setUnifiedInput}
+              editable={!editingId}
+              multiline
+              maxLength={1000}
+              onContentSizeChange={(e) => {
+                setInputHeight(e.nativeEvent.contentSize.height);
               }}
-              style={styles.controlBtn}
+              // Expand up to 8 lines (max 200px)
+              style={[
+                styles.searchBar,
+                { height: Math.min(Math.max(44, inputHeight), 200), textAlignVertical: "top" },
+              ]}
+            />
+            <TouchableOpacity
+              onPress={addIdea}
+              disabled={!unifiedInput.trim()}
+              style={[
+                styles.addIconButton,
+                !unifiedInput.trim() && styles.addIconButtonDisabled,
+              ]}
             >
-              <Text style={{ fontSize: 16, color: colors.text }}>
-                {isCondensedMode ? "Expanded" : "Condensed"}
+              <Text style={{ color: "#fff", fontSize: 24, fontWeight: "bold" }}>
+                +
               </Text>
             </TouchableOpacity>
           </View>
         </View>
-        <TextInput
-          style={styles.searchBar}
-          placeholder="Search..."
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          editable={!editingId}
+
+        <FlatList
+          data={filteredIdeas}
+          renderItem={renderItem}
+          keyExtractor={(item: Idea) => item.id}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={{ alignItems: "center", marginTop: 40 }}>
+              <Text style={{ color: colors.textSecondary }}>No ideas yet</Text>
+            </View>
+          }
         />
       </View>
-
-      <FlatList
-        data={filteredIdeas}
-        renderItem={renderItem}
-        keyExtractor={(item: Idea) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={{ alignItems: "center", marginTop: 40 }}>
-            <Text style={{ color: colors.textSecondary }}>No ideas yet</Text>
-          </View>
-        }
-      />
-
-      <View
-        style={styles.inputArea}
-        pointerEvents={editingId ? "none" : "auto"}
-      >
-        <TextInput
-          style={styles.mainInput}
-          placeholder="New Idea..."
-          placeholderTextColor={colors.textSecondary}
-          value={newIdeaText}
-          onChangeText={setNewIdeaText}
-          multiline
-          editable={!editingId}
-        />
-        {newIdeaText.trim().length > 0 && (
-          <TouchableOpacity onPress={addIdea} style={styles.addBtn}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Save Idea</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
