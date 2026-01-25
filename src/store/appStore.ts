@@ -7,6 +7,7 @@ interface UserPreferences {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   dailyNotificationsEnabled: boolean;
+  dismissedAISettingsNote: boolean;
 }
 
 interface AppState {
@@ -37,6 +38,7 @@ export const useAppStore = create<AppState>()(
         soundEnabled: true,
         hapticsEnabled: true,
         dailyNotificationsEnabled: false,
+        dismissedAISettingsNote: false,
       },
       isFirstLaunch: true,
       currentSparkId: null,
