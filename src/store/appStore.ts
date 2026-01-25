@@ -8,6 +8,8 @@ interface UserPreferences {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   dailyNotificationsEnabled: boolean;
+  customGeminiApiKey?: string;
+  aiVoiceAccent: string;
 }
 
 interface AppState {
@@ -44,6 +46,7 @@ export const useAppStore = create<AppState>()(
         soundEnabled: true,
         hapticsEnabled: true,
         dailyNotificationsEnabled: false,
+        aiVoiceAccent: 'default',
       },
       isFirstLaunch: true,
       currentSparkId: null,

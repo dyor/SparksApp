@@ -92,6 +92,7 @@ export const createCommonStyles = (colors: ThemeColors) => {
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             justifyContent: 'center',
             alignItems: 'center',
+            zIndex: 1000,
         },
         modalContent: {
             backgroundColor: colors.surface,
@@ -99,6 +100,7 @@ export const createCommonStyles = (colors: ThemeColors) => {
             padding: StyleTokens.spacing.xxl,
             width: '90%',
             maxWidth: 400,
+            zIndex: 1001,
         },
         modalTitle: {
             fontSize: StyleTokens.fontSize.xxl,

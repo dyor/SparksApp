@@ -13,13 +13,16 @@ import {
     Share,
     Modal,
     TextInput,
+    TouchableWithoutFeedback,
+    Keyboard,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { MusicMakerService, MusicAnalysisResult } from '../services/MusicMakerService';
 import { useSparkStore } from '../store/sparkStore';
+import { useAppStore } from '../store/appStore';
 import { HapticFeedback } from '../utils/haptics';
 import { getChordFrequencies, RHYTHM_PATTERNS, DRUM_PATTERNS } from '../utils/MusicTheory';
 import {
@@ -28,6 +31,184 @@ import {
     SettingsHeader,
     SettingsFeedbackSection
 } from '../components/SettingsComponents';
+import { AISettingsNote } from '../components/AISettingsNote';
+import { GeminiService } from '../services/GeminiService';
+import { CommonModal } from '../components/CommonModal';
+
+export interface MusicAnalysisResult {
+    songName: string;
+    lyrics: {
+        text: string;
+        chords: string;
+        notes: string;
+        startTime: number;
+    }[];
+    vocalUri: string;
+    key: string;
+    bpm: number;
+}
+
+const MusicMakerService = {
+    analyzeVocalRecording: async (uri: string, songName: string, mimeType: string = 'audio/mp4'): Promise<MusicAnalysisResult | null> => {
+        try {
+            const prompt = `
+                Analyze this vocal recording for a song named "${songName}".
+                Extract the lyrics and determine the melody (notes) and harmonic structure (chords) that would accompany it on a guitar.
+                
+                For each line or phrase, provide:
+                1. The text of the lyrics.
+                2. The guitar chords that fit that phrase.
+                3. The melodic notes being sung.
+                4. The approximate start time in seconds.
+
+                Return the result strictly as a JSON object with the following structure:
+                {
+                    "key": "e.g., G Major",
+                    "bpm": 120,
+                    "lyrics": [
+                        {
+                            "text": "Lyric text here",
+                            "chords": "G C D",
+                            "notes": "G A B",
+                            "startTime": 0.5
+                        }
+                    ]
+                }
+            `;
+
+            let audioBase64 = '';
+
+            if (Platform.OS === 'web') {
+                const response = await fetch(uri);
+                const blob = await response.blob();
+                audioBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64 = (reader.result as string).split(',')[1];
+                        resolve(base64);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } else {
+                audioBase64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+            }
+
+            const contents = [{
+                parts: [
+                    {
+                        inline_data: {
+                            mime_type: mimeType,
+                            data: audioBase64,
+                        },
+                    },
+                    {
+                        text: prompt,
+                    },
+                ],
+            }];
+
+            const apiKey = await GeminiService.getApiKey();
+            const fetchResponse = await fetch(
+                `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents }),
+                }
+            );
+
+            const data = await fetchResponse.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No analysis generated');
+
+            const cleanText = text.replace(/\`\`\`json\n?|\n?\`\`\`/g, '').trim();
+            const parsed = JSON.parse(cleanText);
+
+            return {
+                songName,
+                vocalUri: uri,
+                ...parsed
+            };
+        } catch (error) {
+            console.error('Music analysis failed:', error);
+            throw error;
+        }
+    },
+
+    detectPitch: async (uri: string): Promise<number> => {
+        return 440 + (Math.random() * 10 - 5);
+    },
+
+    generateAISong: async (userPrompt: string, accent: string = 'default'): Promise<Omit<MusicAnalysisResult, 'vocalUri'>> => {
+        const accentInstructions: Record<string, string> = {
+            'canadian': 'Write with a thick Canadian accent. Use slang like "eh", "out and about", and references to cold weather or hockey where it fits.',
+            'texan': 'Write with a heavy Southern Texan drawl. Use slang like "y\'all", "fixin\' to", "reckon", and phonetic spellings for a slow, rhythmic drawl.',
+            'british': 'Write with a distinct British/RP accent. Use UK slang like "brilliant", "mate", "proper", and British spellings (e.g., "colour", "favour").',
+            'east-indian': 'Write with an East Indian rhythmic pattern and phrasing. Use local metaphors or polite/formal East Indian English structures where appropriate.',
+            'australian': 'Write with a strong Australian "Aussie" accent. Use slang like "crikey", "G\'day", "no worries", and references to the outback.',
+            'scottish': 'Write with a thick Scottish brogue. Use words like "wee", "bonnie", "lass", and phonetic spellings to capture the rolling R\'s and unique rhythm.',
+            'new-york': 'Write with a fast-paced, gritty New York accent. Use slang like "fuhgeddaboudit", "deadass", and specific local references.',
+            'southern-blues-male': 'Write as an old-fashioned male Southern blues singer. Use gritty, soulful language, references to the Delta, hardships, and deep Southern slang. Phrasing should be rhythmic and emotive.',
+            'southern-blues-female': 'Write as an old-fashioned female Southern blues singer (think Bessie Smith or Ma Rainey). Use powerful, soulful language, emotive phrasing, and deep Southern blues slang.',
+            'chipmunk': 'Write fun, high-energy lyrics suitable for a high-pitched, squeaky chipmunk character. Use playful language and short, bouncy phrases.',
+            'crooner': 'Write in the smooth, sophisticated style of a mid-century crooner (like Dean Martin or Bing Crosby). Use romantic, effortless phrasing, elegant language, and a relaxed, rhythmic swing.',
+            'neil-young': 'Write in the style of Neil Young. Use high-tenor, emotive phrasing, themes of nature, solitude, and social commentary. Lyrics should feel raw and authentic.',
+            'stevie-nicks': 'Write in the mystical, raspy style of Stevie Nicks. Use poetic, symbolic language (birds, lace, dreams, visions), and a velvety, rhythmic flow typical of Fleetwood Mac.',
+            'bob-dylan': 'Write in the iconic nasal, folk-poetic style of a young Bob Dylan. Use conversational "talk-singing" phrasing, complex metaphors, and a gritty rhythmic structure.',
+            'patsy-cline': 'Write in the moving, soulful style of Patsy Cline. Use rich, emotive language, themes of heartbreak and longing, and a smooth, classic Nashville rhythmic flow.',
+            'hank-williams': 'Write in the foundational honky-tonk style of Hank Williams Sr. Use simple but profound "lonesome" language, references to the road and late nights, and a rhythmic, soulful folk cadence.',
+        };
+
+        const accentPrompt = accent !== 'default' && accentInstructions[accent]
+            ? `\nSTYLE/ACCENT: ${accentInstructions[accent]}\n`
+            : '';
+
+        const prompt = `
+            ${userPrompt}
+            ${accentPrompt}
+
+            Write a song based on the user's request. Provide:
+            1. A creative song title.
+            2. The key and BPM.
+            3. Lyrics with chords and melodic notes for each line.
+            4. A startTime in seconds for each line. 
+            
+            CRITICAL TIMING RULES:
+            - Each lyric line should start at the beginning of a musical bar.
+            - Calculate startTime using: (bar_index * 4 * 60 / BPM).
+            - For example, at 120 BPM:
+                Line 1 (Bar 0): 0s
+                Line 2 (Bar 1): 2s
+                Line 3 (Bar 2): 4s
+                Line 4 (Bar 3): 6s
+            - Keep timings tight. Do NOT add large gaps between lines.
+            - DIRECTIVES: Any musical instructions (like [Intro], [Harmonica Solo], [Chorus]) MUST be on their own line and ALWAYS enclosed in square brackets.
+            - CLEAN LYRICS: The "text" field should contain ONLY actual lyrics or the section name in brackets. DO NOT put vocal instructions (like "talk-singing") or chord letters (like "G") in the "text" field.
+            - CHORDS FIELD: ALWAYS put chord letters in the "chords" field for every line, even if it's the same chord as the previous line.
+            
+            Return strictly JSON:
+            {
+                "songName": "String",
+                "key": "String",
+                "bpm": Number,
+                "lyrics": [
+                    { "text": "String", "chords": "String", "notes": "String", "startTime": Number }
+                ]
+            }
+        `;
+
+        try {
+            const result = await GeminiService.generateJSON<any>(prompt);
+            return result;
+        } catch (error) {
+            console.error('AI Song Generation Failed:', error);
+            throw error;
+        }
+    }
+};
 
 const GUITAR_STRINGS = [
     { note: 'E', freq: 82.41, id: 'E2' },
@@ -121,27 +302,6 @@ const MusicMakerSpark: React.FC<{
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selectedSong, setSelectedSong] = useState<MusicAnalysisResult | null>(null);
 
-    useEffect(() => {
-        const data = getSparkData('music-maker');
-        if (data?.songs) setSongs(data.songs);
-        setDataLoaded(true);
-    }, []);
-
-    useEffect(() => {
-        if (!dataLoaded) return;
-        setSparkData('music-maker', { songs });
-    }, [songs, dataLoaded]);
-
-    // AI Generator State
-    const [isGeneratorVisible, setIsGeneratorVisible] = useState(false);
-    const [generatorPrompt, setGeneratorPrompt] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [selectedSpeechVoice, setSelectedSpeechVoice] = useState<string | null>(null);
-    const [speechVoices, setSpeechVoices] = useState<Speech.Voice[]>([]);
-    const [speechPitch, setSpeechPitch] = useState(1.0);
-    const [speechRate, setSpeechRate] = useState(0.9);
-    const speechTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
-
     // Notation Toggles
     const [showFlats, setShowFlats] = useState(false);
     const [showSharps, setShowSharps] = useState(true);
@@ -153,9 +313,9 @@ const MusicMakerSpark: React.FC<{
     const [selectedDrumPattern, setSelectedDrumPattern] = useState('Basic Rock');
     const [playWithDrums, setPlayWithDrums] = useState(false);
     const [playIntro, setPlayIntro] = useState(false);
-    const [patternRepeats, setPatternRepeats] = useState(1); // 1-4 times per bar
+    const [strumDensity, setStrumDensity] = useState(1); // 1-16 times per bar
     const [isMixerExpanded, setIsMixerExpanded] = useState(false);
-
+    const [showMixerHelp, setShowMixerHelp] = useState(false);
 
     // State for advanced rhythm
     const [swing, setSwing] = useState(0); // 0 to 0.5
@@ -167,26 +327,230 @@ const MusicMakerSpark: React.FC<{
     const [chordVolume, setChordVolume] = useState(0.6);
     const [drumVolume, setDrumVolume] = useState(0.6);
 
+    const isHydrated = useSparkStore(state => state.isHydrated);
+
+    useEffect(() => {
+        if (!isHydrated) return;
+        if (dataLoaded) return;
+
+        console.log('[MusicMaker] Hydrated, loading data...');
+        const data = getSparkData('music-maker');
+        if (data) {
+            if (data.songs) setSongs(data.songs);
+            if (data.swing !== undefined) setSwing(data.swing);
+            if (data.humanize !== undefined) setHumanize(data.humanize);
+            if (data.accentAmount !== undefined) setAccentAmount(data.accentAmount);
+            if (data.voiceVolume !== undefined) setVoiceVolume(data.voiceVolume);
+            if (data.chordVolume !== undefined) setChordVolume(data.chordVolume);
+            if (data.drumVolume !== undefined) setDrumVolume(data.drumVolume);
+            if (data.showFlats !== undefined) setShowFlats(data.showFlats);
+            if (data.showSharps !== undefined) setShowSharps(data.showSharps);
+            if (data.showWhole !== undefined) setShowWhole(data.showWhole);
+            if (data.strumDensity !== undefined) setStrumDensity(data.strumDensity);
+            if (data.selectedRhythm) setSelectedRhythm(data.selectedRhythm);
+            if (data.selectedDrumPattern) setSelectedDrumPattern(data.selectedDrumPattern);
+            if (data.playIntro !== undefined) setPlayIntro(data.playIntro);
+            if (data.playWithDrums !== undefined) setPlayWithDrums(data.playWithDrums);
+            if (data.playWithChords !== undefined) setPlayWithChords(data.playWithChords);
+        }
+        setDataLoaded(true);
+    }, [isHydrated, getSparkData, dataLoaded]);
+
+    useEffect(() => {
+        if (!isHydrated || !dataLoaded) return;
+
+        console.log('[MusicMaker] Saving data...');
+        setSparkData('music-maker', {
+            songs,
+            swing,
+            humanize,
+            accentAmount,
+            voiceVolume,
+            chordVolume,
+            drumVolume,
+            showFlats,
+            showSharps,
+            showWhole,
+            strumDensity,
+            selectedRhythm,
+            selectedDrumPattern,
+            playIntro,
+            playWithDrums,
+            playWithChords
+        });
+    }, [
+        songs, swing, humanize, accentAmount,
+        voiceVolume, chordVolume, drumVolume,
+        showFlats, showSharps, showWhole,
+        strumDensity, selectedRhythm, selectedDrumPattern,
+        playIntro, playWithDrums, playWithChords,
+        isHydrated, dataLoaded
+    ]);
+
+    // AI Generator State
+    const [isGeneratorVisible, setIsGeneratorVisible] = useState(false);
+    const [generatorPrompt, setGeneratorPrompt] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [selectedSpeechVoice, setSelectedSpeechVoice] = useState<string | null>(null);
+    const [speechVoices, setSpeechVoices] = useState<Speech.Voice[]>([]);
+    const [speechPitch, setSpeechPitch] = useState(1.0);
+    const [speechRate, setSpeechRate] = useState(0.9);
+    const speechTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+    const [isLoadingPlayback, setIsLoadingPlayback] = useState(false);
+    const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+    const { preferences } = useAppStore();
+
     // Playback Context for Chords (Web)
     const playbackContextRef = useRef<AudioContext | null>(null);
     const progressFrameRef = useRef<number | null>(null);
+    const audioStartTimeRef = useRef<number>(0);
+    const aiSpeechRef = useRef<{
+        voiceId?: string;
+        pitch: number;
+        rate: number;
+        nextIndex: number;
+    } | null>(null);
+    const activeIntroDelayRef = useRef<number>(0);
     const isPlayingRef = useRef(false);
+
+    const stopAllPlayback = async () => {
+        // 1. Stop and Unload Native Vocals (expo-av)
+        if (soundRef.current) {
+            try {
+                await soundRef.current.stopAsync();
+                await soundRef.current.unloadAsync();
+                soundRef.current = null;
+            } catch (e) { }
+        }
+
+        // Ensure soundRef is always cleared if something failed
+        soundRef.current = null;
+
+        // 2. Stop Web Accompaniment (Web Audio API)
+        if (playbackContextRef.current) {
+            try {
+                playbackContextRef.current.close();
+                playbackContextRef.current = null;
+            } catch (e) { }
+        }
+
+        // 3. Stop AI Vocals (expo-speech)
+        Speech.stop();
+        speechTimeoutsRef.current.forEach(clearTimeout);
+        speechTimeoutsRef.current = [];
+
+        // 4. Cleanup Animation Frames & State
+        if (progressFrameRef.current) {
+            cancelAnimationFrame(progressFrameRef.current);
+            progressFrameRef.current = null;
+        }
+        aiSpeechRef.current = null;
+        audioStartTimeRef.current = 0;
+        activeIntroDelayRef.current = 0;
+
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+        setPlaybackPosition(0);
+    };
+
+    const updateSongName = (newName: string) => {
+        if (!selectedSong) return;
+        const updatedSong = { ...selectedSong, songName: newName };
+        setSelectedSong(updatedSong);
+        // Sync with the master songs list
+        setSongs(prev => prev.map(s => s.vocalUri === selectedSong.vocalUri ? updatedSong : s));
+    };
 
 
     useEffect(() => {
         const loadVoices = async () => {
             const voices = await Speech.getAvailableVoicesAsync();
-            console.log(`[AI Song] Loaded ${voices.length} available voices.`);
-            setSpeechVoices(voices);
-            if (voices.length > 0) {
-                // Find a nice default if possible
-                const preferred = voices.find(v => v.language.includes('en') && v.quality === Speech.VoiceQuality.Enhanced);
-                setSelectedSpeechVoice(preferred?.identifier || voices[0].identifier);
-                console.log(`[AI Song] Default voice selected: ${preferred?.identifier || voices[0].identifier}`);
+
+            // Filter and Sort: Premium/Enhanced voices first, then standard. 
+            // Focus on English but allow common variants.
+            const filtered = voices
+                .filter(v => ['en', 'en-US', 'en-GB', 'en-AU', 'en-IN', 'en-CA'].some(lang => v.language.startsWith(lang)))
+                .sort((a, b) => {
+                    // Enhanced quality first
+                    if (a.quality === Speech.VoiceQuality.Enhanced && b.quality !== Speech.VoiceQuality.Enhanced) return -1;
+                    if (a.quality !== Speech.VoiceQuality.Enhanced && b.quality === Speech.VoiceQuality.Enhanced) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+            console.log(`[AI Song]Found ${ filtered.length
+} interesting voices.`);
+            setSpeechVoices(filtered);
+
+            // Auto-select voice based on accent if not manually set
+            const accent = preferences.aiVoiceAccent;
+            const accentToLang: Record<string, string> = {
+                'british': 'en-GB',
+                'australian': 'en-AU',
+                'east-indian': 'en-IN',
+                'canadian': 'en-CA',
+                'scottish': 'en-GB',
+                'southern-blues-male': 'en-US',
+                'southern-blues-female': 'en-US',
+                'chipmunk': 'en-US',
+                'crooner': 'en-US',
+                'neil-young': 'en-US',
+                'stevie-nicks': 'en-US',
+                'bob-dylan': 'en-US',
+                'patsy-cline': 'en-US',
+                'hank-williams': 'en-US',
+            };
+
+            const targetLang = accentToLang[accent];
+            let bestVoice;
+
+            if (targetLang) {
+                bestVoice = filtered.find(v => v.language.startsWith(targetLang) && v.quality === Speech.VoiceQuality.Enhanced)
+                    || filtered.find(v => v.language.startsWith(targetLang));
+            }
+
+            if (!bestVoice) {
+                bestVoice = filtered.find(v => v.quality === Speech.VoiceQuality.Enhanced) || filtered[0];
+            }
+
+            if (bestVoice) {
+                setSelectedSpeechVoice(bestVoice.identifier);
+            }
+
+            // Adjust pitch/rate for specific styles
+            if (accent === 'southern-blues-male') {
+                setSpeechPitch(0.8);
+                setSpeechRate(0.8);
+            } else if (accent === 'southern-blues-female') {
+                setSpeechPitch(0.9);
+                setSpeechRate(0.85);
+            } else if (accent === 'chipmunk') {
+                setSpeechPitch(1.8);
+                setSpeechRate(1.2);
+            } else if (accent === 'crooner') {
+                setSpeechPitch(0.85);
+                setSpeechRate(0.85);
+            } else if (accent === 'neil-young') {
+                setSpeechPitch(1.2); // Nasal high tenor
+                setSpeechRate(0.85); // Slightly slower/wavering
+            } else if (accent === 'stevie-nicks') {
+                setSpeechPitch(0.9); // Raspy/mystical vibe
+                setSpeechRate(0.8); // Smooth, velvety flow
+            } else if (accent === 'bob-dylan') {
+                setSpeechPitch(1.1); // Nasal talk-singing
+                setSpeechRate(0.9); // Rhythmic folk style
+            } else if (accent === 'patsy-cline') {
+                setSpeechPitch(1.0); // Natural but emotive
+                setSpeechRate(0.85); // Smooth, steady flow
+            } else if (accent === 'hank-williams') {
+                setSpeechPitch(1.1); // Slightly nasal honky-tonk
+                setSpeechRate(0.9); // Lonesome folk tempo
+            } else {
+                setSpeechPitch(1.0);
+                setSpeechRate(0.9);
             }
         };
         loadVoices();
-    }, []);
+    }, [preferences.aiVoiceAccent]);
 
     // --- Tuner Logic ---
     const startTuning = async () => {
@@ -410,7 +774,7 @@ const MusicMakerSpark: React.FC<{
         } catch (error: any) {
             console.error('Start Recording Error:', error);
             setIsRecording(false);
-            Alert.alert('Recording Error', `Could not start: ${error.message}`);
+            Alert.alert('Recording Error', `Could not start: ${ error.message } `);
             recordingRef.current = null;
         }
     };
@@ -433,7 +797,7 @@ const MusicMakerSpark: React.FC<{
                 // Actually MusicMakerService handles fetch.
                 // We'll trust the extension/mime inference or basic blob fetch.
                 console.log('Recording stopped, URI:', uri);
-                const result = await MusicMakerService.analyzeVocalRecording(uri, `Song ${songs.length + 1}`);
+                const result = await MusicMakerService.analyzeVocalRecording(uri, `Song ${ songs.length + 1 } `);
                 setSongs(prev => [...prev, result]);
                 setSelectedSong(result);
             } else {
@@ -441,7 +805,11 @@ const MusicMakerSpark: React.FC<{
             }
         } catch (error) {
             console.error('Stop and Analyze Error:', error);
-            Alert.alert('Analysis Failed', 'Could not process the recording.');
+            if (GeminiService.isApiKeyError(error)) {
+                GeminiService.handleApiKeyError(error);
+            } else {
+                Alert.alert('Analysis Failed', 'Could not process the recording.');
+            }
         } finally {
             setIsAnalyzing(false);
             // Switch back to playback mode
@@ -452,13 +820,14 @@ const MusicMakerSpark: React.FC<{
     const handleGenerateAISong = async () => {
         if (!generatorPrompt.trim()) return;
 
+        await stopAllPlayback();
         setIsGenerating(true);
         setIsGeneratorVisible(false);
         setIsAnalyzing(true);
         HapticFeedback.medium();
 
         try {
-            const songData = await MusicMakerService.generateAISong(generatorPrompt);
+            const songData = await MusicMakerService.generateAISong(generatorPrompt, preferences.aiVoiceAccent);
 
             // For AI songs, we use a special URI scheme: ai://voiceId?p=pitch&r=rate
             const aiResult: MusicAnalysisResult = {
@@ -466,297 +835,301 @@ const MusicMakerSpark: React.FC<{
                 vocalUri: `ai://${selectedSpeechVoice || 'default'}?p=${speechPitch}&r=${speechRate}`
             };
 
-            setSongs(prev => [...prev, aiResult]);
-            setSelectedSong(aiResult);
+setSongs(prev => [...prev, aiResult]);
+setSelectedSong(aiResult);
 
-            Alert.alert('Song Created!', `"${aiResult.songName}" has been generated. Tap Play to hear the AI sing it!`);
+Alert.alert('Song Created!', `"${aiResult.songName}" has been generated. Tap Play to hear the AI sing it!`);
         } catch (error) {
-            console.error('AI Generation Error:', error);
-            Alert.alert('Generation Failed', 'Could not create the AI song. Please try again.');
+    console.error('AI Generation Error:', error);
+    if (GeminiService.isApiKeyError(error)) {
+        GeminiService.handleApiKeyError(error);
+    } else {
+        Alert.alert('Generation Failed', 'Could not create the AI song. Please try again.');
+    }
+} finally {
+    setIsGenerating(false);
+    setIsAnalyzing(false);
+}
+    };
+
+const [playbackPosition, setPlaybackPosition] = useState(0);
+const [isPlaying, setIsPlaying] = useState(false);
+const soundRef = useRef<Audio.Sound | null>(null);
+
+const audioBufferToWav = (buffer: AudioBuffer) => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+
+    const data = buffer.getChannelData(0);
+    const dataLength = data.length * bytesPerSample;
+    const bufferLength = 44 + dataLength;
+
+    const arrayBuffer = new ArrayBuffer(bufferLength);
+    const view = new DataView(arrayBuffer);
+
+    const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    let offset = 44;
+    for (let i = 0; i < data.length; i++) {
+        const sample = Math.max(-1, Math.min(1, data[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+    }
+
+    return arrayBuffer;
+};
+
+const exportSong = async () => {
+    if (!selectedSong) return;
+
+    // On Web, implement Audio Export
+    if (Platform.OS === 'web') {
+        try {
+            setIsAnalyzing(true);
+
+            // 1. Fetch and Decode Vocal Audio
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const tempCtx = new AudioContextClass();
+            const response = await fetch(selectedSong.vocalUri);
+            const arrayBuffer = await response.arrayBuffer();
+            const vocalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+
+            // 2. Calculate intro delay and total duration
+            let introDuration = 0;
+            let topChords: string[] = [];
+
+            if (playIntro) {
+                const chordCounts: Record<string, number> = {};
+                selectedSong.lyrics.forEach(line => {
+                    const chords = line.chords.split(' ');
+                    chords.forEach(c => {
+                        if (c) chordCounts[c] = (chordCounts[c] || 0) + 1;
+                    });
+                });
+                topChords = Object.entries(chordCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([chord]) => chord);
+
+                const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
+                introDuration = beatDuration * 2 * topChords.length;
+            }
+
+            // Extra buffer for reverb tail etc
+            const totalDuration = introDuration + vocalBuffer.duration + 2;
+            const sampleRate = 44100;
+
+            // 3. Create Offline Context
+            const offlineCtx = new OfflineAudioContext(1, sampleRate * totalDuration, sampleRate);
+
+            // 4. Schedule Vocals
+            const vocalSource = offlineCtx.createBufferSource();
+            vocalSource.buffer = vocalBuffer;
+            const vocalGain = offlineCtx.createGain();
+            vocalGain.gain.value = voiceVolume;
+            vocalSource.connect(vocalGain);
+            vocalGain.connect(offlineCtx.destination);
+            vocalSource.start(introDuration);
+
+            // 5. Synthesize Chords & Drums (Copy logic from playSong)
+            const ctx = offlineCtx; // Alias for reuse
+
+            // --- INTRO ---
+            if (playIntro) {
+                const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
+
+                topChords.forEach((chord, idx) => {
+                    const freqs = getChordFrequencies(chord);
+                    const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['Downstrum'];
+
+                    freqs.forEach((freq, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+
+                        // Corrected .time access
+                        const strum = rhythm.strums[i % rhythm.strums.length];
+                        const strumTime = strum.time * (beatDuration * 4); // Full bar duration
+                        const startTime = (idx * beatDuration * 2) + strumTime;
+                        const duration = beatDuration * 2;
+
+                        gain.gain.setValueAtTime(0, 0); // Safe start
+                        gain.gain.linearRampToValueAtTime(0.1 * chordVolume, startTime + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+
+                        osc.start(startTime);
+                        osc.stop(startTime + duration);
+                    });
+                });
+            }
+
+            // --- DRUMS ---
+            if (playWithDrums && selectedSong.bpm) {
+                const beatDuration = 60 / selectedSong.bpm;
+                const finalTime = introDuration + selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
+                const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
+
+                for (let t = introDuration; t < finalTime; t += (beatDuration * 4)) {
+                    pattern.forEach((note: any) => {
+                        const time = t + note.time * beatDuration;
+
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+
+                        if (note.type === 'kick') {
+                            osc.frequency.setValueAtTime(150, time);
+                            osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+                            gain.gain.setValueAtTime(1 * drumVolume, time);
+                            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+                        } else if (note.type === 'snare') {
+                            osc.type = 'triangle';
+                            osc.frequency.setValueAtTime(100, time);
+                            gain.gain.setValueAtTime(0.5 * drumVolume, time);
+                            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                        } else {
+                            // hihat
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(800, time);
+                            gain.gain.setValueAtTime(0.3 * drumVolume, time);
+                            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+                        }
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+
+                        osc.start(time);
+                        osc.stop(time + 0.5);
+                    });
+                }
+            }
+
+            // --- CHORDS ---
+            if (playWithChords) {
+                const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['D D D U'];
+                const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
+                const barDuration = beatDuration * 4;
+
+                selectedSong.lyrics.forEach(line => {
+                    const chords = line.chords.split(' ');
+                    const firstChord = chords[0];
+                    if (firstChord) {
+                        const freqs = getChordFrequencies(firstChord);
+
+                        for (let repeat = 0; repeat < strumDensity; repeat++) {
+                            const repeatOffset = (barDuration / strumDensity) * repeat;
+
+                            rhythm.strums.forEach((strum, strumIdx) => {
+                                const strumTimeFactor = barDuration / strumDensity;
+
+                                // Apply Swing
+                                let adjustedStrumTime = strum.time * strumTimeFactor;
+                                const isOffBeat = (strum.time * 8) % 2 !== 0; // Simple off-beat check for 8ths
+                                if (isOffBeat) {
+                                    adjustedStrumTime += swing * (strumTimeFactor / 8);
+                                }
+
+                                // Apply Humanize
+                                const jitter = (Math.random() - 0.5) * humanize * beatDuration;
+                                const startTime = introDuration + line.startTime + repeatOffset + adjustedStrumTime + jitter;
+                                const duration = 1.5;
+
+                                // Apply Accent
+                                const volumeMult = strum.accent ? accentAmount : (1 / (accentAmount || 1));
+
+                                freqs.forEach((freq, i) => {
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+
+                                    osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
+                                    osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
+
+                                    gain.gain.setValueAtTime(0, 0);
+
+                                    // Strumming effect: delay higher strings slightly
+                                    const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
+                                    const finalStart = startTime + stringDelay;
+
+                                    gain.gain.linearRampToValueAtTime(0.1 * chordVolume * volumeMult, finalStart + 0.02);
+                                    gain.gain.exponentialRampToValueAtTime(0.001, finalStart + duration);
+
+                                    osc.connect(gain);
+                                    gain.connect(ctx.destination);
+
+                                    osc.start(finalStart);
+                                    osc.stop(finalStart + duration);
+                                });
+                            });
+                        }
+                    }
+                });
+            }
+
+            // 6. Render
+            const renderedBuffer = await offlineCtx.startRendering();
+
+            // 7. Convert to Wav
+            const wavBuffer = audioBufferToWav(renderedBuffer);
+            const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+
+            // 8. Download
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${selectedSong.songName}.wav`;
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+
+            tempCtx.close();
+
+        } catch (err) {
+            console.error('Export Failed', err);
+            Alert.alert('Export Failed', 'Could not generate audio file.');
         } finally {
-            setIsGenerating(false);
             setIsAnalyzing(false);
         }
-    };
+        return;
+    }
 
-    const [playbackPosition, setPlaybackPosition] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const soundRef = useRef<Audio.Sound | null>(null);
+    try {
+        const lines = selectedSong.lyrics.map(l =>
+            `[${l.chords}] ${l.text}`
+        ).join('\\n');
 
-    const audioBufferToWav = (buffer: AudioBuffer) => {
-        const numChannels = buffer.numberOfChannels;
-        const sampleRate = buffer.sampleRate;
-        const format = 1; // PCM
-        const bitDepth = 16;
-
-        const bytesPerSample = bitDepth / 8;
-        const blockAlign = numChannels * bytesPerSample;
-
-        const data = buffer.getChannelData(0);
-        const dataLength = data.length * bytesPerSample;
-        const bufferLength = 44 + dataLength;
-
-        const arrayBuffer = new ArrayBuffer(bufferLength);
-        const view = new DataView(arrayBuffer);
-
-        const writeString = (view: DataView, offset: number, string: string) => {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        };
-
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 36 + dataLength, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, format, true);
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * blockAlign, true);
-        view.setUint16(32, blockAlign, true);
-        view.setUint16(34, bitDepth, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, dataLength, true);
-
-        let offset = 44;
-        for (let i = 0; i < data.length; i++) {
-            const sample = Math.max(-1, Math.min(1, data[i]));
-            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-            offset += 2;
-        }
-
-        return arrayBuffer;
-    };
-
-    const exportSong = async () => {
-        if (!selectedSong) return;
-
-        // On Web, implement Audio Export
-        if (Platform.OS === 'web') {
-            try {
-                setIsAnalyzing(true);
-
-                // 1. Fetch and Decode Vocal Audio
-                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-                const tempCtx = new AudioContextClass();
-                const response = await fetch(selectedSong.vocalUri);
-                const arrayBuffer = await response.arrayBuffer();
-                const vocalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
-
-                // 2. Calculate intro delay and total duration
-                let introDuration = 0;
-                let topChords: string[] = [];
-
-                if (playIntro) {
-                    const chordCounts: Record<string, number> = {};
-                    selectedSong.lyrics.forEach(line => {
-                        const chords = line.chords.split(' ');
-                        chords.forEach(c => {
-                            if (c) chordCounts[c] = (chordCounts[c] || 0) + 1;
-                        });
-                    });
-                    topChords = Object.entries(chordCounts)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 3)
-                        .map(([chord]) => chord);
-
-                    const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-                    introDuration = beatDuration * 2 * topChords.length;
-                }
-
-                // Extra buffer for reverb tail etc
-                const totalDuration = introDuration + vocalBuffer.duration + 2;
-                const sampleRate = 44100;
-
-                // 3. Create Offline Context
-                const offlineCtx = new OfflineAudioContext(1, sampleRate * totalDuration, sampleRate);
-
-                // 4. Schedule Vocals
-                const vocalSource = offlineCtx.createBufferSource();
-                vocalSource.buffer = vocalBuffer;
-                const vocalGain = offlineCtx.createGain();
-                vocalGain.gain.value = voiceVolume;
-                vocalSource.connect(vocalGain);
-                vocalGain.connect(offlineCtx.destination);
-                vocalSource.start(introDuration);
-
-                // 5. Synthesize Chords & Drums (Copy logic from playSong)
-                const ctx = offlineCtx; // Alias for reuse
-
-                // --- INTRO ---
-                if (playIntro) {
-                    const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-
-                    topChords.forEach((chord, idx) => {
-                        const freqs = getChordFrequencies(chord);
-                        const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['Downstrum'];
-
-                        freqs.forEach((freq, i) => {
-                            const osc = ctx.createOscillator();
-                            const gain = ctx.createGain();
-
-                            osc.type = 'triangle';
-                            osc.frequency.value = freq;
-
-                            // Corrected .time access
-                            const strum = rhythm.strums[i % rhythm.strums.length];
-                            const strumTime = strum.time * (beatDuration * 4); // Full bar duration
-                            const startTime = (idx * beatDuration * 2) + strumTime;
-                            const duration = beatDuration * 2;
-
-                            gain.gain.setValueAtTime(0, 0); // Safe start
-                            gain.gain.linearRampToValueAtTime(0.1 * chordVolume, startTime + 0.02);
-                            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
-                            osc.connect(gain);
-                            gain.connect(ctx.destination);
-
-                            osc.start(startTime);
-                            osc.stop(startTime + duration);
-                        });
-                    });
-                }
-
-                // --- DRUMS ---
-                if (playWithDrums && selectedSong.bpm) {
-                    const beatDuration = 60 / selectedSong.bpm;
-                    const finalTime = introDuration + selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
-                    const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
-
-                    for (let t = introDuration; t < finalTime; t += (beatDuration * 4)) {
-                        pattern.forEach((note: any) => {
-                            const time = t + note.time * beatDuration;
-
-                            const osc = ctx.createOscillator();
-                            const gain = ctx.createGain();
-
-                            if (note.type === 'kick') {
-                                osc.frequency.setValueAtTime(150, time);
-                                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
-                                gain.gain.setValueAtTime(1 * drumVolume, time);
-                                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
-                            } else if (note.type === 'snare') {
-                                osc.type = 'triangle';
-                                osc.frequency.setValueAtTime(100, time);
-                                gain.gain.setValueAtTime(0.5 * drumVolume, time);
-                                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
-                            } else {
-                                // hihat
-                                osc.type = 'square';
-                                osc.frequency.setValueAtTime(800, time);
-                                gain.gain.setValueAtTime(0.3 * drumVolume, time);
-                                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
-                            }
-
-                            osc.connect(gain);
-                            gain.connect(ctx.destination);
-
-                            osc.start(time);
-                            osc.stop(time + 0.5);
-                        });
-                    }
-                }
-
-                // --- CHORDS ---
-                if (playWithChords) {
-                    const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['D D D U'];
-                    const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-                    const barDuration = beatDuration * 4;
-
-                    selectedSong.lyrics.forEach(line => {
-                        const chords = line.chords.split(' ');
-                        const firstChord = chords[0];
-                        if (firstChord) {
-                            const freqs = getChordFrequencies(firstChord);
-
-                            for (let repeat = 0; repeat < patternRepeats; repeat++) {
-                                const repeatOffset = (barDuration / patternRepeats) * repeat;
-
-                                rhythm.strums.forEach((strum, strumIdx) => {
-                                    const strumTimeFactor = barDuration / patternRepeats;
-
-                                    // Apply Swing
-                                    let adjustedStrumTime = strum.time * strumTimeFactor;
-                                    const isOffBeat = (strum.time * 8) % 2 !== 0; // Simple off-beat check for 8ths
-                                    if (isOffBeat) {
-                                        adjustedStrumTime += swing * (strumTimeFactor / 8);
-                                    }
-
-                                    // Apply Humanize
-                                    const jitter = (Math.random() - 0.5) * humanize * beatDuration;
-                                    const startTime = introDuration + line.startTime + repeatOffset + adjustedStrumTime + jitter;
-                                    const duration = 1.5;
-
-                                    // Apply Accent
-                                    const volumeMult = strum.accent ? accentAmount : (1 / (accentAmount || 1));
-
-                                    freqs.forEach((freq, i) => {
-                                        const osc = ctx.createOscillator();
-                                        const gain = ctx.createGain();
-
-                                        osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
-                                        osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
-
-                                        gain.gain.setValueAtTime(0, 0);
-
-                                        // Strumming effect: delay higher strings slightly
-                                        const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
-                                        const finalStart = startTime + stringDelay;
-
-                                        gain.gain.linearRampToValueAtTime(0.1 * chordVolume * volumeMult, finalStart + 0.02);
-                                        gain.gain.exponentialRampToValueAtTime(0.001, finalStart + duration);
-
-                                        osc.connect(gain);
-                                        gain.connect(ctx.destination);
-
-                                        osc.start(finalStart);
-                                        osc.stop(finalStart + duration);
-                                    });
-                                });
-                            }
-                        }
-                    });
-                }
-
-                // 6. Render
-                const renderedBuffer = await offlineCtx.startRendering();
-
-                // 7. Convert to Wav
-                const wavBuffer = audioBufferToWav(renderedBuffer);
-                const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-                const url = URL.createObjectURL(blob);
-
-                // 8. Download
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `${selectedSong.songName}.wav`;
-                document.body.appendChild(a);
-                a.click();
-
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-
-                tempCtx.close();
-
-            } catch (err) {
-                console.error('Export Failed', err);
-                Alert.alert('Export Failed', 'Could not generate audio file.');
-            } finally {
-                setIsAnalyzing(false);
-            }
-            return;
-        }
-
-        try {
-            const lines = selectedSong.lyrics.map(l =>
-                `[${l.chords}] ${l.text}`
-            ).join('\\n');
-
-            const content = `
+        const content = `
 ${selectedSong.songName}
 Key: ${selectedSong.key} | BPM: ${selectedSong.bpm}
 
@@ -765,679 +1138,874 @@ ${lines}
 Generated by Sparks App
             `.trim();
 
-            await Share.share({
-                message: content,
-                title: selectedSong.songName
-            });
-        } catch (error) {
-            Alert.alert('Export Error', 'Could not share song.');
+        await Share.share({
+            message: content,
+            title: selectedSong.songName
+        });
+    } catch (error) {
+        Alert.alert('Export Error', 'Could not share song.');
+    }
+};
+
+const playHarmonicaNote = (ctx: BaseAudioContext, freq: number, startTime: number, duration: number, volume: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    const vibrato = ctx.createOscillator();
+    const vibratoGain = ctx.createGain();
+
+    // Waveform: Sawtooth for that "reed" bite
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, startTime);
+
+    // Pitch Scoop: Start slightly flat and bend up
+    osc.frequency.setTargetAtTime(freq, startTime, 0.05);
+    osc.frequency.setValueAtTime(freq * 0.98, startTime);
+
+    // Filter: Mellow out the sawtooth
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, startTime);
+    filter.Q.setValueAtTime(5, startTime);
+
+    // Vibrato (LFO)
+    vibrato.frequency.setValueAtTime(6, startTime); // 6Hz pulse
+    vibratoGain.gain.setValueAtTime(freq * 0.005, startTime);
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc.frequency);
+
+    // Volume Envelope
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.3 * volume, startTime + 0.05);
+    gain.gain.linearRampToValueAtTime(0.2 * volume, startTime + duration - 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    vibrato.start(startTime);
+    osc.start(startTime);
+
+    vibrato.stop(startTime + duration + 0.1);
+    osc.stop(startTime + duration + 0.1);
+};
+
+const createDrumSound = (ctx: BaseAudioContext, type: 'kick' | 'snare' | 'hihat', time: number) => {
+    // Helper if used, but largely inlined
+};
+
+const formatNote = (note: string) => {
+    if (!showWhole && !note.includes('#') && !note.includes('b')) return '';
+    if (!showSharps && note.includes('#')) return '';
+    if (!showFlats && note.includes('b')) return '';
+    return note;
+};
+
+
+const playSong = async () => {
+    if (!selectedSong || isLoadingPlayback) return;
+
+    if (isPlaying) {
+        await stopAllPlayback();
+        return;
+    }
+
+    setIsLoadingPlayback(true);
+    try {
+        await setupAudioMode(false);
+        await stopAllPlayback();
+
+        const isAISong = selectedSong.vocalUri.startsWith('ai://');
+        const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
+
+        // 1. Determine if we need a harmonica intro
+        const introKeywords = ['harmonica', 'solo', 'intro'];
+        const hasHarmonicaInstruction = selectedSong.lyrics.some(l => {
+            const text = l.text.toLowerCase();
+            return text.includes('harmonica') || (text.includes('intro') && text.includes('solo'));
+        });
+        const introDelay = playIntro ? (beatDuration * 8) : 0; // 2 bars (8 beats) intro
+        activeIntroDelayRef.current = introDelay;
+
+        if (isAISong) {
+            const uri = selectedSong.vocalUri;
+            const voiceIdPart = uri.replace('ai://', '').split('?')[0];
+            const searchParams = new URLSearchParams(uri.includes('?') ? uri.split('?')[1] : '');
+            const voiceId = voiceIdPart === 'default' ? undefined : voiceIdPart;
+            const p = parseFloat(searchParams.get('p') || '1.0');
+            const r = parseFloat(searchParams.get('r') || '0.9');
+
+            console.log(`[AI Song] Sync start initialized. Voice: ${voiceId || 'default'}, Pitch: ${p}, Rate: ${r}, Intro: ${introDelay}s`);
+
+            // Store AI state in ref for safe frame-based access
+            aiSpeechRef.current = {
+                voiceId,
+                pitch: p,
+                rate: r,
+                nextIndex: 0
+            };
+        } else {
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: selectedSong.vocalUri },
+                { shouldPlay: false, volume: voiceVolume }
+            );
+            soundRef.current = sound;
         }
-    };
 
-    const createDrumSound = (ctx: BaseAudioContext, type: 'kick' | 'snare' | 'hihat', time: number) => {
-        // Helper if used, but largely inlined
-    };
+        // Start accompaniment (if any)
+        if ((playWithChords || playWithDrums || playIntro) && Platform.OS === 'web') {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new AudioContextClass();
+            playbackContextRef.current = ctx;
+            if (ctx.state === 'suspended') await ctx.resume();
 
-    const formatNote = (note: string) => {
-        if (!showWhole && !note.includes('#') && !note.includes('b')) return '';
-        if (!showSharps && note.includes('#')) return '';
-        if (!showFlats && note.includes('b')) return '';
-        return note;
-    };
+            const startTime = ctx.currentTime + 0.1;
+            audioStartTimeRef.current = startTime;
 
-
-    const playSong = async () => {
-        if (!selectedSong) return;
-
-        if (isPlaying) {
-            await soundRef.current?.stopAsync();
-            setIsPlaying(false);
-            isPlayingRef.current = false;
-            Speech.stop();
-            speechTimeoutsRef.current.forEach(clearTimeout);
-            speechTimeoutsRef.current = [];
-            setPlaybackPosition(0);
-
-            if (playbackContextRef.current) {
-                playbackContextRef.current.close();
-                playbackContextRef.current = null;
-            }
-            if (progressFrameRef.current) {
-                cancelAnimationFrame(progressFrameRef.current);
-                progressFrameRef.current = null;
-            }
-            return;
-        }
-
-        try {
-            await setupAudioMode(false);
-
-            let introDelay = 0;
+            // --- Intro Logic ---
             if (playIntro) {
-                const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-                introDelay = beatDuration * 2 * 3; // Approx 3 chords
-            }
-
-            const isAISong = selectedSong.vocalUri.startsWith('ai://');
-
-            if (isAISong) {
-                // Parse URI manually: ai://voiceId?p=pitch&r=rate
-                // URL constructor might fail on non-standard schemes in some environments
-                const uri = selectedSong.vocalUri;
-                const voiceIdPart = uri.replace('ai://', '').split('?')[0];
-                const searchParams = new URLSearchParams(uri.includes('?') ? uri.split('?')[1] : '');
-
-                const voiceId = voiceIdPart === 'default' ? undefined : voiceIdPart;
-                const p = parseFloat(searchParams.get('p') || '1.0');
-                const r = parseFloat(searchParams.get('r') || '0.9');
-
-                console.log(`[AI Song] Playing with voice: ${voiceId || 'system default'}, pitch: ${p}, rate: ${r}`);
-
+                const chordCounts: Record<string, number> = {};
                 selectedSong.lyrics.forEach(line => {
-                    const delay = (introDelay + line.startTime) * 1000;
-                    const tid = setTimeout(() => {
-                        if (!isPlayingRef.current) return;
-                        console.log(`[AI Song] Speaking line: ${line.text}`);
-                        Speech.speak(line.text, {
-                            voice: voiceId,
-                            rate: r,
-                            pitch: p,
-                            onError: (err: any) => console.error('[AI Song] Speech Error:', err)
-                        });
-                    }, delay);
-                    speechTimeoutsRef.current.push(tid);
+                    const chords = line.chords.split(' ');
+                    chords.forEach(c => { if (c) chordCounts[c] = (chordCounts[c] || 0) + 1; });
                 });
-            } else {
-                // WEB & NATIVE UNIFIED: Use expo-av for vocals
-                const { sound } = await Audio.Sound.createAsync(
-                    { uri: selectedSong.vocalUri },
-                    { shouldPlay: false, volume: voiceVolume }
-                );
-                soundRef.current = sound;
-            }
+                const topChords = Object.entries(chordCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([c]) => c);
+                const introChord1 = topChords[0] || 'G';
+                const introChord2 = topChords[1] || topChords[0] || 'C';
 
-            // Start accompaniment (if any)
-            if ((playWithChords || playWithDrums || playIntro) && Platform.OS === 'web') {
-                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-                const ctx = new AudioContextClass();
-                playbackContextRef.current = ctx;
-                if (ctx.state === 'suspended') await ctx.resume();
+                // Play 2 bars of intro
+                [0, 1, 2, 3, 4, 5, 6, 7].forEach((beat) => {
+                    const t = startTime + (beat * beatDuration);
+                    const isFirstBar = beat < 4;
+                    const chord = isFirstBar ? introChord1 : introChord2;
 
-                const startTime = ctx.currentTime + 0.1;
-
-                if (playIntro) {
-                    const chordCounts: Record<string, number> = {};
-                    selectedSong.lyrics.forEach(line => {
-                        const chords = line.chords.split(' ');
-                        chords.forEach(c => { if (c) chordCounts[c] = (chordCounts[c] || 0) + 1; });
-                    });
-                    const topChords = Object.entries(chordCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c);
-
-                    const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-
-                    topChords.forEach((chord, idx) => {
-                        const freqs = getChordFrequencies(chord);
-                        const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['D D D U'];
-                        freqs.forEach((freq, i) => {
-                            const osc = ctx.createOscillator();
-                            const gain = ctx.createGain();
-                            osc.type = 'triangle'; osc.frequency.value = freq;
-                            const strum = rhythm.strums[i % rhythm.strums.length];
-                            const strumTime = strum.time * beatDuration * 4;
-                            const t = startTime + (idx * beatDuration * 2) + strumTime;
-
-                            gain.gain.setValueAtTime(0, t);
-                            gain.gain.linearRampToValueAtTime(0.1 * chordVolume, t + 0.02);
-                            gain.gain.exponentialRampToValueAtTime(0.001, t + (beatDuration * 2));
-                            osc.connect(gain); gain.connect(ctx.destination);
-                            osc.start(t); osc.stop(t + (beatDuration * 2) + 1);
-                        });
-                    });
-                }
-
-                if (playWithChords) {
-                    const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['D D D U'];
-                    const beatDuration = selectedSong.bpm ? (60 / selectedSong.bpm) : 0.5;
-                    const barDuration = beatDuration * 4;
-                    selectedSong.lyrics.forEach(line => {
-                        const chords = line.chords.split(' ');
-                        const firstChord = chords[0];
-                        if (firstChord) {
-                            const freqs = getChordFrequencies(firstChord);
-                            for (let repeat = 0; repeat < patternRepeats; repeat++) {
-                                const repeatOffset = (barDuration / patternRepeats) * repeat;
-                                rhythm.strums.forEach((strum) => {
-                                    const strumTimeFactor = barDuration / patternRepeats;
-                                    let adjustedStrumTime = strum.time * strumTimeFactor;
-                                    if ((strum.time * 8) % 2 !== 0) adjustedStrumTime += swing * (strumTimeFactor / 8);
-
-                                    const jitter = (Math.random() - 0.5) * humanize * beatDuration;
-                                    const t = startTime + introDelay + line.startTime + repeatOffset + adjustedStrumTime + jitter;
-                                    const volumeMult = strum.accent ? accentAmount : (1 / (accentAmount || 1));
-
-                                    freqs.forEach((freq, i) => {
-                                        const osc = ctx.createOscillator();
-                                        const gain = ctx.createGain();
-                                        osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
-                                        osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
-                                        const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
-                                        const finalT = t + stringDelay;
-
-                                        gain.gain.setValueAtTime(0, finalT);
-                                        gain.gain.linearRampToValueAtTime(0.1 * chordVolume * volumeMult, finalT + 0.02);
-                                        gain.gain.exponentialRampToValueAtTime(0.001, finalT + 1.5);
-                                        osc.connect(gain); gain.connect(ctx.destination);
-                                        osc.start(finalT); osc.stop(finalT + 2);
-                                    });
-                                });
-                            }
+                    if (hasHarmonicaInstruction) {
+                        // Harmonica Intro: Play a melody note on the 1 and 3
+                        if (beat % 2 === 0) {
+                            const freqs = getChordFrequencies(chord);
+                            const noteFreq = freqs[freqs.length - 1] * (beat % 4 === 0 ? 1 : 1.25);
+                            playHarmonicaNote(ctx, noteFreq, t, beatDuration * 1.5, chordVolume);
                         }
-                    });
-                }
-
-                if (playWithDrums && selectedSong.bpm) {
-                    const beatDuration = 60 / selectedSong.bpm;
-                    const totalDuration = selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
-                    const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
-                    for (let t = 0; t < totalDuration; t += (beatDuration * 4)) {
-                        pattern.forEach((note: any) => {
-                            const noteStart = startTime + introDelay + t + note.time * beatDuration;
-                            const osc = ctx.createOscillator();
-                            const gain = ctx.createGain();
-                            if (note.type === 'kick') {
-                                osc.frequency.setValueAtTime(150, noteStart);
-                                osc.frequency.exponentialRampToValueAtTime(0.01, noteStart + 0.5);
-                                gain.gain.setValueAtTime(1 * drumVolume, noteStart);
-                                gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.5);
-                            } else if (note.type === 'snare') {
-                                osc.type = 'triangle'; osc.frequency.setValueAtTime(100, noteStart);
-                                gain.gain.setValueAtTime(0.5 * drumVolume, noteStart);
-                                gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.2);
-                            } else {
-                                osc.type = 'square'; osc.frequency.setValueAtTime(800, noteStart);
-                                gain.gain.setValueAtTime(0.3 * drumVolume, noteStart);
-                                gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.05);
-                            }
-                            osc.connect(gain); gain.connect(ctx.destination);
-                            osc.start(noteStart); osc.stop(noteStart + 0.5);
-                        });
-                    }
-                }
-            }
-
-            setIsPlaying(true);
-            isPlayingRef.current = true;
-            HapticFeedback.light();
-
-            if (soundRef.current) {
-                soundRef.current.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-                    if (status.isLoaded) {
-                        setPlaybackPosition(status.positionMillis / 1000);
-                        if (status.didJustFinish) {
-                            setIsPlaying(false);
-                            isPlayingRef.current = false;
-                            setPlaybackPosition(0);
-                        }
-                    }
-                });
-
-                if (introDelay > 0) {
-                    setTimeout(async () => {
-                        try { await soundRef.current?.playAsync(); } catch (e) { console.log('Play failed', e); }
-                    }, introDelay * 1000);
-                } else {
-                    await soundRef.current.playAsync();
-                }
-            } else if (isAISong) {
-                // For AI songs, manually track progress
-                const startT = Date.now();
-                const updateProgress = () => {
-                    if (!isPlayingRef.current) return;
-                    const elapsed = (Date.now() - startT) / 1000;
-                    setPlaybackPosition(elapsed);
-                    const maxT = selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
-                    if (elapsed < maxT) {
-                        progressFrameRef.current = requestAnimationFrame(updateProgress);
                     } else {
+                        // Guitar Intro: Simple strums
+                        const freqs = getChordFrequencies(chord);
+                        freqs.forEach((f, i) => {
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.type = 'triangle'; osc.frequency.value = f;
+                            gain.gain.setValueAtTime(0, t + (i * 0.01));
+                            gain.gain.linearRampToValueAtTime(0.08 * chordVolume, t + (i * 0.01) + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+                            osc.connect(gain); gain.connect(ctx.destination);
+                            osc.start(t + (i * 0.01)); osc.stop(t + 2);
+                        });
+                    }
+                });
+            }
+
+            // --- Main Accompaniment ---
+            if (playWithChords) {
+                const rhythm = RHYTHM_PATTERNS[selectedRhythm] || RHYTHM_PATTERNS['D D D U'];
+                const barDuration = beatDuration * 4;
+                const lastLine = selectedSong.lyrics[selectedSong.lyrics.length - 1];
+                // Play until 4 bars after the last lyric starts to ensure we cover the final vocal line and tail
+                const totalDuration = lastLine.startTime + (barDuration * 4);
+
+                let lastActiveChord = '';
+                let lyricIndex = 0;
+
+                for (let barOffset = 0; barOffset < totalDuration; barOffset += barDuration) {
+                    // 1. Update the active chord if we've reached a new lyric line
+                    while (lyricIndex < selectedSong.lyrics.length && selectedSong.lyrics[lyricIndex].startTime <= barOffset + 0.05) {
+                        const lineChords = selectedSong.lyrics[lyricIndex].chords?.trim().split(/\s+/).filter(c => c);
+                        if (lineChords && lineChords.length > 0) {
+                            lastActiveChord = lineChords[0];
+                        }
+                        lyricIndex++;
+                    }
+
+                    // 2. Play the accompaniment for this bar if we have a chord
+                    if (lastActiveChord) {
+                        const freqs = getChordFrequencies(lastActiveChord);
+                        for (let repeat = 0; repeat < strumDensity; repeat++) {
+                            const barPartDuration = barDuration / strumDensity;
+                            const repeatOffset = barPartDuration * repeat;
+
+                            rhythm.strums.forEach((strum) => {
+                                let adjustedStrumTime = strum.time * barPartDuration;
+                                if ((strum.time * 8) % 2 !== 0) adjustedStrumTime += swing * (barPartDuration / 8);
+
+                                const t = startTime + introDelay + barOffset + repeatOffset + adjustedStrumTime;
+                                const volumeMult = (strum.accent ? accentAmount : 1 / (accentAmount || 1)) * chordVolume;
+
+                                freqs.forEach((freq, i) => {
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+                                    osc.type = strum.type === 'bass' ? 'sine' : 'triangle';
+                                    osc.frequency.value = strum.type === 'bass' ? freq / 2 : freq;
+                                    const stringDelay = strum.type === 'up' ? (freqs.length - i) * 0.01 : i * 0.01;
+                                    const finalT = t + stringDelay;
+                                    gain.gain.setValueAtTime(0, finalT);
+                                    gain.gain.linearRampToValueAtTime(0.1 * volumeMult, finalT + 0.02);
+                                    gain.gain.exponentialRampToValueAtTime(0.001, finalT + 1.5);
+                                    osc.connect(gain); gain.connect(ctx.destination);
+                                    osc.start(finalT); osc.stop(finalT + 2);
+                                });
+                            });
+                        }
+                    }
+                }
+            }
+
+
+            if (playWithDrums) {
+                const totalDuration = selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + 5;
+                const pattern = (DRUM_PATTERNS as any)[selectedDrumPattern] || DRUM_PATTERNS['Basic Rock'];
+                for (let barT = 0; barT < totalDuration; barT += (beatDuration * 4)) {
+                    pattern.forEach((note: any) => {
+                        const noteStart = startTime + introDelay + barT + note.time * beatDuration;
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        if (note.type === 'kick') {
+                            osc.frequency.setValueAtTime(150, noteStart);
+                            osc.frequency.exponentialRampToValueAtTime(0.01, noteStart + 0.5);
+                            gain.gain.setValueAtTime(1 * drumVolume, noteStart);
+                        } else if (note.type === 'snare') {
+                            osc.type = 'triangle'; osc.frequency.setValueAtTime(100, noteStart);
+                            gain.gain.setValueAtTime(0.5 * drumVolume, noteStart);
+                        } else {
+                            osc.type = 'square'; osc.frequency.setValueAtTime(800, noteStart);
+                            gain.gain.setValueAtTime(0.3 * drumVolume, noteStart);
+                        }
+                        gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.1);
+                        osc.connect(gain); gain.connect(ctx.destination);
+                        osc.start(noteStart); osc.stop(noteStart + 0.5);
+                    });
+                }
+            }
+        }
+
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        HapticFeedback.light();
+
+        const startT = Date.now();
+        const updateProgress = () => {
+            if (!isPlayingRef.current) return;
+
+            let elapsed = (Date.now() - startT) / 1000;
+
+            // If on web and using AudioContext, use that for precision
+            if (playbackContextRef.current) {
+                elapsed = playbackContextRef.current.currentTime - audioStartTimeRef.current;
+            }
+
+            // If we have a native sound, let its own status update handle the position to avoid jitter
+            if (!soundRef.current) {
+                setPlaybackPosition(elapsed);
+            }
+
+            // --- Sync Speech Logic ---
+            const ai = aiSpeechRef.current;
+            if (ai && ai.nextIndex < selectedSong.lyrics.length) {
+                const nextLine = selectedSong.lyrics[ai.nextIndex];
+                if (elapsed >= (introDelay + nextLine.startTime - 0.05)) { // 50ms lookahead
+                    // Aggressive cleaning: remove [...], (...), ***, and lines that are JUST section names
+                    let cleanText = nextLine.text
+                        .replace(/\[.*?\]/g, '')
+                        .replace(/\(.*?\)/g, '')
+                        .replace(/\*+/g, '')
+                        .trim();
+
+                    const lower = cleanText.toLowerCase();
+                    const isInstructionOnly =
+                        lower === 'intro' ||
+                        lower === 'chorus' ||
+                        lower === 'verse' ||
+                        lower === 'bridge' ||
+                        lower === 'outro' ||
+                        lower.startsWith('verse ') ||
+                        lower.includes('harmonica') ||
+                        lower.includes('solo');
+
+                    if (cleanText && !isInstructionOnly) {
+                        console.log(`[AI Sync] Triggering: "${cleanText}" at ${elapsed.toFixed(2)}s`);
+                        Speech.speak(cleanText, {
+                            voice: ai.voiceId,
+                            pitch: ai.pitch,
+                            rate: ai.rate
+                        });
+                    }
+                    ai.nextIndex++;
+                }
+            }
+
+            const maxT = selectedSong.lyrics[selectedSong.lyrics.length - 1].startTime + introDelay + (beatDuration * 16);
+            if (elapsed < maxT) {
+                progressFrameRef.current = requestAnimationFrame(updateProgress);
+            } else {
+                setIsPlaying(false);
+                isPlayingRef.current = false;
+            }
+        };
+
+        if (soundRef.current) {
+            soundRef.current.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded) {
+                    // Offset by intro delay to keep in sync with timeline
+                    setPlaybackPosition(activeIntroDelayRef.current + (status.positionMillis / 1000));
+                    if (status.didJustFinish) {
                         setIsPlaying(false);
                         isPlayingRef.current = false;
                     }
-                };
-                updateProgress();
+                }
+            });
+            if (introDelay > 0) {
+                setTimeout(() => soundRef.current?.playAsync(), introDelay * 1000);
+            } else {
+                await soundRef.current.playAsync();
             }
-
-        } catch (error) {
-            console.error('Playback Error:', error);
-            Alert.alert('Playback Error', 'Could not play the recording.');
-            setIsPlaying(false);
         }
+
+        updateProgress();
+
+    } catch (error) {
+        console.error('Playback Error:', error);
+        Alert.alert('Playback Error', 'Check console for details.');
+        setIsPlaying(false);
+    } finally {
+        setIsLoadingPlayback(false);
+    }
+};
+
+
+useEffect(() => {
+    return () => {
+        stopAllPlayback();
+        soundRef.current?.unloadAsync();
     };
+}, []);
 
+if (showSettings) {
+    return (
+        <SettingsContainer>
+            <SettingsScrollView>
+                <SettingsHeader title="Music Maker" subtitle="Guitar tools" icon="🎸" sparkId="music-maker" />
 
-    useEffect(() => {
-        return () => {
-            soundRef.current?.unloadAsync();
-            if (playbackContextRef.current) {
-                playbackContextRef.current.close();
-            }
-            if (progressFrameRef.current) {
-                cancelAnimationFrame(progressFrameRef.current);
-            }
-        };
-    }, []);
+                <View style={{ paddingVertical: 20 }}>
+                    <AISettingsNote sparkName="Music Maker" />
+                </View>
 
-    if (showSettings) {
-        return (
-            <SettingsContainer>
-                <SettingsScrollView>
-                    <SettingsHeader title="Music Maker" subtitle="Guitar tools" icon="🎸" sparkId="music-maker" />
+                <View style={[styles.helpSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Text style={[styles.helpTitle, { color: colors.primary }]}>How it Works</Text>
 
-                    <View style={[styles.helpSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.helpTitle, { color: colors.primary }]}>How it Works</Text>
-
-                        <View style={styles.helpItem}>
-                            <Text style={[styles.helpSubitle, { color: colors.text }]}>🎸 Tuning Your Guitar</Text>
-                            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                                Start the tuner and pluck a string. The meter shows if you're sharp or flat.
-                                Aim for the center green needle!
-                            </Text>
-                        </View>
-
-                        <View style={styles.helpItem}>
-                            <Text style={[styles.helpSubitle, { color: colors.text }]}>🎙️ Recording a Song</Text>
-                            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                                Go to the "Songs" tab and tap the microphone. Sing your song clearly.
-                                When finished, tap stop to let Gemini analyze the melody and chords.
-                            </Text>
-                        </View>
-
-                        <View style={styles.helpItem}>
-                            <Text style={[styles.helpSubitle, { color: colors.text }]}>🪄 AI Song Generator</Text>
-                            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                                Tap the sparkles icon to have AI write a song for you! Enter a theme, choose a voice,
-                                and adjust the Pitch and Rate to customize the AI singer's character.
-                            </Text>
-                        </View>
-
-                        <View style={styles.helpItem}>
-                            <Text style={[styles.helpSubitle, { color: colors.text }]}>📂 Managing Songs</Text>
-                            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                                Tap a song to view lyrics and play it with guitar accompaniment. Use the trash icon
-                                to delete songs. On the web, you can even export your songs as WAV files!
-                            </Text>
-                        </View>
-
-                        <View style={styles.helpItem}>
-                            <Text style={[styles.helpSubitle, { color: colors.text }]}>🎛️ Mixer & Rhythm Controls</Text>
-                            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                                Expand the Mixer to fine-tune your sound: {"\n"}
-                                • <Text style={{ fontWeight: 'bold' }}>Swing:</Text> Adds a groovy, off-beat feel. {"\n"}
-                                • <Text style={{ fontWeight: 'bold' }}>Humanize:</Text> Adds natural timing variations. {"\n"}
-                                • <Text style={{ fontWeight: 'bold' }}>Accent:</Text> Modulates the volume of emphasized beats. {"\n"}
-                                • <Text style={{ fontWeight: 'bold' }}>Volumes:</Text> Mix the levels of Voice, Guitar, and Drums. {"\n"}
-                                • <Text style={{ fontWeight: 'bold' }}>AI Song Generator:</Text> Refined timing and voice customization (Pitch & Rate).
-                            </Text>
-                        </View>
+                    <View style={styles.helpItem}>
+                        <Text style={[styles.helpSubitle, { color: colors.text }]}>🎸 Tuning Your Guitar</Text>
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Start the tuner and pluck a string. The meter shows if you're sharp or flat.
+                            Aim for the center green needle!
+                        </Text>
                     </View>
 
-                    <SettingsFeedbackSection sparkId="music-maker" sparkName="Music Maker" />
-                    <TouchableOpacity onPress={onCloseSettings} style={styles.closeBtn}>
-                        <Text style={{ color: colors.text }}>Close</Text>
-                    </TouchableOpacity>
-                </SettingsScrollView>
-            </SettingsContainer>
-        );
-    }
+                    <View style={styles.helpItem}>
+                        <Text style={[styles.helpSubitle, { color: colors.text }]}>🎙️ Recording a Song</Text>
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Go to the "Songs" tab and tap the microphone. Sing your song clearly.
+                            When finished, tap stop to let Gemini analyze the melody and chords.
+                        </Text>
+                    </View>
 
-    return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={styles.tabs}>
-                <TouchableOpacity
-                    onPress={() => setActiveTab('tuner')}
-                    style={[styles.tab, activeTab === 'tuner' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-                >
-                    <Text style={[styles.tabText, { color: activeTab === 'tuner' ? colors.primary : colors.textSecondary }]}>Tuner</Text>
+                    <View style={styles.helpItem}>
+                        <Text style={[styles.helpSubitle, { color: colors.text }]}>🪄 AI Song Generator</Text>
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Tap the sparkles icon to have AI write a song for you! Enter a theme, choose a voice,
+                            and adjust the Pitch and Rate to customize the AI singer's character.
+                        </Text>
+                    </View>
+
+                    <View style={styles.helpItem}>
+                        <Text style={[styles.helpSubitle, { color: colors.text }]}>📂 Managing Songs</Text>
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Tap a song to view lyrics and play it with guitar accompaniment. Use the trash icon
+                            to delete songs. On the web, you can even export your songs as WAV files!
+                        </Text>
+                    </View>
+
+                    <View style={styles.helpItem}>
+                        <Text style={[styles.helpSubitle, { color: colors.text }]}>🎛️ Mixer & Rhythm Controls</Text>
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Expand the Mixer to fine-tune your sound: {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>Swing:</Text> Adds a groovy, off-beat feel to the rhythm. {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>Humanize:</Text> Adds subtle timing variations for a more natural feel. {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>Accent:</Text> Controls the volume difference of emphasized beats. {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>Volumes:</Text> Mix the levels of Voice, Guitar, and Drums. {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>Strum Density:</Text> Controls how many times the rhythm pattern repeats per bar (1-16). {"\n"}
+                            • <Text style={{ fontWeight: 'bold' }}>AI Tuning (Pitch & Rate):</Text> Customize the AI singer's character. {"\n"}
+                            - <Text style={{ fontWeight: 'bold' }}>Pitch:</Text> Shift the voice higher (chipmunk) or lower (gravelly). {"\n"}
+                            - <Text style={{ fontWeight: 'bold' }}>Rate:</Text> Control the speed of the AI performance.
+                        </Text>
+                    </View>
+                </View>
+
+                <SettingsFeedbackSection sparkId="music-maker" sparkName="Music Maker" />
+                <TouchableOpacity onPress={onCloseSettings} style={styles.closeBtn}>
+                    <Text style={{ color: colors.text }}>Close</Text>
                 </TouchableOpacity>
+            </SettingsScrollView>
+        </SettingsContainer>
+    );
+}
+
+return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.tabs}>
+            <TouchableOpacity
+                onPress={() => setActiveTab('tuner')}
+                style={[styles.tab, activeTab === 'tuner' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+            >
+                <Text style={[styles.tabText, { color: activeTab === 'tuner' ? colors.primary : colors.textSecondary }]}>Tuner</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+                onPress={() => setActiveTab('songs')}
+                style={[styles.tab, activeTab === 'songs' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+            >
+                <Text style={[styles.tabText, { color: activeTab === 'songs' ? colors.primary : colors.textSecondary }]}>Songs</Text>
+            </TouchableOpacity>
+        </View>
+
+        {activeTab === 'tuner' ? (
+            <View style={styles.tunerContainer}>
+                <View style={styles.meter}>
+                    <Text style={[styles.pitchText, { color: colors.text }]}>
+                        {currentPitch ? `${currentPitch.toFixed(2)} Hz` : '---'}
+                    </Text>
+                    <Text style={[styles.noteText, { color: colors.primary }]}>
+                        {closestString?.note || '?'}
+                    </Text>
+
+                    <View style={styles.visualMeter}>
+                        <View style={[styles.meterLine, { backgroundColor: colors.textSecondary + '40' }]} />
+                        <View style={[styles.meterCenter, { backgroundColor: colors.primary }]} />
+                        {currentPitch && closestString ? (() => {
+                            const cents = 1200 * Math.log2(currentPitch / closestString.freq);
+                            const clampedCents = Math.max(-50, Math.min(50, cents));
+                            const leftPosition = 50 + clampedCents; // 0-100%
+                            return (
+                                <>
+                                    <View style={[styles.needle, { left: `${leftPosition}%`, backgroundColor: Math.abs(cents) < 5 ? '#4CAF50' : colors.error }]} />
+                                    <Text style={[styles.centsText, { color: Math.abs(cents) < 5 ? '#4CAF50' : colors.textSecondary }]}>
+                                        {cents > 0 ? '+' : ''}{cents.toFixed(0)} cents
+                                    </Text>
+                                </>
+                            );
+                        })() : (
+                            <Text style={[styles.centsText, { color: colors.textSecondary, opacity: 0.5 }]}>Ready</Text>
+                        )}
+                    </View>
+                </View>
+                <View style={styles.stringGrid}>
+                    {GUITAR_STRINGS.map(s => (
+                        <View key={s.id} style={[styles.stringTag, closestString?.id === s.id && { backgroundColor: colors.primary }]}>
+                            <Text style={{ color: closestString?.id === s.id ? '#fff' : colors.textSecondary }}>{s.note}</Text>
+                        </View>
+                    ))}
+                </View>
                 <TouchableOpacity
-                    onPress={() => setActiveTab('songs')}
-                    style={[styles.tab, activeTab === 'songs' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+                    onPress={isTuning ? () => stopTuning() : startTuning}
+                    style={[styles.actionBtn, { backgroundColor: isTuning ? colors.error : colors.primary }]}
                 >
-                    <Text style={[styles.tabText, { color: activeTab === 'songs' ? colors.primary : colors.textSecondary }]}>Songs</Text>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{isTuning ? 'Stop' : 'Start Tuning'}</Text>
                 </TouchableOpacity>
             </View>
-
-            {activeTab === 'tuner' ? (
-                <View style={styles.tunerContainer}>
-                    <View style={styles.meter}>
-                        <Text style={[styles.pitchText, { color: colors.text }]}>
-                            {currentPitch ? `${currentPitch.toFixed(2)} Hz` : '---'}
-                        </Text>
-                        <Text style={[styles.noteText, { color: colors.primary }]}>
-                            {closestString?.note || '?'}
-                        </Text>
-
-                        <View style={styles.visualMeter}>
-                            <View style={[styles.meterLine, { backgroundColor: colors.textSecondary + '40' }]} />
-                            <View style={[styles.meterCenter, { backgroundColor: colors.primary }]} />
-                            {currentPitch && closestString ? (() => {
-                                const cents = 1200 * Math.log2(currentPitch / closestString.freq);
-                                const clampedCents = Math.max(-50, Math.min(50, cents));
-                                const leftPosition = 50 + clampedCents; // 0-100%
-                                return (
-                                    <>
-                                        <View style={[styles.needle, { left: `${leftPosition}%`, backgroundColor: Math.abs(cents) < 5 ? '#4CAF50' : colors.error }]} />
-                                        <Text style={[styles.centsText, { color: Math.abs(cents) < 5 ? '#4CAF50' : colors.textSecondary }]}>
-                                            {cents > 0 ? '+' : ''}{cents.toFixed(0)} cents
-                                        </Text>
-                                    </>
-                                );
-                            })() : (
-                                <Text style={[styles.centsText, { color: colors.textSecondary, opacity: 0.5 }]}>Ready</Text>
-                            )}
-                        </View>
-                    </View>
-                    <View style={styles.stringGrid}>
-                        {GUITAR_STRINGS.map(s => (
-                            <View key={s.id} style={[styles.stringTag, closestString?.id === s.id && { backgroundColor: colors.primary }]}>
-                                <Text style={{ color: closestString?.id === s.id ? '#fff' : colors.textSecondary }}>{s.note}</Text>
-                            </View>
-                        ))}
-                    </View>
-                    <TouchableOpacity
-                        onPress={isTuning ? () => stopTuning() : startTuning}
-                        style={[styles.actionBtn, { backgroundColor: isTuning ? colors.error : colors.primary }]}
-                    >
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>{isTuning ? 'Stop' : 'Start Tuning'}</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <View style={styles.songsContainer}>
-                    {selectedSong ? (
-                        <View style={{ flex: 1 }}>
-                            <View style={[styles.songHeader, { justifyContent: 'space-between' }]}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <TouchableOpacity onPress={() => setSelectedSong(null)}>
-                                        <Ionicons name="chevron-back" size={24} color={colors.text} />
-                                    </TouchableOpacity>
-                                    <Text style={[styles.songTitle, { color: colors.text }]}>{selectedSong.songName}</Text>
-                                </View>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity onPress={exportSong} style={[styles.playBtn, { backgroundColor: colors.textSecondary }]}>
-                                        <Ionicons name="share-outline" size={20} color="#fff" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={playSong} style={[styles.playBtn, { backgroundColor: colors.primary }]}>
-                                        <Ionicons name={isPlaying ? "stop" : "play"} size={20} color="#fff" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={[styles.mixerContainer, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                                <TouchableOpacity
-                                    style={styles.mixerHeader}
-                                    onPress={() => setIsMixerExpanded(!isMixerExpanded)}
-                                >
-                                    <Text style={[styles.mixerTitleMain, { color: colors.text }]}>🎚️ Mixer & Options</Text>
-                                    <Ionicons name={isMixerExpanded ? "chevron-up" : "chevron-down"} size={20} color={colors.textSecondary} />
+        ) : (
+            <View style={styles.songsContainer}>
+                {selectedSong ? (
+                    <View style={{ flex: 1 }}>
+                        <View style={[styles.songHeader, { justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <TouchableOpacity onPress={async () => {
+                                    await stopAllPlayback();
+                                    setSelectedSong(null);
+                                }}>
+                                    <Ionicons name="chevron-back" size={24} color={colors.text} />
                                 </TouchableOpacity>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TextInput
+                                            style={[styles.songTitleInput, { color: colors.text }]}
+                                            value={selectedSong.songName}
+                                            onChangeText={updateSongName}
+                                            placeholder="Enter song name..."
+                                            placeholderTextColor={colors.textSecondary}
+                                        />
+                                    </View>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Auto-saved to your collection</Text>
+                                </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        await stopAllPlayback();
+                                        setSelectedSong(null);
+                                    }}
+                                    style={[styles.doneBtn, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                                >
+                                    <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>Done</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={exportSong} style={[styles.playBtn, { backgroundColor: colors.textSecondary }]}>
+                                    <Ionicons name="share-outline" size={20} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={playSong} style={[styles.playBtn, { backgroundColor: colors.primary }]}>
+                                    <Ionicons name={isPlaying ? "stop" : "play"} size={20} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
 
-                                {isMixerExpanded && (
-                                    <View style={styles.mixerContent}>
-                                        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>RHYTHM CONTROLS</Text>
-                                        <View style={styles.rhythmParamsRow}>
-                                            <RhythmParamControl
-                                                label="Swing"
-                                                value={swing}
-                                                min={0} max={0.5} step={0.05}
-                                                onChange={setSwing}
-                                                color={colors.primary}
-                                                format={(v) => `${(v * 100).toFixed(0)}%`}
-                                            />
-                                            <RhythmParamControl
-                                                label="Humanize"
-                                                value={humanize}
-                                                min={0} max={0.1} step={0.01}
-                                                onChange={setHumanize}
-                                                color={colors.primary}
-                                                format={(v) => `${(v * 100).toFixed(0)}%`}
-                                            />
-                                            <RhythmParamControl
-                                                label="Accent"
-                                                value={accentAmount}
-                                                min={0.8} max={1.5} step={0.1}
-                                                onChange={setAccentAmount}
-                                                color={colors.primary}
-                                            />
+                        <View style={[styles.mixerContainer, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                            <TouchableOpacity
+                                style={styles.mixerHeader}
+                                onPress={() => setIsMixerExpanded(!isMixerExpanded)}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text style={[styles.mixerTitleMain, { color: colors.text }]}>🎚️ Mixer & Options</Text>
+                                    <TouchableOpacity onPress={() => setShowMixerHelp(true)}>
+                                        <Ionicons name="help-circle-outline" size={18} color={colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                                <Ionicons name={isMixerExpanded ? "chevron-up" : "chevron-down"} size={20} color={colors.textSecondary} />
+                            </TouchableOpacity>
+
+                            {isMixerExpanded && (
+                                <View style={styles.mixerContent}>
+                                    <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>RHYTHM CONTROLS</Text>
+                                    <View style={styles.rhythmParamsRow}>
+                                        <RhythmParamControl
+                                            label="Swing"
+                                            value={swing}
+                                            min={0} max={0.5} step={0.05}
+                                            onChange={setSwing}
+                                            color={colors.primary}
+                                            format={(v) => `${(v * 100).toFixed(0)}%`}
+                                        />
+                                        <RhythmParamControl
+                                            label="Humanize"
+                                            value={humanize}
+                                            min={0} max={0.1} step={0.01}
+                                            onChange={setHumanize}
+                                            color={colors.primary}
+                                            format={(v) => `${(v * 100).toFixed(0)}%`}
+                                        />
+                                        <RhythmParamControl
+                                            label="Accent"
+                                            value={accentAmount}
+                                            min={0.8} max={1.5} step={0.1}
+                                            onChange={setAccentAmount}
+                                            color={colors.primary}
+                                        />
+                                    </View>
+
+                                    <View style={styles.divider} />
+                                    <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>OPTIONS</Text>
+                                    <View style={styles.toggleRow}>
+                                        <View style={styles.toggleItem}>
+                                            <Switch value={playIntro} onValueChange={setPlayIntro} />
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Intro</Text>
                                         </View>
-
-                                        <View style={styles.divider} />
-                                        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>OPTIONS</Text>
-                                        <View style={styles.toggleRow}>
-                                            <View style={styles.toggleItem}>
-                                                <Switch value={playIntro} onValueChange={setPlayIntro} />
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Intro</Text>
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Switch value={playWithDrums} onValueChange={setPlayWithDrums} />
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drums</Text>
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drum Beat</Text>
-                                                <TouchableOpacity style={styles.patternNameBox} onPress={() => {
-                                                    const types = Object.keys(DRUM_PATTERNS);
-                                                    const idx = types.indexOf(selectedDrumPattern);
-                                                    setSelectedDrumPattern(types[(idx + 1) % types.length]);
-                                                }}>
-                                                    <Text style={[styles.patternName, { color: colors.primary }]}>{selectedDrumPattern}</Text>
-                                                    <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
-                                                </TouchableOpacity>
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{RHYTHM_PATTERNS[selectedRhythm]?.genre || 'Rhythm'}</Text>
-                                                <TouchableOpacity style={styles.patternNameBox} onPress={() => {
-                                                    const types = Object.keys(RHYTHM_PATTERNS);
-                                                    const idx = types.indexOf(selectedRhythm);
-                                                    setSelectedRhythm(types[(idx + 1) % types.length]);
-                                                }}>
-                                                    <Text style={[styles.patternName, { color: colors.primary }]}>{selectedRhythm}</Text>
-                                                    <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
-                                                </TouchableOpacity>
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{patternRepeats}x/bar</Text>
-                                                <TouchableOpacity onPress={() => {
-                                                    setPatternRepeats((prev) => (prev % 4) + 1); // Cycle 1-4
-                                                }}>
-                                                    <Ionicons name="repeat" size={20} color={colors.primary} />
-                                                </TouchableOpacity>
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Flats</Text>
-                                                <Switch value={showFlats} onValueChange={setShowFlats} />
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Sharps</Text>
-                                                <Switch value={showSharps} onValueChange={setShowSharps} />
-                                            </View>
-                                            <View style={styles.toggleItem}>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Whole</Text>
-                                                <Switch value={showWhole} onValueChange={setShowWhole} />
-                                            </View>
-                                            {Platform.OS === 'web' && (
-                                                <View style={styles.toggleItem}>
-                                                    <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Chords</Text>
-                                                    <Switch value={playWithChords} onValueChange={setPlayWithChords} />
-                                                </View>
-                                            )}
+                                        <View style={styles.toggleItem}>
+                                            <Switch value={playWithDrums} onValueChange={setPlayWithDrums} />
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drums</Text>
                                         </View>
-
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Drum Beat</Text>
+                                            <TouchableOpacity style={styles.patternNameBox} onPress={() => {
+                                                const types = Object.keys(DRUM_PATTERNS);
+                                                const idx = types.indexOf(selectedDrumPattern);
+                                                setSelectedDrumPattern(types[(idx + 1) % types.length]);
+                                            }}>
+                                                <Text style={[styles.patternName, { color: colors.primary }]}>{selectedDrumPattern}</Text>
+                                                <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{RHYTHM_PATTERNS[selectedRhythm]?.genre || 'Rhythm'}</Text>
+                                            <TouchableOpacity style={styles.patternNameBox} onPress={() => {
+                                                const types = Object.keys(RHYTHM_PATTERNS);
+                                                const idx = types.indexOf(selectedRhythm);
+                                                setSelectedRhythm(types[(idx + 1) % types.length]);
+                                            }}>
+                                                <Text style={[styles.patternName, { color: colors.primary }]}>{selectedRhythm}</Text>
+                                                <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Strum {strumDensity}x</Text>
+                                            <TouchableOpacity onPress={() => {
+                                                setStrumDensity((prev) => (prev % 16) + 1); // Cycle 1-16
+                                            }}>
+                                                <Ionicons name="repeat" size={20} color={colors.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Flats</Text>
+                                            <Switch value={showFlats} onValueChange={setShowFlats} />
+                                        </View>
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Sharps</Text>
+                                            <Switch value={showSharps} onValueChange={setShowSharps} />
+                                        </View>
+                                        <View style={styles.toggleItem}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Whole</Text>
+                                            <Switch value={showWhole} onValueChange={setShowWhole} />
+                                        </View>
                                         {Platform.OS === 'web' && (
-                                            <>
-                                                <View style={styles.divider} />
-                                                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>VOLUMES</Text>
-                                                <View style={styles.mixerRow}>
-                                                    <VolumeControl label="Voice" value={voiceVolume} onChange={setVoiceVolume} color={colors.primary} />
-                                                    <VolumeControl label="Guitar" value={chordVolume} onChange={setChordVolume} color="#FF6B6B" />
-                                                    <VolumeControl label="Drums" value={drumVolume} onChange={setDrumVolume} color="#4ECDC4" />
-                                                </View>
-                                            </>
+                                            <View style={styles.toggleItem}>
+                                                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Chords</Text>
+                                                <Switch value={playWithChords} onValueChange={setPlayWithChords} />
+                                            </View>
                                         )}
                                     </View>
-                                )}
-                            </View>
 
-                            <ScrollView style={styles.lyricsScroll}>
-                                {selectedSong.lyrics.map((l, i) => {
-                                    const isActive = isPlaying && playbackPosition >= l.startTime && (i === selectedSong.lyrics.length - 1 || playbackPosition < selectedSong.lyrics[i + 1].startTime);
-                                    return (
-                                        <View key={i} style={[styles.lyricLine, isActive && { opacity: 1, transform: [{ scale: 1.02 }] }, !isActive && isPlaying && { opacity: 0.5 }]}>
-                                            <View style={styles.notationRow}>
-                                                <Text style={[styles.chordText, { color: colors.primary }]}>{l.chords}</Text>
-                                                <Text style={[styles.noteTextSmall, { color: colors.textSecondary }]}>
-                                                    {l.notes.split(' ').map(formatNote).join(' ')}
-                                                </Text>
+                                    {Platform.OS === 'web' && (
+                                        <>
+                                            <View style={styles.divider} />
+                                            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>VOLUMES</Text>
+                                            <View style={styles.mixerRow}>
+                                                <VolumeControl label="Voice" value={voiceVolume} onChange={setVoiceVolume} color={colors.primary} />
+                                                <VolumeControl label="Guitar" value={chordVolume} onChange={setChordVolume} color="#FF6B6B" />
+                                                <VolumeControl label="Drums" value={drumVolume} onChange={setDrumVolume} color="#4ECDC4" />
                                             </View>
-                                            <Text style={[styles.lyricText, { color: colors.text, fontWeight: isActive ? 'bold' : 'normal' }]}>{l.text}</Text>
-                                            {isActive && (
-                                                <View style={{ height: 2, backgroundColor: colors.primary, width: 20, marginTop: 5 }} />
-                                            )}
-                                        </View>
-                                    );
-                                })}
-                            </ScrollView>
-                        </View>
-                    ) : (
-                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <FlatList
-                                data={songs}
-                                keyExtractor={(item: MusicAnalysisResult, index: number) => index.toString()}
-                                renderItem={({ item }: { item: MusicAnalysisResult }) => (
-                                    <View style={styles.songItem}>
-                                        <TouchableOpacity onPress={() => setSelectedSong(item)} style={{ flex: 1 }}>
-                                            <Text style={{ color: colors.text }}>{item.songName}</Text>
-                                            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{item.key} • {item.bpm} BPM {item.vocalUri.startsWith('ai://') ? '🤖' : ''}</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => {
-                                            const newSongs = songs.filter(s => s !== item);
-                                            setSongs(newSongs);
-                                        }}>
-                                            <Ionicons name="trash-outline" size={20} color={colors.error} />
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
-                                style={{ width: '100%', flex: 1 }}
-                            />
-
-                            {isAnalyzing && <ActivityIndicator size="large" color={colors.primary} />}
-
-                            <TouchableOpacity
-                                onPress={isRecording ? stopAndAnalyze : startRecordingSong}
-                                disabled={isAnalyzing}
-                                style={[
-                                    styles.recordBtn,
-                                    { backgroundColor: isAnalyzing ? colors.textSecondary : (isRecording ? colors.error : colors.primary) }
-                                ]}
-                            >
-                                {isAnalyzing ? (
-                                    <ActivityIndicator size="small" color="#fff" />
-                                ) : (
-                                    <Ionicons name={isRecording ? "stop" : "mic"} size={32} color="#fff" />
-                                )}
-                                <Text style={{ color: '#fff', marginTop: 5 }}>
-                                    {isAnalyzing ? 'Processing...' : (isRecording ? 'Stop' : 'Record Song')}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => setIsGeneratorVisible(true)}
-                                disabled={isAnalyzing || isRecording}
-                                style={[
-                                    styles.aiBtn,
-                                    { backgroundColor: colors.secondary }
-                                ]}
-                            >
-                                <Ionicons name="sparkles" size={24} color="#fff" />
-                                <Text style={{ color: '#fff', fontSize: 12, marginTop: 2 }}>AI Song</Text>
-                            </TouchableOpacity>
-
-                            {/* Generator Modal */}
-                            <Modal
-                                visible={isGeneratorVisible}
-                                animationType="slide"
-                                transparent={true}
-                                onRequestClose={() => setIsGeneratorVisible(false)}
-                            >
-                                <View style={styles.modalOverlay}>
-                                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-                                        <Text style={[styles.modalTitle, { color: colors.text }]}>AI Song Generator</Text>
-
-                                        <TextInput
-                                            style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
-                                            placeholder="e.g. Write an 8 line blues song about dead alligators sung by a raspy woman"
-                                            placeholderTextColor={colors.textSecondary}
-                                            multiline
-                                            value={generatorPrompt}
-                                            onChangeText={setGeneratorPrompt}
-                                        />
-
-                                        <View style={styles.rhythmParamsRow}>
-                                            <RhythmParamControl
-                                                label="Pitch" value={speechPitch}
-                                                min={0.5} max={2.0} step={0.1}
-                                                onChange={setSpeechPitch}
-                                                color={colors.primary}
-                                            />
-                                            <RhythmParamControl
-                                                label="Rate" value={speechRate}
-                                                min={0.5} max={2.0} step={0.1}
-                                                onChange={setSpeechRate}
-                                                color={colors.primary}
-                                            />
-                                        </View>
-
-                                        <Text style={[styles.label, { color: colors.textSecondary }]}>Select Voice</Text>
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voicePicker}>
-                                            {speechVoices.filter(v => v.language.includes('en')).map((voice) => (
-                                                <TouchableOpacity
-                                                    key={voice.identifier}
-                                                    onPress={() => setSelectedSpeechVoice(voice.identifier)}
-                                                    style={[
-                                                        styles.voiceItem,
-                                                        selectedSpeechVoice === voice.identifier && { backgroundColor: colors.primary }
-                                                    ]}
-                                                >
-                                                    <Text style={[
-                                                        styles.voiceName,
-                                                        { color: selectedSpeechVoice === voice.identifier ? '#fff' : colors.text }
-                                                    ]}>
-                                                        {voice.name.replace('en-us-', '')}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-
-                                        <View style={styles.modalButtons}>
-                                            <TouchableOpacity
-                                                style={[styles.modalBtn, { backgroundColor: colors.textSecondary }]}
-                                                onPress={() => setIsGeneratorVisible(false)}
-                                            >
-                                                <Text style={{ color: '#fff' }}>Cancel</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
-                                                onPress={handleGenerateAISong}
-                                            >
-                                                <Text style={{ color: '#fff' }}>Generate</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
+                                        </>
+                                    )}
                                 </View>
-                            </Modal>
+                            )}
                         </View>
-                    )}
+
+                        <ScrollView style={styles.lyricsScroll}>
+                            {selectedSong.lyrics.map((l, i) => {
+                                // Calculate position relative to lyrics start (subtracting intro)
+                                const displayPos = playbackPosition - activeIntroDelayRef.current;
+                                const isActive = isPlaying && displayPos >= l.startTime && (i === selectedSong.lyrics.length - 1 || displayPos < selectedSong.lyrics[i + 1].startTime);
+                                return (
+                                    <View key={i} style={[styles.lyricLine, isActive && { opacity: 1, transform: [{ scale: 1.02 }] }, !isActive && isPlaying && { opacity: 0.5 }]}>
+                                        <View style={styles.notationRow}>
+                                            <Text style={[styles.chordText, { color: colors.primary }]}>{l.chords}</Text>
+                                            <Text style={[styles.noteTextSmall, { color: colors.textSecondary }]}>
+                                                {l.notes.split(' ').map(formatNote).join(' ')}
+                                            </Text>
+                                        </View>
+                                        <Text style={[styles.lyricText, { color: colors.text, fontWeight: isActive ? 'bold' : 'normal' }]}>{l.text}</Text>
+                                        {isActive && (
+                                            <View style={{ height: 2, backgroundColor: colors.primary, width: 20, marginTop: 5 }} />
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                ) : (
+                    <View style={{ flex: 1 }}>
+                        <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                            <AISettingsNote sparkName="Music Maker" />
+                            <Text style={[styles.songsHeading, { color: colors.text }]}>Your Songs</Text>
+                        </View>
+                        <FlatList
+                            data={songs}
+                            keyExtractor={(item: MusicAnalysisResult, index: number) => index.toString()}
+                            renderItem={({ item }: { item: MusicAnalysisResult }) => (
+                                <View style={styles.songItem}>
+                                    <TouchableOpacity onPress={() => setSelectedSong(item)} style={{ flex: 1 }}>
+                                        <Text style={{ color: colors.text }}>{item.songName}</Text>
+                                        <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{item.key} • {item.bpm} BPM {item.vocalUri.startsWith('ai://') ? '🤖' : ''}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => {
+                                        const newSongs = songs.filter(s => s !== item);
+                                        setSongs(newSongs);
+                                    }}>
+                                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                            style={{ width: '100%', flex: 1 }}
+                        />
+
+                        <View style={{ paddingVertical: 20, paddingHorizontal: 20 }}>
+                            {isAnalyzing && (
+                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                    <Text style={{ color: colors.textSecondary, marginTop: 10 }}>Processing Song...</Text>
+                                </View>
+                            )}
+
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <TouchableOpacity
+                                    onPress={isRecording ? stopAndAnalyze : startRecordingSong}
+                                    disabled={isAnalyzing}
+                                    style={[
+                                        styles.recordBtn,
+                                        { backgroundColor: isAnalyzing ? colors.textSecondary : (isRecording ? colors.error : colors.primary) }
+                                    ]}
+                                >
+                                    {isAnalyzing ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <Ionicons name={isRecording ? "stop" : "mic"} size={28} color="#fff" />
+                                    )}
+                                    <Text style={{ color: '#fff', fontSize: 13, marginTop: 2 }}>
+                                        {isAnalyzing ? '...' : (isRecording ? 'Stop' : 'Record Song')}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => setIsGeneratorVisible(true)}
+                                    disabled={isAnalyzing || isRecording}
+                                    style={[
+                                        styles.aiBtn,
+                                        { backgroundColor: colors.secondary }
+                                    ]}
+                                >
+                                    <Ionicons name="sparkles" size={24} color="#fff" />
+                                    <Text style={{ color: '#fff', fontSize: 13, marginTop: 2 }}>AI Song Generator</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                )}
+            </View>
+        )}
+
+        {/* AI Generator Modal */}
+        <CommonModal
+            visible={isGeneratorVisible}
+            title="AI Song Generator"
+            onClose={() => setIsGeneratorVisible(false)}
+            footer={
+                <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                        style={[styles.modalBtn, { backgroundColor: colors.textSecondary }]}
+                        onPress={() => setIsGeneratorVisible(false)}
+                    >
+                        <Text style={{ color: '#fff' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+                        onPress={handleGenerateAISong}
+                    >
+                        <Text style={{ color: '#fff' }}>Generate</Text>
+                    </TouchableOpacity>
                 </View>
-            )}
-        </View>
-    );
+            }
+        >
+            <TextInput
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g. Write an 8 line blues song about dead alligators sung by a raspy woman"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                value={generatorPrompt}
+                onChangeText={setGeneratorPrompt}
+            />
+
+            <View style={styles.rhythmParamsRow}>
+                <RhythmParamControl
+                    label="Pitch" value={speechPitch}
+                    min={0.5} max={2.0} step={0.1}
+                    onChange={setSpeechPitch}
+                    color={colors.primary}
+                />
+                <RhythmParamControl
+                    label="Rate" value={speechRate}
+                    min={0.5} max={2.0} step={0.1}
+                    onChange={setSpeechRate}
+                    color={colors.primary}
+                />
+            </View>
+
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Select Voice</Text>
+            <TouchableOpacity
+                style={[styles.dropdownTrigger, { borderColor: colors.border, backgroundColor: colors.background }]}
+                onPress={() => setShowVoiceSelector(true)}
+            >
+                <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: 'bold' }}>
+                        {speechVoices.find(v => v.identifier === selectedSpeechVoice)?.name.replace('en-us-', '') || 'Select Voice'}
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+                        {speechVoices.find(v => v.identifier === selectedSpeechVoice)?.quality === Speech.VoiceQuality.Enhanced ? '✨ High Quality' : 'Standard'}
+                    </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Nested Voice Selection Modal */}
+            <Modal
+                visible={showVoiceSelector}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowVoiceSelector(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowVoiceSelector(false)}
+                >
+                    <View style={[styles.dropdownContent, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 15 }]}>Choose an AI Voice</Text>
+                        <FlatList
+                            data={speechVoices}
+                            keyExtractor={(item) => item.identifier}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.voiceListItem,
+                                        selectedSpeechVoice === item.identifier && { backgroundColor: colors.primary + '20' }
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedSpeechVoice(item.identifier);
+                                        setShowVoiceSelector(false);
+                                    }}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.voiceNameText, { color: selectedSpeechVoice === item.identifier ? colors.primary : colors.text }]}>
+                                            {item.name.replace('en-us-', '').replace('en-gb-', 'GB ')}
+                                        </Text>
+                                        <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+                                            {item.language} • {item.quality === Speech.VoiceQuality.Enhanced ? 'Premium' : 'System'}
+                                        </Text>
+                                    </View>
+                                    {selectedSpeechVoice === item.identifier && (
+                                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            style={{ maxHeight: 400 }}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        </CommonModal>
+
+        {/* Mixer Help Modal */}
+        <CommonModal
+            visible={showMixerHelp}
+            title="Mixer & Rhythm Help"
+            onClose={() => setShowMixerHelp(false)}
+        >
+            <View style={{ gap: 15, paddingBottom: 20 }}>
+                <Text style={[styles.mixerHelpText, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: 'bold', color: colors.text }}>🎛️ Mixer & Rhythm Controls</Text> {"\n\n"}
+                    Expand the Mixer within any song to fine-tune your sound: {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>Swing:</Text> Adds a groovy, off-beat feel to the rhythm. {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>Humanize:</Text> Adds subtle timing variations for a more natural, live performance feel. {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>Accent:</Text> Controls the volume difference of emphasized beats. {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>Volumes:</Text> Separately mix the levels of the Voice, Guitar chords, and Drums. {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>Strum Density:</Text> Controls how many times the chosen rhythm pattern repeats within a single musical bar (1-16). {"\n\n"}
+                    • <Text style={{ fontWeight: 'bold', color: colors.text }}>AI Tuning (Pitch & Rate):</Text> Customize the AI singer's character. {"\n\n"}
+                    - <Text style={{ fontWeight: 'bold' }}>Pitch:</Text> Shift the voice higher (chipmunk-like) or lower (deep/gravelly). {"\n\n"}
+                    - <Text style={{ fontWeight: 'bold' }}>Rate:</Text> Control the speed and articulation of the AI performance.
+                </Text>
+            </View>
+        </CommonModal>
+    </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -1458,7 +2026,7 @@ const styles = StyleSheet.create({
     stringTag: { padding: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', width: 40, alignItems: 'center' },
     actionBtn: { padding: 15, borderRadius: 10, width: '100%', alignItems: 'center' },
     songsContainer: { flex: 1, padding: 20 },
-    recordBtn: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', position: 'absolute', bottom: 40 },
+    recordBtn: { flex: 1, height: 70, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     songItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1467,6 +2035,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
         width: '100%'
+    },
+    songTitleInput: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        paddingVertical: 0,
+        marginVertical: 0,
+        flexShrink: 1,
     },
     songHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     songTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
@@ -1518,6 +2093,12 @@ const styles = StyleSheet.create({
     mixerTitleMain: {
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    doneBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
     },
     mixerContent: {
         padding: 10,
@@ -1598,18 +2179,18 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     aiBtn: {
-        width: 80,
-        height: 60,
-        borderRadius: 15,
+        flex: 1,
+        height: 70,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 20,
     },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 2000,
     },
     modalContent: {
         width: '90%',
@@ -1659,6 +2240,44 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         alignItems: 'center',
     },
+    dropdownTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        marginBottom: 10,
+    },
+    dropdownContent: {
+        width: '85%',
+        maxHeight: '70%',
+        padding: 20,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    voiceListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 4,
+    },
+    voiceNameText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    songsHeading: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    mixerHelpText: {
+        fontSize: 14,
+        lineHeight: 20,
+    }
 });
 
 export default MusicMakerSpark;

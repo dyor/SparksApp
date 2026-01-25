@@ -534,6 +534,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "media",
       createdAt: "2026-01-19T00:00:00.000Z",
       rating: 4.8,
+      properties: ["AI"],
     },
     component: MusicMakerSpark,
   },

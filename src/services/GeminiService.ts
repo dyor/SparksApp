@@ -14,13 +14,14 @@ const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
 async function getApiKey(): Promise<string> {
     // 1. Check for user's custom key
     try {
-        const customKey = await AsyncStorage.getItem(CUSTOM_API_KEY_STORAGE_KEY);
+        const { useAppStore } = require('../store/appStore');
+        const customKey = useAppStore.getState().preferences.customGeminiApiKey;
         if (customKey && customKey.trim()) {
-            console.log('🔑 Using custom Gemini API key');
+            console.log('🔑 Using custom Gemini API key from store');
             return customKey.trim();
         }
     } catch (error) {
-        console.warn('⚠️ Failed to check custom API key:', error);
+        console.warn('⚠️ Failed to check custom API key from store:', error);
     }
 
     // 2. Check Firebase Remote Config

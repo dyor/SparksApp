@@ -183,46 +183,32 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
         setIsGenerating(true);
         try {
             const systemPrompt = currentRecipe
-                ? `You are refining an existing recipe. Here is the current recipe:
+                ? `Refine this recipe based on the user request.
+                   Current Recipe: ${currentRecipe}
+                   User Request: "${prompt}"`
+                : `Create a professional recipe based on: "${prompt}"`;
 
-${currentRecipe}
+            const fullPrompt = `${systemPrompt}
 
-The user wants this change: "${prompt}"
+            FORMATTING RULES:
+            1. title: Creative name for the dish.
+            2. ingredients: List each ingredient on a new line. In instructions, include quantities in parentheses briefly.
+            3. instructions: Write clear, step-by-step sentences. Break into small paragraphs.
+            4. TIMERS: Wrap all durations (e.g. 20 minutes) in double curly braces: {{20 minutes}}.
 
-Generate the updated recipe using the SAME format as before. Keep the same structure and only modify what's needed for the requested change.
-IMPORTANT: Wrap all time durations (e.g. "bake for 20 minutes", "let rest for 1 hour") in double curly braces like {{20 minutes}} or {{1 hour}}.`
-                : `You are a professional chef creating recipes. Generate a recipe based on this description:
+            RETURN JSON ONLY:
+            {
+                "title": "String",
+                "ingredients": "String (newline separated)",
+                "instructions": "String (newline separated paragraphs)"
+            }`;
 
-"${prompt}"
+            const parsed = await GeminiService.generateJSON<{
+                title: string;
+                ingredients: string;
+                instructions: string;
+            }>(fullPrompt);
 
-IMPORTANT FORMATTING RULES:
-1. The output must consist only of an 'Ingredients' section and an 'Instructions' section, with no introduction or concluding remarks.
-2. In the 'Ingredients' section, each ingredient must be on a single line.
-3. In the 'Instructions' section, the first time an ingredient is mentioned, include its quantity in parentheses immediately following the ingredient name.
-4. Write instructions as clear paragraphs, with each sentence as its own separate paragraph. Each instruction step should be broken down into individual sentences, making it easy to follow step-by-step and easy to check off when complete.
-5. Include cooking temperature and time where applicable. IMPORTANT: Wrap all durations (e.g. "bake for 20 minutes", "let rest for 1 hour") in double curly braces like {{20 minutes}} or {{1 hour}}.
-6. Start with a recipe title on the first line.
-
-Example format:
-
-🍪 Chocolate Chip Oatmeal Cookies
-
-Ingredients
-1 cup (2 sticks) unsalted butter, softened
-1 cup packed brown sugar
-
-Instructions
-Preheat your oven to 375°F (190°C).
-
-Line two baking sheets with parchment paper.
-
-In a large bowl, cream together the unsalted butter (1 cup/2 sticks), the packed brown sugar (1 cup), and the granulated sugar (1/2 cup) using an electric mixer until light and fluffy.
-
-Generate the recipe now:`;
-
-            const recipeText = await GeminiService.generateContent(systemPrompt);
-
-            const parsed = parseRecipe(recipeText);
             setGeneratedRecipe(parsed);
             setMode('preview');
             HapticFeedback.success();
@@ -234,25 +220,6 @@ Generate the recipe now:`;
         } finally {
             setIsGenerating(false);
         }
-    };
-
-    // Parse AI response
-    const parseRecipe = (text: string): Partial<Recipe> => {
-        const lines = text.trim().split('\n');
-        let title = lines[0].trim();
-
-        const ingredientsIndex = lines.findIndex(l => l.trim().toLowerCase() === 'ingredients');
-        const instructionsIndex = lines.findIndex(l => l.trim().toLowerCase() === 'instructions');
-
-        let ingredients = '';
-        let instructions = '';
-
-        if (ingredientsIndex >= 0 && instructionsIndex >= 0) {
-            ingredients = lines.slice(ingredientsIndex + 1, instructionsIndex).filter(l => l.trim()).join('\n');
-            instructions = lines.slice(instructionsIndex + 1).filter(l => l.trim()).join('\n\n');
-        }
-
-        return { title, ingredients, instructions };
     };
 
     // Recipe management

@@ -110,6 +110,10 @@ Save and organize your favorite Spotify tracks. Support for both simple URLs (co
 
 Record and play custom sound clips with categories. Create your own audio library for any occasion.
 
+### 🎸 Music Maker
+
+Guitar tuner and AI vocal song analyzer. Tune your guitar with a high-precision meter and sing your song ideas to let Gemini analyze the melody and harmonic structure.
+
 ## 🛠️ Utilities
 
 ### 🎡 Decision Spinner
@@ -140,6 +144,6 @@ Submit your own Spark idea and become a product manager. Help shape the future o
 
 ---
 
-**Total Sparks:** 29 unique mini-apps  
+**Total Sparks:** 30 unique mini-apps  
 **Categories:** Productivity, Travel, Food, Health, Education, Golf, Games, Media, Utilities, Community  
 **All Sparks:** Available now and ready to make your life...just a little bit better⚡️
