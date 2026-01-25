@@ -40,6 +40,7 @@ import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
+import SongMakerSpark from "../sparks/SongMakerSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import styled from "styled-components/native";
 
@@ -537,6 +538,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       properties: ["AI"],
     },
     component: BusinessSpark,
+  },
+  "song-maker": {
+    metadata: {
+      id: "song-maker",
+      title: "Song Maker",
+      description: "Clean guitar tuner and AI vocal song analyzer",
+      icon: "🎵🎸",
+      category: "media",
+      createdAt: "2026-01-21T00:00:00.000Z",
+      rating: 5.0,
+      properties: ["AI"],
+    },
+    component: SongMakerSpark,
   },
 };
 
