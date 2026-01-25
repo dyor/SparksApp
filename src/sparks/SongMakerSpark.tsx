@@ -207,6 +207,24 @@ export interface MusicAnalysisResult {
     key: string;
     bpm: number;
 }
+const ACCENT_INSTRUCTIONS: Record<string, string> = {
+    'canadian': 'Write with a thick Canadian accent. Use slang like "eh", "out and about", and references to cold weather or hockey where it fits.',
+    'texan': 'Write with a heavy Southern Texan drawl. Use slang like "y\'all", "fixin\' to", "reckon", and phonetic spellings for a slow, rhythmic drawl.',
+    'british': 'Write with a distinct British/RP accent. Use UK slang like "brilliant", "mate", "proper", and British spellings (e.g., "colour", "favour").',
+    'east-indian': 'Write with an East Indian rhythmic pattern and phrasing. Use local metaphors or polite/formal East Indian English structures where appropriate.',
+    'australian': 'Write with a strong Australian "Aussie" accent. Use slang like "crikey", "G\'day", "no worries", and references to the outback.',
+    'scottish': 'Write with a thick Scottish brogue. Use words like "wee", "bonnie", "lass", and phonetic spellings to capture the rolling R\'s and unique rhythm.',
+    'new-york': 'Write with a fast-paced, gritty New York accent. Use slang like "fuhgeddaboudit", "deadass", and specific local references.',
+    'southern-blues-male': 'Write as an old-fashioned male Southern blues singer. Use gritty, soulful language, references to the Delta, hardships, and deep Southern slang. Phrasing should be rhythmic and emotive.',
+    'southern-blues-female': 'Write as an old-fashioned female Southern blues singer (think Bessie Smith or Ma Rainey). Use powerful, soulful language, emotive phrasing, and deep Southern blues slang.',
+    'chipmunk': 'Write fun, high-energy lyrics suitable for a high-pitched, squeaky chipmunk character. Use playful language and short, bouncy phrases.',
+    'crooner': 'Write in the smooth, sophisticated style of a mid-century crooner (like Dean Martin or Bing Crosby). Use romantic, effortless phrasing, elegant language, and a relaxed, rhythmic swing.',
+    'neil-young': 'Write in the style of Neil Young. Use high-tenor, emotive phrasing, themes of nature, solitude, and social commentary. Lyrics should feel raw and authentic.',
+    'stevie-nicks': 'Write in the mystical, raspy style of Stevie Nicks. Use poetic, symbolic language (birds, lace, dreams, visions), and a velvety, rhythmic flow typical of Fleetwood Mac.',
+    'bob-dylan': 'Write in the iconic nasal, folk-poetic style of a young Bob Dylan. Use conversational "talk-singing" phrasing, complex metaphors, and a gritty rhythmic structure.',
+    'patsy-cline': 'Write in the moving, soulful style of Patsy Cline. Use rich, emotive language, themes of heartbreak and longing, and a smooth, classic Nashville rhythmic flow.',
+    'hank-williams': 'Write in the foundational honky-tonk style of Hank Williams Sr. Use simple but profound "lonesome" language, references to the road and late nights, and a rhythmic, soulful folk cadence.',
+};
 
 const SongMakerService = {
     analyzeVocalRecording: async (uri: string, songName: string, mimeType: string = 'audio/mp4'): Promise<MusicAnalysisResult | null> => {
@@ -303,27 +321,8 @@ const SongMakerService = {
     },
 
     generateAISong: async (userPrompt: string, accent: string = 'default'): Promise<Omit<MusicAnalysisResult, 'vocalUri'>> => {
-        const accentInstructions: Record<string, string> = {
-            'canadian': 'Write with a thick Canadian accent. Use slang like "eh", "out and about", and references to cold weather or hockey where it fits.',
-            'texan': 'Write with a heavy Southern Texan drawl. Use slang like "y\'all", "fixin\' to", "reckon", and phonetic spellings for a slow, rhythmic drawl.',
-            'british': 'Write with a distinct British/RP accent. Use UK slang like "brilliant", "mate", "proper", and British spellings (e.g., "colour", "favour").',
-            'east-indian': 'Write with an East Indian rhythmic pattern and phrasing. Use local metaphors or polite/formal East Indian English structures where appropriate.',
-            'australian': 'Write with a strong Australian "Aussie" accent. Use slang like "crikey", "G\'day", "no worries", and references to the outback.',
-            'scottish': 'Write with a thick Scottish brogue. Use words like "wee", "bonnie", "lass", and phonetic spellings to capture the rolling R\'s and unique rhythm.',
-            'new-york': 'Write with a fast-paced, gritty New York accent. Use slang like "fuhgeddaboudit", "deadass", and specific local references.',
-            'southern-blues-male': 'Write as an old-fashioned male Southern blues singer. Use gritty, soulful language, references to the Delta, hardships, and deep Southern slang. Phrasing should be rhythmic and emotive.',
-            'southern-blues-female': 'Write as an old-fashioned female Southern blues singer (think Bessie Smith or Ma Rainey). Use powerful, soulful language, emotive phrasing, and deep Southern blues slang.',
-            'chipmunk': 'Write fun, high-energy lyrics suitable for a high-pitched, squeaky chipmunk character. Use playful language and short, bouncy phrases.',
-            'crooner': 'Write in the smooth, sophisticated style of a mid-century crooner (like Dean Martin or Bing Crosby). Use romantic, effortless phrasing, elegant language, and a relaxed, rhythmic swing.',
-            'neil-young': 'Write in the style of Neil Young. Use high-tenor, emotive phrasing, themes of nature, solitude, and social commentary. Lyrics should feel raw and authentic.',
-            'stevie-nicks': 'Write in the mystical, raspy style of Stevie Nicks. Use poetic, symbolic language (birds, lace, dreams, visions), and a velvety, rhythmic flow typical of Fleetwood Mac.',
-            'bob-dylan': 'Write in the iconic nasal, folk-poetic style of a young Bob Dylan. Use conversational "talk-singing" phrasing, complex metaphors, and a gritty rhythmic structure.',
-            'patsy-cline': 'Write in the moving, soulful style of Patsy Cline. Use rich, emotive language, themes of heartbreak and longing, and a smooth, classic Nashville rhythmic flow.',
-            'hank-williams': 'Write in the foundational honky-tonk style of Hank Williams Sr. Use simple but profound "lonesome" language, references to the road and late nights, and a rhythmic, soulful folk cadence.',
-        };
-
-        const accentPrompt = accent !== 'default' && accentInstructions[accent]
-            ? `\nSTYLE/ACCENT: ${accentInstructions[accent]}\n`
+        const accentPrompt = accent !== 'default' && ACCENT_INSTRUCTIONS[accent]
+            ? `\nSTYLE/ACCENT: ${ACCENT_INSTRUCTIONS[accent]}\n`
             : '';
 
         const prompt = `
@@ -2082,7 +2081,7 @@ Generated by Sparks App
 
                 <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Accent / Style</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accentScroll}>
-                    {Object.keys(accentInstructions).map((acc) => (
+                    {Object.keys(ACCENT_INSTRUCTIONS).map((acc) => (
                         <TouchableOpacity
                             key={acc}
                             onPress={() => setPreferences({ aiVoiceAccent: acc })}
