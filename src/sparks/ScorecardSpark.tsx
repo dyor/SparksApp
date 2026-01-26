@@ -1,8 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from "expo-speech-recognition";
+import { Audio, AVPlaybackStatus } from "expo-av";
 import React, {
   useCallback,
   useEffect,
@@ -24,6 +21,7 @@ import {
   View,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -40,7 +38,17 @@ import {
   SettingsSection,
 } from "../components/SettingsComponents";
 import { ServiceFactory } from "../services/ServiceFactory";
-import { isExpoGo } from "../utils/expoGoDetection";
+import { AudioTranscriptionService } from "../services/AudioTranscriptionService";
+
+const SCORECARD_VERSION = "1.5.0";
+
+interface VoiceLogEntry {
+  timestamp: number;
+  rawText: string;
+  processedNums: number[];
+  status: "success" | "error" | "ambiguous";
+  message?: string;
+}
 
 
 
@@ -129,23 +137,14 @@ interface ScoringViewProps {
   setColorMode: (mode: "light" | "dark") => void;
   colors: any;
   styles: any;
-  // Lifted voice state
-  currentTranscript: string;
-  setCurrentTranscript: (v: string) => void;
-  errorMessage: string | null;
-  setErrorMessage: (v: string | null) => void;
-  voiceLog: { text: string; parsed: string; timestamp: number }[];
-  setVoiceLog: React.Dispatch<
-    React.SetStateAction<{ text: string; parsed: string; timestamp: number }[]>
-  >;
-  isRecording: boolean;
-  setIsRecording: (v: boolean) => void;
+  addVoiceLog: (entry: Omit<VoiceLogEntry, "timestamp">) => void;
 }
 
 interface SettingsViewProps {
   colorMode: "light" | "dark";
   setColorMode: (mode: "light" | "dark") => void;
   onCloseSettings?: () => void;
+  voiceLogs: VoiceLogEntry[];
 }
 
 // --- Colors ---
@@ -1198,21 +1197,17 @@ const ScoringView: React.FC<ScoringViewProps> = ({
   setColorMode,
   colors,
   styles,
-  // Voice state
-  isRecording,
-  setIsRecording,
-  currentTranscript,
-  setCurrentTranscript,
-  errorMessage,
-  setErrorMessage,
-  voiceLog,
-  setVoiceLog,
+  addVoiceLog,
 }) => {
   const round = rounds.find((r) => r.id === activeRoundId);
   const course = courses.find((c) => c.id === round?.course_id);
   const roundScores = scores.filter((s) => s.round_id === activeRoundId);
-  const speechTimeoutRef = useRef<any>(null);
-  const lastProcessedRef = useRef<{ text: string; time: number } | null>(null);
+
+  // Audio/Voice Refs
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   if (!round || !course) return null;
 
@@ -1234,11 +1229,10 @@ const ScoringView: React.FC<ScoringViewProps> = ({
     par: course.holes.reduce((sum, h) => sum + h.par, 0),
   };
 
-  // Handicap Index N/A display
+  // Handicap Index display
   const finishedRounds = rounds.filter(
     (r) => r.is_completed && r.handicap_differential !== undefined,
   );
-  // Filter out invalid differentials to prevent NaN/-Infinite issues and bad migration data (e.g. -54)
   const validDifferentials = finishedRounds
     .map((r) => ({ diff: r.handicap_differential!, type: r.diff_type || "18" }))
     .filter(
@@ -1262,12 +1256,10 @@ const ScoringView: React.FC<ScoringViewProps> = ({
       ? `${currentHandicapIndex.toFixed(1)} (CH: ${courseHandicap})`
       : "N/A";
 
-  // Calculate Total To Par (Sum of 'Net' column values which show Net Score vs Par)
   const totalToPar = roundScores.reduce((sum, s) => {
     if (!s.strokes) return sum;
     const hole = course.holes.find((h) => h.hole_number === s.hole_number);
     if (!hole) return sum;
-
     const strokesReceived = HandicapService.getStrokesForHole(
       courseHandicap,
       hole.stroke_index,
@@ -1281,203 +1273,382 @@ const ScoringView: React.FC<ScoringViewProps> = ({
   const cumulativePar = course.holes.reduce(
     (acc, h, i) => {
       const prevHoleNum = course.holes[i - 1]?.hole_number;
-      const par = h.par || 0;
-      acc[h.hole_number] = (acc[prevHoleNum] || 0) + (isNaN(par) ? 0 : par);
+      acc[h.hole_number] = (acc[prevHoleNum] || 0) + (h.par || 0);
       return acc;
     },
     {} as Record<number, number>,
   );
 
-  const totalCoursePar = totals.par || 72; // Avoid division by zero
-  const [h, m] = (course.expected_time || "4:00")
+  const [eh, em] = (course.expected_time || "4:00")
     .split(":")
     .map((val) => parseInt(val) || 0);
-  const expectedTimeTotalMinutes = h * 60 + m;
+  const expectedTimeTotalMinutes = eh * 60 + em;
 
   const holePaceMap = course.holes.reduce(
     (acc, h) => {
       acc[h.hole_number] =
-        ((cumulativePar[h.hole_number] || 0) / totalCoursePar) *
+        ((cumulativePar[h.hole_number] || 0) / (totals.par || 72)) *
         expectedTimeTotalMinutes;
       return acc;
     },
     {} as Record<number, number>,
   );
 
-  // Voice
-  useSpeechRecognitionEvent("start", () => setIsRecording(true));
-  useSpeechRecognitionEvent("end", () => setIsRecording(false));
-  useSpeechRecognitionEvent("result", (event) => {
-    const transcript = event.results[event.results.length - 1]?.transcript;
-    if (transcript) {
-      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
-      speechTimeoutRef.current = setTimeout(() => {
-        parseVoice(transcript);
-      }, 800);
-    }
-  });
-
   const canComplete = course.holes.every(
-    (h) =>
-      scoreMap[h.hole_number]?.strokes &&
-      parseInt(scoreMap[h.hole_number].strokes) > 0,
+    (h) => scoreMap[h.hole_number]?.strokes && parseInt(scoreMap[h.hole_number].strokes) > 0,
   );
 
-  const numberMap: Record<string, number> = {
-    one: 1,
-    two: 2,
-    three: 3,
-    four: 4,
-    five: 5,
-    six: 6,
-    seven: 7,
-    eight: 8,
-    nine: 9,
-    ten: 10,
-    zero: 0,
-    none: 0,
-    first: 1,
-    second: 2,
-    third: 3,
+  // --- Mobile Voice Core ---
+
+  const setupAudioMode = async (enable: boolean) => {
+    try {
+      const initialStatus = await Audio.getPermissionsAsync();
+      console.log("[Scorecard] Current Mic Permission:", initialStatus.status);
+
+      if (enable) {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
+        });
+
+        if (initialStatus.status !== "granted") {
+          console.log("[Scorecard] Requesting Mic Permission...");
+          const { status } = await Audio.requestPermissionsAsync();
+          addVoiceLog({
+            rawText: "[System]",
+            processedNums: [],
+            status: status === "granted" ? "success" : "error",
+            message: `Mic Permission Request: ${status}`,
+          });
+
+          if (status !== "granted") {
+            Alert.alert(
+              "Microphone Required",
+              "Microphone access is disabled. Please enable it in your device settings.",
+            );
+            return false;
+          }
+        }
+      } else {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          shouldDuckAndroid: false,
+          staysActiveInBackground: false,
+        });
+      }
+      return true;
+    } catch (e: any) {
+      console.warn("[Scorecard] Audio Mode Error:", e);
+      addVoiceLog({
+        rawText: "[System Error]",
+        processedNums: [],
+        status: "error",
+        message: e?.message || "AudioMode failure",
+      });
+      return false;
+    }
   };
 
   const parseVoice = (text: string) => {
-    const lowerText = text.toLowerCase();
+    console.log("[Scorecard] Parsing voice text:", text);
 
-    // Split by whitespace and common punctuation, but keep digits attached
-    const words = lowerText.split(/[\s,.:-]+/);
-    const nums: number[] = [];
+    const numberWords: Record<string, string> = {
+      zero: "0",
+      one: "1",
+      won: "1",
+      two: "2",
+      to: "2",
+      too: "2",
+      three: "3",
+      thru: "3",
+      four: "4",
+      for: "4",
+      fore: "4",
+      five: "5",
+      six: "6",
+      seven: "7",
+      eight: "8",
+      ate: "8",
+      nine: "9",
+      ten: "10",
+      eleven: "11",
+      twelve: "12",
+      thirteen: "13",
+      fourteen: "14",
+      fifteen: "15",
+      sixteen: "16",
+      seventeen: "17",
+      eighteen: "18",
+      nineteen: "19",
+      twenty: "20",
+    };
 
-    for (const word of words) {
-      // 1. Try digit extraction first (handles "5", "5th")
-      const digitMatch = word.match(/\d+/);
-      if (digitMatch) {
-        nums.push(parseInt(digitMatch[0]));
-      }
-      // 2. Try word mapping if no digit found
-      else if (numberMap[word] !== undefined) {
-        nums.push(numberMap[word]);
-      }
-    }
+    let processedText = text.toLowerCase();
+    Object.keys(numberWords).forEach((word) => {
+      const reg = new RegExp(`\\b${word}\\b`, "g");
+      processedText = processedText.replace(reg, numberWords[word]);
+    });
 
-    if (nums.length === 0) {
-      if (lowerText.trim()) {
-        setVoiceLog((prev) =>
-          [
-            {
-              text: lowerText,
-              parsed: "None",
-              timestamp: Date.now(),
-            },
-            ...prev,
-          ].slice(0, 5),
-        );
-      }
+    const matches = processedText.match(/\d+/g);
+    if (!matches || matches.length < 2) {
+      addVoiceLog({
+        rawText: text,
+        processedNums: matches ? matches.map((m) => parseInt(m)) : [],
+        status: "error",
+        message: "Need at least 2 digits (strokes putts).",
+      });
+      Alert.alert(
+        "Voice Not Recognized",
+        `Heard: "${text}"\n\nPlease say scores clearly, like '4 1'.`,
+      );
       return;
     }
 
-    // Deduplication: Check if the *content* (numbers) matches the last command
-    const commandKey = nums.join(",");
-    if (
-      lastProcessedRef.current &&
-      lastProcessedRef.current.text === commandKey &&
-      Date.now() - lastProcessedRef.current.time < 3000
-    ) {
-      return;
-    }
-    // Update ref with the KEY (numbers), not the raw text
-    lastProcessedRef.current = { text: commandKey, time: Date.now() };
+    const nums = matches.map((m) => parseInt(m));
+    console.log("[Scorecard] Extracted numbers:", nums);
 
-    if (nums.length >= 3) {
-      // Specific Hole: [hole] [strokes] [putts]
-      const [h, s, p] = nums.slice(-3);
-      if (h < 1 || h > course.holes.length) {
-        triggerError(`Invalid hole: ${h}`);
-        return;
-      }
-      if (s > 0 && p >= s) {
-        triggerError(`Hole ${h}: Putts (${p}) >= Strokes (${s})`);
-        return;
-      }
-      saveHoleScore(activeRoundId!, h, s, p);
-      const msg = `Hole ${h}: ${s} with ${p}`;
-      setCurrentTranscript(msg);
-      setVoiceLog((prev) =>
-        [{ text: lowerText, parsed: msg, timestamp: Date.now() }, ...prev].slice(
-          0,
-          5,
-        ),
-      );
-    } else if (nums.length === 2) {
-      // Next Hole: [strokes] [putts]
-      const nextHole = course.holes.find(
-        (h) => !scoreMap[h.hole_number]?.strokes,
-      );
-      if (nextHole) {
-        const [s, p] = nums;
-        if (s > 0 && p >= s) {
-          triggerError(
-            `Hole ${nextHole.hole_number}: Putts (${p}) >= Strokes (${s})`,
-          );
-          return;
+    const sortedHoles = [...course.holes].sort(
+      (a, b) => a.hole_number - b.hole_number,
+    );
+
+    let currentIndex = 0;
+    let successCount = 0;
+    const summaries: string[] = [];
+    const assignedHoles = new Set<number>();
+
+    while (currentIndex < nums.length) {
+      const remaining = nums.length - currentIndex;
+
+      // Rule 1: Hole-Stroke-Putt triplet
+      if (remaining >= 3 && nums[currentIndex] <= course.holes.length) {
+        const [h, s, p] = [
+          nums[currentIndex],
+          nums[currentIndex + 1],
+          nums[currentIndex + 2],
+        ];
+        if (s > 0) {
+          if (p >= s) {
+            Alert.alert(
+              "Invalid Input",
+              `Hole #${h}: Putts (${p}) must be less than strokes (${s}).`,
+            );
+            currentIndex += 3;
+            continue;
+          }
+          saveHoleScore(activeRoundId!, h, s, p);
+          assignedHoles.add(h);
+          successCount++;
+          summaries.push(`#${h}: ${s}-${p}`);
+          currentIndex += 3;
+          continue;
         }
-        saveHoleScore(activeRoundId!, nextHole.hole_number, s, p);
-        const msg = `Hole ${nextHole.hole_number}: ${s} with ${p}`;
-        setCurrentTranscript(msg);
-        setVoiceLog((prev) =>
-          [
-            { text: lowerText, parsed: msg, timestamp: Date.now() },
-            ...prev,
-          ].slice(0, 5),
-        );
-      } else {
-        triggerError("No more holes left");
       }
+
+      // Rule 2: Stroke-Putt pair (next available)
+      if (remaining >= 2) {
+        const [s, p] = [nums[currentIndex], nums[currentIndex + 1]];
+        if (s > 0) {
+          if (p >= s) {
+            Alert.alert(
+              "Invalid Input",
+              `Putts (${p}) must be less than strokes (${s}).`,
+            );
+            currentIndex += 2;
+            continue;
+          }
+          const nextHole = sortedHoles.find(
+            (h) =>
+              !assignedHoles.has(h.hole_number) &&
+              (!scoreMap[h.hole_number]?.strokes ||
+                parseInt(scoreMap[h.hole_number].strokes) === 0),
+          );
+          if (nextHole) {
+            saveHoleScore(activeRoundId!, nextHole.hole_number, s, p);
+            assignedHoles.add(nextHole.hole_number);
+            successCount++;
+            summaries.push(`#${nextHole.hole_number}: ${s}-${p}`);
+            currentIndex += 2;
+            continue;
+          }
+        }
+      }
+
+      currentIndex++;
+    }
+
+    if (successCount > 0) {
+      addVoiceLog({
+        rawText: text,
+        processedNums: nums,
+        status: "success",
+        message: `Saved: ${summaries.join(", ")}`,
+      });
+      HapticFeedback.success();
     } else {
-      if (nums.length > 0) {
-        triggerError(
-          `Incomplete: Heard ${nums.join(", ")} (Need strokes & putts)`,
-        );
-      } else {
-        triggerError(`Cannot Parse: "${lowerText}"`);
-      }
-      setVoiceLog((prev) =>
-        [
-          {
-            text: lowerText,
-            parsed: `Ignored: ${nums.join(", ")}`,
-            timestamp: Date.now(),
-          },
-          ...prev,
-        ].slice(0, 5),
+      addVoiceLog({
+        rawText: text,
+        processedNums: nums,
+        status: "ambiguous",
+        message: "No valid score patterns found.",
+      });
+      Alert.alert(
+        "Ambiguous Input",
+        `Parsed numbers: ${nums.join(", ")} from "${text}".\n\nI couldn't match these to a score.`,
       );
-      setCurrentTranscript("");
     }
   };
 
-  const triggerError = (msg: string) => {
-    setErrorMessage(null);
-    // Small delay to ensure state clears if it was already set
-    setTimeout(() => {
-      setErrorMessage(msg);
-      HapticFeedback.error();
-      // Longer timeout for visibility (user requested "few seconds")
-      setTimeout(() => setErrorMessage(null), 4000);
-    }, 50);
+  const cleanupRecording = async () => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+
+    try {
+      if (recordingRef.current) {
+        const status = await recordingRef.current.getStatusAsync();
+        if (status.canRecord) {
+          await recordingRef.current.stopAndUnloadAsync();
+        }
+        recordingRef.current = null;
+      }
+    } catch (error) {
+      console.warn("[Scorecard] Local Cleanup Error (Ignored):", error);
+    } finally {
+      setIsRecording(false);
+    }
   };
 
   const handleToggleMic = async () => {
+    addVoiceLog({
+      rawText: "[User Action]",
+      processedNums: [],
+      status: "success",
+      message: `Mic Button Pressed (isRecording: ${isRecording})`,
+    });
+
+    const stopFlow = async (recordingObj: Audio.Recording) => {
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+
+      try {
+        await recordingObj.stopAndUnloadAsync();
+        const uri = recordingObj.getURI();
+        recordingRef.current = null;
+        setIsRecording(false);
+
+        if (uri) {
+          setIsAnalyzing(true);
+          try {
+            const transcript = await AudioTranscriptionService.transcribe(uri);
+            if (transcript && transcript.trim()) {
+              parseVoice(transcript);
+            } else {
+              addVoiceLog({
+                rawText: "[AI Result]",
+                processedNums: [],
+                status: "error",
+                message: "No words detected in audio clip.",
+              });
+              Alert.alert(
+                "No Speech Detected",
+                "I couldn't hear any clear numbers. Try speaking louder or holding the phone closer.",
+              );
+            }
+          } catch (error: any) {
+            console.error("[Scorecard] Transcription error:", error);
+            addVoiceLog({
+              rawText: "[AI Error]",
+              processedNums: [],
+              status: "error",
+              message: error?.message || "AI Transcription Error",
+            });
+            Alert.alert("Error", "Could not transcribe your voice.");
+          } finally {
+            setIsAnalyzing(false);
+          }
+        }
+      } catch (error) {
+        console.error("[Scorecard] Stop recording error:", error);
+        setIsRecording(false);
+      }
+    };
+
     if (isRecording) {
-      ExpoSpeechRecognitionModule.stop();
-      setIsRecording(false);
+      if (recordingRef.current) {
+        await stopFlow(recordingRef.current);
+      } else {
+        setIsRecording(false);
+      }
     } else {
-      const res = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (res.granted) {
+      try {
+        await cleanupRecording();
+        const hasPermission = await setupAudioMode(true);
+        if (!hasPermission) return;
+
+        console.log("[Scorecard] Attempting to create recording session...");
+        const { recording } = await Audio.Recording.createAsync({
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          isMeteringEnabled: true,
+        });
+
+        recordingRef.current = recording;
         setIsRecording(true);
-        ExpoSpeechRecognitionModule.start({ lang: "en-US" });
+        HapticFeedback.light();
+        console.log("[Scorecard] Recording session active.");
+
+        let hasSpoken = false;
+        let silenceStartTime = 0;
+
+        recording.setOnRecordingStatusUpdate((status) => {
+          if (!status.isRecording || status.metering === undefined) return;
+
+          if (status.metering > -40) {
+            hasSpoken = true;
+            silenceStartTime = 0;
+          } else if (hasSpoken && status.metering < -45) { // v1.4.0: Raised threshold from -50 to -45 for reliability
+            if (silenceStartTime === 0) {
+              silenceStartTime = Date.now();
+            } else if (Date.now() - silenceStartTime > 900) { // v1.4.0: Reduced duration from 1200ms to 900ms for snappiness
+              console.log("[Scorecard] Auto-Stop: Silence detected.");
+              stopFlow(recording);
+            }
+          }
+        });
+
+        recordingTimeoutRef.current = setTimeout(() => {
+          if (recordingRef.current) {
+            console.log("[Scorecard] 7s Safety Timeout reached.");
+            stopFlow(recordingRef.current);
+          }
+        }, 7000);
+      } catch (error: any) {
+        console.error("[Scorecard] createAsync error:", error);
+        addVoiceLog({
+          rawText: "[Microphone Error]",
+          processedNums: [],
+          status: "error",
+          message: error?.message || "Failed to start recorder object",
+        });
+        await cleanupRecording();
+        Alert.alert(
+          "Recording Failed",
+          `Could not access microphone: ${error?.message || "Unknown error"}. Check system settings.`,
+        );
       }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      cleanupRecording();
+    };
+  }, []);
 
   return (
     <KeyboardAvoidingView
@@ -1490,7 +1661,7 @@ const ScoringView: React.FC<ScoringViewProps> = ({
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: "center" }}>
           <Text style={styles.headerTitle}>{course.name}</Text>
-          <Text style={styles.helpText}>Ex: 5 and 2</Text>
+          <Text style={styles.helpText}>Ex: 5 2</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 15 }}>
           <TouchableOpacity onPress={() => setShowHelp(true)}>
@@ -1511,23 +1682,27 @@ const ScoringView: React.FC<ScoringViewProps> = ({
               color={colors.primary}
             />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleToggleMic}
+            style={[
+              styles.micButtonSmall,
+              isRecording && { backgroundColor: colors.danger },
+              isAnalyzing && { backgroundColor: colors.textSecondary },
+            ]}
+            disabled={isAnalyzing}
+          >
+            {isAnalyzing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={isRecording ? "mic" : "mic-outline"}
+                size={18}
+                color="#fff"
+              />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
-
-      {/* Error Message Overlay */}
-      {errorMessage && (
-        <View
-          style={[
-            styles.activeVoiceBanner,
-            { backgroundColor: colors.danger + "20" },
-          ]}
-        >
-          <Ionicons name="warning" size={16} color={colors.danger} />
-          <Text style={[styles.voiceStatusText, { color: colors.danger }]}>
-            {errorMessage}
-          </Text>
-        </View>
-      )}
 
       {/* Sub-header Area */}
       <View style={styles.subHeader}>
@@ -1537,33 +1712,18 @@ const ScoringView: React.FC<ScoringViewProps> = ({
             {indexText}
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-          <TouchableOpacity
-            style={[
-              styles.completeRoundHeaderButton,
-              !canComplete && { backgroundColor: "#cccccc", opacity: 0.7 },
-            ]}
-            onPress={() => markRoundComplete(activeRoundId!)}
-            disabled={!canComplete}
-          >
-            <Text style={styles.completeRoundHeaderButtonText}>
-              COMPLETE ROUND
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleToggleMic}
-            style={[
-              styles.micButtonSmall,
-              isRecording && { backgroundColor: colors.danger },
-            ]}
-          >
-            <Ionicons
-              name={isRecording ? "mic" : "mic-outline"}
-              size={24}
-              color="#fff"
-            />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.completeRoundHeaderButton,
+            !canComplete && { backgroundColor: "#cccccc", opacity: 70 },
+          ]}
+          onPress={() => markRoundComplete(activeRoundId!)}
+          disabled={!canComplete}
+        >
+          <Text style={styles.completeRoundHeaderButtonText}>
+            COMPLETE ROUND
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Consolidated Time Row */}
@@ -1673,6 +1833,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   colorMode,
   setColorMode,
   onCloseSettings,
+  voiceLogs,
 }) => {
   const [showScorecardFeatures, setShowScorecardFeatures] = useState(false);
   const colors = Colors[colorMode];
@@ -1688,6 +1849,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             icon="⛳"
             sparkId="scorecard"
           />
+          <View style={{ alignItems: "center", marginTop: -10, marginBottom: 10 }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+              v{SCORECARD_VERSION}
+            </Text>
+          </View>
           <SettingsFeedbackSection sparkName="Scorecard" sparkId="scorecard" />
 
           <SettingsSection title="Appearance">
@@ -1698,6 +1864,91 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               }
               variant="outline"
             />
+          </SettingsSection>
+
+          <SettingsSection title="Voice Debug Log">
+            {voiceLogs.length === 0 ? (
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 12,
+                  padding: 10,
+                  textAlign: "center",
+                }}
+              >
+                No voice entries yet.
+              </Text>
+            ) : (
+              voiceLogs.map((log, i) => (
+                <View
+                  key={log.timestamp}
+                  style={{
+                    padding: 10,
+                    borderBottomWidth: i === voiceLogs.length - 1 ? 0 : 1,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        color: colors.textSecondary,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "bold",
+                        color:
+                          log.status === "success"
+                            ? colors.success
+                            : log.status === "error"
+                              ? colors.danger
+                              : "#FFA500",
+                      }}
+                    >
+                      {log.status.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 13, color: colors.text }}>
+                    Heard: "{log.rawText}"
+                  </Text>
+                  {log.processedNums.length > 0 && (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: colors.textSecondary,
+                        fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+                        marginTop: 2,
+                      }}
+                    >
+                      Nums: {log.processedNums.join(", ")}
+                    </Text>
+                  )}
+                  {log.message && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: colors.textSecondary,
+                        fontStyle: "italic",
+                        marginTop: 2,
+                      }}
+                    >
+                      {log.message}
+                    </Text>
+                  )}
+                </View>
+              ))
+            )}
           </SettingsSection>
 
           <SettingsButton
@@ -1872,14 +2123,14 @@ export const ScorecardSpark: React.FC<{
   const [scores, setScores] = useState<Score[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [voiceLogs, setVoiceLogs] = useState<VoiceLogEntry[]>([]);
 
-  // Lifted voice state for global overlay and Help access
-  const [currentTranscript, setCurrentTranscript] = useState("");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [voiceLog, setVoiceLog] = useState<
-    { text: string; parsed: string; timestamp: number }[]
-  >([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const addVoiceLog = useCallback((entry: Omit<VoiceLogEntry, "timestamp">) => {
+    setVoiceLogs((prev) => [
+      { ...entry, timestamp: Date.now() },
+      ...prev.slice(0, 19), // Keep last 20 entries
+    ]);
+  }, []);
 
   // Derived State
   const colors = Colors[colorMode];
@@ -1945,7 +2196,7 @@ export const ScorecardSpark: React.FC<{
       course_id: courseId,
       course_name: course.name,
       timestamp: Date.now(),
-      begin_time: Date.now(),
+      // begin_time: Date.now(), // v1.5.0: No longer set by default.
       is_completed: false,
     };
 
@@ -2023,7 +2274,24 @@ export const ScorecardSpark: React.FC<{
           let end_time = r.end_time;
 
           const course = courses.find((c) => c.id === r.course_id);
-          if (course && holeNumber === course.holes.length && safeStrokes > 0)
+          if (!course) return r;
+
+          // v1.5.0: Smart Start Time (Auto-backfill Hole 1)
+          if (holeNumber === 1 && !begin_time && safeStrokes > 0) {
+            const [eh, em] = (course.expected_time || "4:00")
+              .split(":")
+              .map((val) => parseInt(val) || 0);
+            const totalMinutes = eh * 60 + em;
+            const totalPar = course.holes.reduce((sum, h) => sum + h.par, 0);
+            const hole1Par = course.holes.find((h) => h.hole_number === 1)?.par || 4;
+
+            // Expected minutes to complete hole 1 = (Hole1Par / TotalPar) * TotalPace
+            const expectedMinutes = (hole1Par / (totalPar || 72)) * totalMinutes;
+            begin_time = Date.now() - (expectedMinutes * 60000);
+            console.log("[Scorecard] Smart Start: Backfilling Start Time (minus", Math.round(expectedMinutes), "mins).");
+          }
+
+          if (holeNumber === course.holes.length && safeStrokes > 0)
             end_time = Date.now();
           return { ...r, begin_time, end_time };
         }
@@ -2056,22 +2324,16 @@ export const ScorecardSpark: React.FC<{
     const totalStrokes = roundScores.reduce((sum, s) => sum + s.strokes, 0);
 
     // Calculate handicap using only COMPLETED rounds
-    const previousCompletedRounds = rounds.filter(
-      (r) => r.is_completed && r.handicap_differential !== undefined,
-    );
-    const validDifferentials = previousCompletedRounds
-      .map((r) => ({
-        diff: r.handicap_differential!,
-        type: r.diff_type || "18",
-      }))
-      .filter(
-        (d) =>
-          !isNaN(d.diff) && isFinite(d.diff) && d.diff > -20 && d.diff < 60,
-      ) as { diff: number; type: "9" | "18" }[];
-
-    const currentHandicapIndex =
-      HandicapService.calculateHandicap(validDifferentials);
     const totalPar = course.holes.reduce((sum, h) => sum + h.par, 0);
+    const currentHandicapIndex = HandicapService.calculateHandicap(
+      rounds
+        .filter((r) => r.is_completed && r.handicap_differential !== undefined)
+        .map((r) => ({
+          diff: r.handicap_differential!,
+          type: r.diff_type || "18",
+        })),
+    );
+
     const courseHandicap =
       currentHandicapIndex !== null
         ? HandicapService.calculateCourseHandicap(
@@ -2129,6 +2391,7 @@ export const ScorecardSpark: React.FC<{
         colorMode={colorMode}
         setColorMode={setColorMode}
         onCloseSettings={onCloseSettings}
+        voiceLogs={voiceLogs}
       />
     );
 
@@ -2170,15 +2433,7 @@ export const ScorecardSpark: React.FC<{
           setColorMode={setColorMode}
           colors={colors}
           styles={styles}
-          // Voice state passed down
-          currentTranscript={currentTranscript}
-          setCurrentTranscript={setCurrentTranscript}
-          errorMessage={errorMessage}
-          setErrorMessage={setErrorMessage}
-          voiceLog={voiceLog}
-          setVoiceLog={setVoiceLog}
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
+          addVoiceLog={addVoiceLog}
         />
       )}
 
@@ -2411,7 +2666,7 @@ const getStyles = (colors: any) =>
       flexDirection: "row",
       paddingHorizontal: 16,
       paddingVertical: 6,
-      backgroundColor: "#F8F8F8",
+      backgroundColor: colors.border, // v1.4.1: Responsive background
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
@@ -2438,13 +2693,13 @@ const getStyles = (colors: any) =>
     holeNumber: { fontSize: 16, fontWeight: "bold", color: colors.text },
     parText: { fontSize: 16, color: colors.textSecondary, textAlign: "center" },
     tableInput: {
-      backgroundColor: "#F9F9F9",
+      backgroundColor: colors.background, // v1.4.1: Responsive background
       borderRadius: 6,
       paddingVertical: 4,
       textAlign: "center",
       color: colors.text,
       borderWidth: 1,
-      borderColor: "#E0E0E0",
+      borderColor: colors.border, // v1.4.1: Responsive border
       marginHorizontal: 4,
       fontSize: 16,
     },
@@ -2463,7 +2718,7 @@ const getStyles = (colors: any) =>
       flexDirection: "row",
       paddingHorizontal: 16,
       paddingVertical: 15,
-      backgroundColor: "#F8F8F8",
+      backgroundColor: colors.background, // v1.4.1: Responsive background
       borderTopWidth: 2,
       borderTopColor: colors.border,
     },
