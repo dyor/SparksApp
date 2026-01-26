@@ -533,7 +533,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       icon: "💼",
       category: "productivity",
       createdAt: "2026-01-23T00:00:00.000Z",
-      rating: 5.0,
+      rating: 4.5,
       properties: ["AI"],
     },
     component: BusinessSpark,

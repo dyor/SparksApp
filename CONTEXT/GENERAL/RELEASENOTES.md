@@ -2,6 +2,20 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
+### Version 1.0.37 released Jan 26, 2026
+
+Revised the Business Simulator spark into the CFO Simulator spark, a narrative-driven business simulation where you learn accounting by running a 3D printing company. Powered by a new "AI Dungeon Master" architecture that combines creative storytelling with strict double-entry bookkeeping validation. Try it out and learn the basics of running the books for a small business. 
+
+- **New Spark: CFO Simulator**:
+    - **AI-Driven Gameplay**: Replaced static logic with a dynamic Gemini-powered engine that generates unique business scenarios and outcomes based on your decisions.
+    - **Strict Accounting Engine**: Implemented a `LedgerEngine` that validates every AI-generated transaction against real-world accounting rules (Assets = Liabilities + Equity), ensuring educational accuracy.
+    - **Interactive Narrative**: Users make strategic choices (e.g., "Buy cheap plastic" vs "Invest in marketing") and receive immediate financial feedback via an intuitive dashboard.
+- **Infrastructure & Stability**:
+    - **Gemini JSON Hardening**: Fixed a critical crash caused by malformed AI responses by enforcing strict JSON schemas in the system prompt.
+    - **Codebase Consolidation**: Archived legacy prototypes and centralized the Business Spark architecture for better maintainability.
+
+---
+
 ### Version 1.0.36 released Jan 22, 2026
 
 Big upgrades to the Soundboard Spark including precision trimming, visual playback feedback, and instant-play performance optimizations. Improvements to RecAIpe spark including embedded timers to keep your cooking on track. Bug fixes for Coming Up, Minute Minder, and Tee Time Timer sparks.

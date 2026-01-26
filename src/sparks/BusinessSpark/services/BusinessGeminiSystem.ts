@@ -41,6 +41,33 @@ export const BusinessGeminiSystem = {
     
     **USER ACTION:**
     "${userAction}"
+
+    **REQUIRED JSON STRUCTURE (Example):**
+    {
+      "narrative_outcome": "You bought new equipment...",
+      "mentor_feedback": "Assets increased, Cash decreased. No P&L impact yet.",
+      "journal_entries": [
+        {
+           "debit_account": "Equipment",
+           "credit_account": "Cash",
+           "amount": 500,
+           "description": "Purchase of high-speed nozzle"
+        }
+      ],
+      "ops_updates": {
+        "inventory_mass_change_kg": 0,
+        "machine_health_change": 10,
+        "new_week_number": ${currentState.week + 1}
+      },
+      "next_options": [
+        {
+          "id": "opt_1",
+          "label": "Buy materials",
+          "type": "operational",
+          "estimated_cost_preview": "$200"
+        }
+      ]
+    }
     `;
 
         try {

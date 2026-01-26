@@ -2233,30 +2233,6 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - RNCPicker (2.11.4):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.11.18.00)
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-hermes
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Yoga
   - RNDateTimePicker (8.4.1):
     - DoubleConversion
     - glog
@@ -2565,7 +2541,6 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
-  - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBRemoteConfig (from `../node_modules/@react-native-firebase/remote-config`)"
@@ -2823,8 +2798,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
-  RNCPicker:
-    :path: "../node_modules/@react-native-picker/picker"
   RNDateTimePicker:
     :path: "../node_modules/@react-native-community/datetimepicker"
   RNFBApp:
@@ -2972,7 +2945,6 @@ SPEC CHECKSUMS:
   ReactCodegen: 3d5c9def468f7df3b90b05d3098ab8d47d76c62e
   ReactCommon: 4c22936ee38ecf885efc95ac5832f430f27e0271
   RNCAsyncStorage: 646c1bf2ebfc78d6632a3b0399f471fba8101e73
-  RNCPicker: d957426e631657b70d391c4193db87c91c8406b3
   RNDateTimePicker: cbba58b7fde72d73362a8896b9815498c8e014b2
   RNFBApp: 0c4cadae3900893d4631ea9a9effd14f853cd8e0
   RNFBRemoteConfig: 34254f2c0f5d5490bb2036f4af050bdd6ff2a645
