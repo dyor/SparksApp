@@ -61,6 +61,13 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleStateChange = React.useCallback((state: any) => {
     // Handle spark state changes
     console.log("Spark state changed:", state);
+
+    // Handle openSettings signal
+    if (state.openSettings) {
+      navigation.setParams({ showSettings: true } as any);
+      return;
+    }
+
     // Handle dark mode for final-clock spark
     if (sparkId === "final-clock" && state.darkMode !== undefined) {
       setSparkDarkMode((prev) => {
@@ -70,7 +77,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
         return prev;
       });
     }
-  }, [sparkId]);
+  }, [sparkId, navigation]);
 
   // Reset dark mode when leaving the spark
   useEffect(() => {

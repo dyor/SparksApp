@@ -1,9 +1,7 @@
 # 🏗️ Codebase Architecture & Reference Guide
 
 > [!NOTE]
-> For the primary **Spark Creation Workflow** (branching, development, preview, and publishing), please refer to the root [AGENTS.md](file:///Users/mattdyor/SparksApp/AGENTS.md).
-
-This document serves as a deep-dive reference for the architectural patterns, design standards, and internal workflows of the SparksApp codebase.
+> For all agent instructions and workflows, please refer to the primary guide: `CONTEXT/GENERAL/SKILLS.md`. This document now serves as a deep-dive reference for architectural patterns, design standards, and internal workflows of the SparksApp codebase, but not the primary source of agent instructions.
 
 ---
 
@@ -70,7 +68,6 @@ Consistency is key. Follow `CONTEXT/GENERAL/SETTINGSDESIGN.md` strictly.
 
 ## 📂 Key Documentation References
 
-*   [AGENTS.md (Root)](file:///Users/mattdyor/SparksApp/AGENTS.md) ⭐ **Primary Workflow**
 *   [SPARK_DEVELOPMENT_GUIDE.md](file:///Users/mattdyor/SparksApp/CONTEXT/GENERAL/SPARK_DEVELOPMENT_GUIDE.md) - Code templates.
 *   [SETTINGSDESIGN.md](file:///Users/mattdyor/SparksApp/CONTEXT/GENERAL/SETTINGSDESIGN.md) - UI standards.
 *   [DEPLOYMENT.md](file:///Users/mattdyor/SparksApp/CONTEXT/GENERAL/DEPLOYMENT.md) - Release procedures.

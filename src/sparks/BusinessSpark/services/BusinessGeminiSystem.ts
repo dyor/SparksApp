@@ -2,86 +2,87 @@ import { GeminiService } from '../../../services/GeminiService';
 import { BusinessState, GameTurnResponse, VALID_ACCOUNTS } from '../types';
 
 export const BusinessGeminiSystem = {
-    /**
-     * Generates the next turn based on the current state and user action.
-     */
-    generateTurn: async (currentState: BusinessState, userAction: string): Promise<GameTurnResponse> => {
-
-        const context = `
-    You are the **Business Spark Engine**, an expert forensic accountant and business simulation master.
+  /**
+   * Generates the next turn based on the current state and user action.
+   */
+  generateTurn: async (currentState: BusinessState, userAction: string): Promise<GameTurnResponse> => {
+    const context = `
+    You are the **Empire Business Engine**, a master storyteller and expert forensic accountant.
     
-    **GOAL:** Teach the user accounting intuition (Cash Flow vs Profit, Balance Sheets) via a 3D printing business simulation.
+    **CONTEXT:** The user is building a 3D printing empire from NOTHING in a "Wolf of Wall Street" energy world. Ambitious, high-stakes, bold moves.
     
-    **RULES:**
-    1. Time: Each turn = 1 week.
-    2. Logic: Events must be realistic. Machines break, clients pay late.
-    3. Accounting: Return ONLY valid double-entry bookkeeping moves.
-    4. Output: STRICT JSON. No markdown.
+    **BUSINESS RULES & ECONOMY:**
+    - **Startup Phase:** The user begins with $0. The FIRST move MUST be "Invest $1,000 of personal savings into the business" (Owner's Equity).
+    - **Asset Costs:** 3D Printer = $600. Filament = $20/kg.
+    - **Overhead:** Shopify Site = $100 setup, then $30/month (every 4 turns/weeks).
+    - **Sales:** 
+        - First Run Order = $100 (Price) - $5 (Shipping) - $0.50 (Material: 25g) = Profit.
+        - Secondary Order = $25 (Price) - $5 (Shipping) - $0.50 (Material: 25g) = Profit.
+    - **Capacity:** Max 4 prints per day (28/week) per machine.
+    - **Marketing:** $100 ad campaign = 1 new customer/day for 2 days. 
+    - **Retention:** Each first-time customer orders a secondary print every 3 days indefinitely.
+    - **Maintenance:** Each print = 1% health loss. At 0%, machine needs $100 repair.
+    - **Repair Logic:** Max health potential drops 10% after each repair (100 -> 90 -> 80...).
     
-    **ACCOUNTS ALLOWED:**
-    ${VALID_ACCOUNTS.join(', ')}
+    **TONE:** 
+    - Ambitious and exciting. Every decision is a step toward an empire.
+    - Educational: Explain how moves impact the Three Financial Statements (Income Stmt, Balance Sheet, Cash Flow).
+    - Hard-hitting: Machines break, shipping delays happen, cash is oxygen.
     
-    **INSTRUCTIONS:**
-    1. Analyze the User's Action + Current State.
-    2. Determine outcome probability.
-    3. Generate "narrative_outcome" (The Story).
-    4. Generate "journal_entries" (The Math).
-       - If buying assets: Dr Asset, Cr Cash.
-       - If selling: Dr Cash/AR, Cr Revenue AND Dr COGS, Cr Inventory.
-       - If making a profit: Balance Sheet MUST balance.
-    5. Generate "mentor_feedback" (The Lesson). Explain clearly why the cash/profit changed.
-    6. Generate "next_options" (3 choices: Safe, Risky, Admin).
+    **OUTPUT RULES:**
+    1. Return ONLY STRICT JSON.
+    2. Total Debits MUST equal Total Credits across all entries.
+    3. Use ONLY valid accounts: Cash, Accounts Receivable, Inventory, Equipment, Accounts Payable, Loans Payable, Owner's Equity, Retained Earnings, Sales Revenue, COGS, Rent, Marketing, Maintenance, Salaries, Depreciation.
     
     **CURRENT STATE:**
     Week: ${currentState.week}
-    Cash: ${currentState.cash}
-    Inventory: ${currentState.inventory_kg} kg
-    Machine Health: ${currentState.machine_health}%
-    Last Turn: ${currentState.turn_history.length > 0 ? currentState.turn_history[currentState.turn_history.length - 1].narrative_outcome : 'Start of Game'}
+    Cash: $${currentState.cash}
+    Inventory: ${currentState.inventory_kg}kg
+    Machines: ${currentState.machines?.length || 0}
+    Customers: ${currentState.active_repeat_customers || 0} active Repeat, ${currentState.customers_first_run_queue || 0} first-run in queue.
     
     **USER ACTION:**
     "${userAction}"
 
-    **REQUIRED JSON STRUCTURE (Example):**
+    **JSON RESPONSE STRUCTURE:**
     {
-      "narrative_outcome": "You bought new equipment...",
-      "mentor_feedback": "Assets increased, Cash decreased. No P&L impact yet.",
+      "narrative_outcome": "The energy in the room is electric. You just [Story Outcome]...",
+      "mentor_feedback": "[Explain the math: e.g. Why cash went down but assets went up. Mention the 3-statement impact.]",
       "journal_entries": [
-        {
-           "debit_account": "Equipment",
-           "credit_account": "Cash",
-           "amount": 500,
-           "description": "Purchase of high-speed nozzle"
-        }
+        { "debit_account": "Cash", "credit_account": "Owner's Equity", "amount": 1000, "description": "Owner investment" }
+        // ... more entries as needed
       ],
       "ops_updates": {
         "inventory_mass_change_kg": 0,
-        "machine_health_change": 10,
-        "new_week_number": ${currentState.week + 1}
+        "new_week_number": ${currentState.week + 1},
+        "machines": [ // Return FULL updated array of machines
+           { "id": "m1", "model": "Basic Pro", "health": 99, "maxHealth": 100 }
+        ],
+        "growth_engine": {
+           "first_run_queue_delta": 0,
+           "repeat_customers_delta": 0,
+           "has_shopify": ${currentState.has_shopify},
+           "monthly_costs": ${currentState.monthly_costs}
+        }
       },
       "next_options": [
-        {
-          "id": "opt_1",
-          "label": "Buy materials",
-          "type": "operational",
-          "estimated_cost_preview": "$200"
-        }
+        { "id": "o1", "label": "Buy materials", "type": "operational", "estimated_cost_preview": "$20" }
+        // ... include a strategic "Review the books" option frequently
       ]
     }
     `;
 
-        try {
-            const response = await GeminiService.generateJSON<GameTurnResponse>(context);
+    try {
+      const response = await GeminiService.generateJSON<GameTurnResponse>(context);
 
-            // Basic runtime validation of structure
-            if (!response.journal_entries || !Array.isArray(response.journal_entries)) {
-                throw new Error("Invalid response: Missing journal_entries");
-            }
+      if (!response.journal_entries || !Array.isArray(response.journal_entries)) {
+        throw new Error("Invalid response from AI: Missing journal entries");
+      }
 
-            return response;
-        } catch (error) {
-            console.error("Gemini Business Generation Failed:", error);
-            throw error;
-        }
+      return response;
+    } catch (error) {
+      console.error("Gemini Business Generation Failed:", error);
+      throw error;
     }
+  }
 };

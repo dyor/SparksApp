@@ -528,8 +528,8 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   "business-spark": {
     metadata: {
       id: "business-spark",
-      title: "CFO Simulator",
-      description: "Learn accounting by running a 3D printing business",
+      title: "Empire",
+      description: "Build a 3D printing empire from nothing. Learn accounting through bold business moves.",
       icon: "💼",
       category: "productivity",
       createdAt: "2026-01-23T00:00:00.000Z",

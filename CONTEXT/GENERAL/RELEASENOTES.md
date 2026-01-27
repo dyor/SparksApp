@@ -110,7 +110,7 @@ Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in
 - **Enhanced Visual Celebrations**: Created a reusable `CelebrationOverlay` component supporting high-quality Confetti, Fire (🔥), and Poop (💩) animations across all sparks.
 - **Settings UI Polish**: Optimized safe area spacing for iPhone Dynamic Island/notch, fixed modal keyboard styling, and resolved double-tap requirements for feedback submission.
 - **Native Module Stability**: Implemented proactive Expo Go detection to prevent native module crashes and fixed critical iOS recording errors in Soundboard spark.
-- **Developer Experience**: Renamed and centralized agent instructions in `AGENTS.md`, including a new "COMMON CODE" reference for reusable services and components.
+- **Developer Experience**: Migrated agent instructions from `AGENTS.md` to a new skill-based framework in `CONTEXT/GENERAL/SKILLS.md`, deprecating `AGENTS.md`. This enhances clarity, maintainability, and modularity of agent guidance.
 - **Reliability & Performance**: Fixed data persistence issues in Tee Time Timer and resolved New Architecture build failures by optimizing library dependencies.
 
 ## Version 1.0.25 released Jan 7, 2026

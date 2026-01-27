@@ -201,5 +201,44 @@ When executing this plan:
 3.  **Hardcode the 'Accounts'.** Do not let the AI name accounts dynamically. Use the `VALID_ACCOUNTS` constant as a runtime check.
 4.  **Error Handling.** If Gemini fails or timeouts, provide a "Manual Override" or "Retry" option in the UI so the user isn't stuck.
 
-## 8. Next Immediate Step
-Create the directory structure and the core `types.ts` to establish the contract.
+## 8. Upcoming Improvements (Empire Refactor)
+
+We are refactoring the simulation into **"Empire"**, a high-stakes, Wolf of Wall Street styled journey to build a 3D printing titan.
+
+### 8.1 Game Economics & Rules
+*   **Starting State:** 
+    *   $0 Cash. 
+    *   0kg Filament. 
+    *   0 Machines.
+*   **The First Phase (Guided):** The first 4 moves are critical to capitalize and initialize the business:
+    1.  **Capitalization:** Put in $1,000 of personal cash (Owner's Equity).
+    2.  **Equipment:** Buy a printer ($600).
+    3.  **Materials:** Buy 1kg filament ($20).
+    4.  **Platform:** Set up Shopify ($100 setup + $30/month recurring).
+*   **Growth Mechanics:**
+    *   **Marketing:** $100 ad campaign = 1 new customer/day for 2 days.
+    *   **Retention:** Every first-time customer orders a secondary print every 3 days.
+    *   **Pricing:** First run order = $100. Secondary prints = $25.
+    *   **Capcity:** Max 4 prints per day per machine.
+    *   **Unit Economics:**
+        *   Each print consumes 25g filament ($0.50 cost).
+        *   Shipping cost = $5 per order.
+*   **Maintenance:** 
+    *   Each print = 1% health loss. 
+    *   At 0%, requires $100 repair.
+    *   Max health degradation: 1st repair -> 90%, 2nd -> 80%, etc.
+
+### 8.2 UI Layout (Expandable Panels)
+The UI will be organized into 3 mutually exclusive expandable panels:
+1.  **Books (Top):**
+    *   Linked Financial Statements (Income Statement, Balance Sheet, Cash Flow Statement).
+    *   Must show how items like Depreciation and Working Capital link between statements.
+2.  **Narrative (Middle):** 
+    *   The "Wolf of Wall Street" energy story feed.
+3.  **Options (Bottom):** 
+    *   Next strategic moves.
+
+### 8.3 Technical requirements
+*   **Restart Functionality:** Add a way to reset the game state.
+*   **Statement Linking:** Implement logic to derive all 3 statements from the Ledger history.
+*   **Wolf of Wall Street Style:** System prompt updated for ambitious, high-energy storytelling focusing on "the books tell the story".

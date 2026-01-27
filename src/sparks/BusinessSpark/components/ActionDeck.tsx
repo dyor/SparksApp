@@ -26,9 +26,14 @@ export const ActionDeck: React.FC<ActionDeckProps> = ({ options, onSelectOption,
             <View style={styles.container}>
                 <TouchableOpacity
                     style={[styles.button, styles.primaryButton]}
-                    onPress={() => onSelectOption({ id: 'start', label: 'Open for Business ($1000 Capital)', type: 'strategic', estimated_cost_preview: '$0' })}
+                    onPress={() => onSelectOption({
+                        id: 'start',
+                        label: 'Pull the trigger: Form business ($300) and capitalize with $1,000',
+                        type: 'strategic',
+                        estimated_cost_preview: '$1300'
+                    })}
                 >
-                    <Text style={styles.buttonText}>Start Business</Text>
+                    <Text style={styles.buttonText}>Establish Empire & Start</Text>
                 </TouchableOpacity>
             </View>
         );

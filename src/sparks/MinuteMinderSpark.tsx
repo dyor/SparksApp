@@ -11,6 +11,7 @@ import Svg, { Circle } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { GeminiService } from '../services/GeminiService';
+import { Dropdown, DropdownOption } from '../components/shared/Dropdown';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 import {
@@ -26,6 +27,12 @@ interface Activity {
   duration: number; // minutes
   name: string;
   order: number;
+}
+
+interface Template {
+  id: string;
+  name: string;
+  schedule: string; // Same format as activitiesText
 }
 
 interface TimerState {
@@ -131,6 +138,8 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const [breakDuration, setBreakDuration] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
   const isHydrated = useSparkStore(state => state.isHydrated);
 
@@ -143,6 +152,9 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     const savedData = getSparkData('minute-minder');
     if (savedData.activitiesText) {
       setActivitiesText(savedData.activitiesText);
+    }
+    if (savedData.templates && Array.isArray(savedData.templates)) {
+      setTemplates(savedData.templates);
     }
     if (savedData.timerState) {
       const savedTimerState = savedData.timerState;
@@ -292,6 +304,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 
     setSparkData('minute-minder', {
       activitiesText,
+      templates,
       timerState: {
         ...timerState,
         startDate: timerState.startDate ? timerState.startDate.toISOString() : null,
@@ -299,7 +312,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       },
       lastUsed: new Date().toISOString(),
     });
-  }, [activitiesText, timerState, setSparkData, dataLoaded]);
+  }, [activitiesText, templates, timerState, setSparkData, dataLoaded]);
 
   // Parse activities from text input
   const parseActivities = (text: string): Activity[] => {
@@ -447,9 +460,24 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   };
 
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(Math.abs(seconds) / 60);
-    const secs = Math.abs(seconds) % 60;
+    const absSeconds = Math.round(Math.abs(seconds));
+    const hours = Math.floor(absSeconds / 3600);
+    const mins = Math.floor((absSeconds % 3600) / 60);
+    const secs = absSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDuration = (minutes: number): string => {
+    if (minutes >= 60) {
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return m > 0 ? `${h}h${m}m` : `${h}h`;
+    }
+    return `${minutes}m`;
   };
 
   const handleStartTimer = async () => {
@@ -682,8 +710,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       return formatTime(secondsRemaining);
     } else {
       // Future activity - show when it starts with start time
-      const [hours, minutes] = activity.startTime.split(':').map(Number);
-      return `${activity.startTime} (${activity.duration}m)`;
+      return `${activity.startTime} (${formatDuration(activity.duration)})`;
     }
   };
 
@@ -784,6 +811,26 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     setBreakStartTime('');
     setBreakDuration('');
     HapticFeedback.success();
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (templateId: string | number) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setActivitiesText(template.schedule);
+      HapticFeedback.success();
+    }
+  };
+
+  // Handle template button click
+  const handleTemplateButton = () => {
+    if (templates.length === 0) {
+      // Navigate directly to settings
+      onStateChange?.({ openSettings: true });
+    } else {
+      // Show dropdown
+      setShowTemplateDropdown(true);
+    }
   };
 
   // Get organized activities: completed above, current/next at top, future below
@@ -1135,24 +1182,270 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     },
   });
 
+  // Template management state
+  const [showTemplateEditModal, setShowTemplateEditModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [templateSchedule, setTemplateSchedule] = useState('');
+
+  // Template CRUD operations
+  const handleAddTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateName('');
+    setTemplateSchedule('');
+    setShowTemplateEditModal(true);
+  };
+
+  const handleEditTemplate = (template: Template) => {
+    setEditingTemplate(template);
+    setTemplateName(template.name);
+    setTemplateSchedule(template.schedule);
+    setShowTemplateEditModal(true);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    Alert.alert(
+      'Delete Template',
+      'Are you sure you want to delete this template?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updated = templates.filter(t => t.id !== templateId);
+            setTemplates(updated);
+            HapticFeedback.medium();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveTemplate = () => {
+    if (!templateName.trim()) {
+      Alert.alert('Missing Name', 'Please enter a template name.');
+      return;
+    }
+    if (!templateSchedule.trim()) {
+      Alert.alert('Missing Schedule', 'Please enter a schedule.');
+      return;
+    }
+
+    // Validate schedule format
+    const parsed = parseActivities(templateSchedule);
+    if (parsed.length === 0) {
+      Alert.alert('Invalid Format', 'Please use the format: HH:MM, duration, Activity Name');
+      return;
+    }
+
+    if (editingTemplate) {
+      // Update existing template
+      const updated = templates.map(t =>
+        t.id === editingTemplate.id
+          ? { ...t, name: templateName.trim(), schedule: templateSchedule.trim() }
+          : t
+      );
+      setTemplates(updated);
+    } else {
+      // Create new template
+      const newTemplate: Template = {
+        id: `template_${Date.now()}`,
+        name: templateName.trim(),
+        schedule: templateSchedule.trim(),
+      };
+      setTemplates([...templates, newTemplate]);
+    }
+
+    setShowTemplateEditModal(false);
+    setEditingTemplate(null);
+    setTemplateName('');
+    setTemplateSchedule('');
+    HapticFeedback.success();
+  };
+
   if (showSettings) {
     return (
-      <SettingsContainer>
-        <SettingsScrollView>
-          <SettingsHeader
-            title="Minute Minder Settings"
-            subtitle="Make every minute matter"
-            icon="⏳"
-            sparkId="minute-minder"
-          />
-          <SettingsFeedbackSection sparkName="Minute Minder" sparkId="minute-minder" />
-          <SettingsButton
-            title="Close"
-            onPress={onCloseSettings || (() => { })}
-            variant="primary"
-          />
-        </SettingsScrollView>
-      </SettingsContainer>
+      <>
+        <SettingsContainer>
+          <SettingsScrollView>
+            <SettingsHeader
+              title="Minute Minder Settings"
+              subtitle="Make every minute matter"
+              icon="⏳"
+              sparkId="minute-minder"
+            />
+
+            <SettingsFeedbackSection sparkName="Minute Minder" sparkId="minute-minder" />
+
+            {/* Templates Section */}
+            <View style={{ marginTop: 20 }}>
+              <Text style={{
+                fontSize: 20,
+                fontWeight: '600',
+                color: colors.text,
+                marginBottom: 12,
+                paddingHorizontal: 4,
+              }}>
+                Templates
+              </Text>
+
+              {templates.length === 0 ? (
+                <View style={{
+                  padding: 20,
+                  backgroundColor: colors.surface,
+                  borderRadius: 12,
+                  marginBottom: 12,
+                }}>
+                  <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+                    No templates yet. Create one to quickly load your daily schedule.
+                  </Text>
+                </View>
+              ) : (
+                templates.map((template) => (
+                  <View
+                    key={template.id}
+                    style={{
+                      backgroundColor: colors.surface,
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 18,
+                      fontWeight: '600',
+                      color: colors.text,
+                      marginBottom: 8,
+                    }}>
+                      {template.name}
+                    </Text>
+                    <Text style={{
+                      fontSize: 14,
+                      color: colors.textSecondary,
+                      marginBottom: 12,
+                    }}>
+                      {parseActivities(template.schedule).length} activities
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          backgroundColor: colors.background,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                        }}
+                        onPress={() => handleEditTemplate(template)}
+                      >
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
+                          Edit
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          backgroundColor: '#FF3B30',
+                          borderWidth: 1,
+                          borderColor: '#FF3B30',
+                        }}
+                        onPress={() => handleDeleteTemplate(template.id)}
+                      >
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              <SettingsButton
+                title="Add Template"
+                onPress={handleAddTemplate}
+                variant="primary"
+              />
+            </View>
+
+            <SettingsButton
+              title="Close"
+              onPress={onCloseSettings || (() => { })}
+              variant="secondary"
+            />
+          </SettingsScrollView>
+        </SettingsContainer>
+
+        {/* Template Edit Modal */}
+        <CommonModal
+          visible={showTemplateEditModal}
+          title={editingTemplate ? 'Edit Template' : 'New Template'}
+          onClose={() => {
+            setShowTemplateEditModal(false);
+            setEditingTemplate(null);
+            setTemplateName('');
+            setTemplateSchedule('');
+          }}
+          footer={
+            <View style={commonStyles.modalButtons}>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, { backgroundColor: colors.border }]}
+                onPress={() => {
+                  setShowTemplateEditModal(false);
+                  setEditingTemplate(null);
+                  setTemplateName('');
+                  setTemplateSchedule('');
+                }}
+              >
+                <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveTemplate}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        >
+          <View>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8 }}>
+              Template Name
+            </Text>
+            <TextInput
+              style={commonStyles.input}
+              value={templateName}
+              onChangeText={setTemplateName}
+              placeholder="e.g., Weekday Schedule"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+            />
+
+            <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8, marginTop: 16 }}>
+              Schedule
+            </Text>
+            <TextInput
+              style={[commonStyles.input, { minHeight: 120 }]}
+              value={templateSchedule}
+              onChangeText={setTemplateSchedule}
+              placeholder="08:30, 30, Breakfast&#10;09:00, 30, Drive to Work&#10;10:30, 30, Meeting"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+            />
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>
+              Format: HH:MM, duration (minutes), Activity Name{'\n'}One activity per line
+            </Text>
+          </View>
+        </CommonModal>
+      </>
     );
   }
 
@@ -1185,13 +1478,13 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
                 >
                   <View style={styles.circleContent}>
                     <Text style={styles.activityNameText}>
-                      {current.status === 'current' ? truncate(current.activity.name, 20) : `${truncate(current.activity.name, 15)} starts in`}
+                      {truncate(current.activity.name, 20)}
                     </Text>
                     <Text style={styles.timeText}>
                       {showFlameAnimations && countdownSeconds > 0 ? countdownSeconds : formatTime(getActivityTime(current.activity, current.status))}
                     </Text>
                     <Text style={styles.activityInfoText}>
-                      {showFlameAnimations ? 'seconds' : current.status === 'current' ? 'remaining' : 'minutes'}
+                      {showFlameAnimations ? 'seconds' : current.status === 'current' ? 'remaining' : 'to start'}
                     </Text>
                   </View>
                 </TeeTimeCircularProgress>
@@ -1261,7 +1554,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
                         onPress={() => handleBreakEdit(prevItem.index, originalIndex, gap!)}
                       >
                         <Text style={styles.breakDividerText}>
-                          {gap} minute{gap !== 1 ? 's' : ''} break
+                          {formatDuration(gap!)} break
                         </Text>
                         <Text style={styles.breakEditIcon}>✎</Text>
                       </TouchableOpacity>
@@ -1300,26 +1593,64 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.inputContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  {
-                    backgroundColor: colors.secondary,
-                    marginBottom: 12,
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    gap: 8,
-                    maxHeight: 56, // Keep it compact at the top
-                  }
-                ]}
-                onPress={handleScanSchedule}
-                disabled={isScanning}
-              >
-                <Text style={{ fontSize: 18 }}>📸</Text>
-                <Text style={[styles.buttonText, { color: colors.background }]}>
-                  {isScanning ? 'Scanning...' : 'Scan Schedule'}
-                </Text>
-              </TouchableOpacity>
+              {/* Button Row: Scan Schedule and Template */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: colors.secondary,
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8,
+                      maxHeight: 56,
+                      flex: 1,
+                    }
+                  ]}
+                  onPress={handleScanSchedule}
+                  disabled={isScanning}
+                >
+
+                  <Text style={[styles.buttonText, { color: colors.background }]}>
+                    {isScanning ? 'Scanning...' : 'Scan Schedule'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: colors.primary,
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8,
+                      maxHeight: 56,
+                      flex: 1,
+                    }
+                  ]}
+                  onPress={handleTemplateButton}
+                >
+                  <Text style={[styles.buttonText, { color: '#fff' }]}>
+                    Template
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Template Dropdown */}
+              {showTemplateDropdown && templates.length > 0 && (
+                <View style={{ marginBottom: 12 }}>
+                  <Dropdown
+                    options={templates.map(t => ({ label: t.name, value: t.id }))}
+                    selectedValue=""
+                    onSelect={(value) => {
+                      handleTemplateSelect(value);
+                      setShowTemplateDropdown(false);
+                    }}
+                    placeholder="Select a template"
+                    modalTitle="Choose Template"
+                  />
+                </View>
+              )}
 
               <TextInput
                 style={styles.textInput}

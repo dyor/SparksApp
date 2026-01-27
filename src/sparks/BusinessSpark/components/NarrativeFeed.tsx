@@ -22,7 +22,7 @@ export const NarrativeFeed: React.FC<NarrativeFeedProps> = ({ history }) => {
     if (history.length === 0) {
         return (
             <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>Tap 'Start Business' to begin satisfy market demand!</Text>
+                <Text style={styles.emptyText}>Tap the 'Options' panel below and invest your first $1,000 to begin your journey. The empire awaits.</Text>
             </View>
         );
     }
@@ -45,16 +45,16 @@ export const NarrativeFeed: React.FC<NarrativeFeedProps> = ({ history }) => {
                         </View>
                     )}
 
-                    {/* Minimal Journal Preview (Debug style for MVP) */}
-                    {/* We will expand this into a full accordion in Phase 2 */}
                     <View style={styles.ledgerPreview}>
-                        <Text style={styles.ledgerLabel}>Journal Entries ({turn.journal_entries.length})</Text>
+                        <Text style={styles.ledgerLabel}>Financial Impact</Text>
                         {turn.journal_entries.map((entry, idx) => (
                             <Text key={idx} style={styles.ledgerRow}>
-                                {entry.debit_account} / {entry.credit_account}: ${entry.amount}
+                                • {entry.description}
                             </Text>
                         ))}
                     </View>
+
+                    <Text style={styles.reviewHint}>💡 Tip: Check the 'Books' panel to see how this affected your statements.</Text>
                 </View>
             ))}
         </ScrollView>
@@ -138,5 +138,12 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontFamily: 'SpaceMono-Regular',
         color: '#6b7280'
+    },
+    reviewHint: {
+        marginTop: 12,
+        fontSize: 11,
+        color: '#9ca3af',
+        fontStyle: 'italic',
+        textAlign: 'center',
     }
 });

@@ -22,15 +22,20 @@ export const useBusinessEngine = () => {
             }
 
             // 3. Apply Math (Ledger Update)
-            // We calculate the new state (Cash, etc.) based on the new entries to ensure strict correctness.
             let nextState = LedgerEngine.applyEntries(state, turnResponse.journal_entries);
 
-            // 4. Update Operational State (from AI)
+            // 4. Update Operational State (from AI response)
+            const ops = turnResponse.ops_updates as any; // Cast for now as we transition
+
             nextState = {
                 ...nextState,
-                week: state.week + 1, // Or use ops_updates.new_week_number
-                inventory_kg: state.inventory_kg + (turnResponse.ops_updates?.inventory_mass_change_kg || 0),
-                machine_health: Math.max(0, Math.min(100, state.machine_health + (turnResponse.ops_updates?.machine_health_change || 0))),
+                week: state.week + 1,
+                inventory_kg: state.inventory_kg + (ops.inventory_mass_change_kg || 0),
+                machines: ops.machines || state.machines,
+                customers_first_run_queue: state.customers_first_run_queue + (ops.growth_engine?.first_run_queue_delta || 0),
+                active_repeat_customers: state.active_repeat_customers + (ops.growth_engine?.repeat_customers_delta || 0),
+                has_shopify: ops.growth_engine?.has_shopify !== undefined ? ops.growth_engine.has_shopify : state.has_shopify,
+                monthly_costs: ops.growth_engine?.monthly_costs !== undefined ? ops.growth_engine.monthly_costs : state.monthly_costs,
                 turn_history: [...state.turn_history, turnResponse],
                 is_loading: false
             };
@@ -49,10 +54,28 @@ export const useBusinessEngine = () => {
         setError(null);
     }, []);
 
+    const loadState = useCallback((loadedState: BusinessState) => {
+        // Merge loaded state with initial state to ensure new properties (like machines[]) 
+        // are present even if loading old data.
+        // Also ensure we NEVER start in a loading state.
+        setState({
+            ...INITIAL_BUSINESS_STATE,
+            ...loadedState,
+            is_loading: false
+        });
+        setError(null);
+    }, []);
+
+    const stopLoading = useCallback(() => {
+        setState(prev => ({ ...prev, is_loading: false }));
+    }, []);
+
     return {
         state,
         error,
         processTurn,
-        resetGame
+        resetGame,
+        loadState,
+        stopLoading
     };
 };
