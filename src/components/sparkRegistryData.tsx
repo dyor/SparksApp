@@ -40,6 +40,8 @@ import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
+import SongMakerSpark from "../sparks/SongMakerSpark";
+import OddMathSpark from "../sparks/OddMathSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import { InfiniteSpark } from "../sparks/InfiniteSpark";
 import styled from "styled-components/native";
@@ -551,6 +553,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       properties: ["Beta"],
     },
     component: InfiniteSpark,
+  },
+  "odd-math": {
+    metadata: {
+      id: "odd-math",
+      title: "OddMath",
+      description: "Fun, weird, and clever math questions with multiple difficulties.",
+      icon: "🔢🤪",
+      category: "game",
+      createdAt: "2026-01-28T00:00:00.000Z",
+      rating: 4.5,
+    },
+    component: OddMathSpark,
   },
 };
 
