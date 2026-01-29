@@ -989,12 +989,11 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     );
   }
 
-  // Goal detail screen
-  if (currentScreen === 'goal-detail' && currentGoal) {
-    const stats = calculateStats(currentGoal);
-
-    return (
-      <View style={styles.container}>
+  // Main Navigation / Screen Logic
+  const renderContent = () => {
+    if (currentScreen === 'goal-detail' && currentGoal) {
+      const stats = calculateStats(currentGoal);
+      return (
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackToHome}>
             <Text style={styles.backButtonText}>← Back to Goals</Text>
@@ -1071,52 +1070,11 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
             )}
           </View>
         </ScrollView>
+      );
+    }
 
-        {/* Celebration Confetti */}
-        {showCelebration && (
-          <ConfettiCannon
-            ref={confettiRef}
-            count={50}
-            origin={{ x: Dimensions.get('window').width / 2, y: -20 }}
-            autoStart={false}
-            fadeOut={true}
-            onAnimationEnd={() => setShowCelebration(false)}
-          />
-        )}
-
-        {/* Edit Entry Modal */}
-        <Modal visible={showEditEntryModal} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Entry Date</Text>
-              <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="2025-01-15"
-                placeholderTextColor={colors.textSecondary}
-                value={editEntryDate}
-                onChangeText={setEditEntryDate}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <SaveCancelButtons
-                onSave={handleSaveEditEntry}
-                onCancel={() => {
-                  setShowEditEntryModal(false);
-                  setEditingEntry(null);
-                  setEditEntryDate('');
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
-      </View>
-    );
-  }
-
-  // Home screen
-  return (
-    <View style={styles.container}>
+    // Home Screen
+    return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Goal Tracker 🎯</Text>
@@ -1204,6 +1162,42 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           <Text style={styles.addGoalButtonText}>+ Add New Goal</Text>
         </TouchableOpacity>
       </ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {renderContent()}
+
+      {/* Edit Entry Modal */}
+      <Modal visible={showEditEntryModal} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Entry Date</Text>
+              <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="2025-01-15"
+                placeholderTextColor={colors.textSecondary}
+                value={editEntryDate}
+                onChangeText={setEditEntryDate}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <SaveCancelButtons
+                onSave={handleSaveEditEntry}
+                onCancel={() => {
+                  setShowEditEntryModal(false);
+                  setEditingEntry(null);
+                  setEditEntryDate('');
+                  Keyboard.dismiss();
+                }}
+              />
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Add Goal Modal */}
       <Modal visible={showAddGoalModal} transparent animationType="slide">
