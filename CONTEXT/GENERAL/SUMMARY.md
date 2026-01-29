@@ -88,6 +88,10 @@ Inspirational golf wisdom from Tam O'Shanter. Beautiful book-style interface wit
 
 Run your own virtual company with strategic decisions. Build your empire and test your business acumen.
 
+### 🔢 OddMath
+
+Fun, weird, and clever math questions with multiple difficulties. Choose your category and jump into unexpected challenges designed to make you think and smile.
+
 ### 🎯 Buzzy Bingo
 
 Buzzword bingo game - mark squares as you hear tech terms. Perfect for meetings and conferences.
@@ -140,6 +144,6 @@ Submit your own Spark idea and become a product manager. Help shape the future o
 
 ---
 
-**Total Sparks:** 29 unique mini-apps  
+**Total Sparks:** 30 unique mini-apps  
 **Categories:** Productivity, Travel, Food, Health, Education, Golf, Games, Media, Utilities, Community  
 **All Sparks:** Available now and ready to make your life...just a little bit better⚡️
