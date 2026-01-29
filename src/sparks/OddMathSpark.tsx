@@ -853,6 +853,28 @@ Difficulty should strictly match: ${selectedDifficulty}.`;
 
         return (
             <QuizContainer>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <TouchableOpacity onPress={() => setGameState('menu')} style={{ padding: 8 }}>
+                        <Subtitle style={{ marginTop: 0 }}>🏠 Menu</Subtitle>
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (questionsAnswered > 0) {
+                                    // Logic for 'back' if applicable, but usually refers to menu or next
+                                    setGameState('difficulty');
+                                }
+                            }}
+                            style={{ padding: 8 }}
+                        >
+                            <Subtitle style={{ marginTop: 0 }}>← Back</Subtitle>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleNext} style={{ padding: 8 }}>
+                            <Subtitle style={{ marginTop: 0 }}>Next →</Subtitle>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 <StatsRow>
                     <StatItem>
                         <StatValue>{score}/{questionsAnswered}</StatValue>
