@@ -343,22 +343,55 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
         }
     };
 
-    // Value Interpolator (e.g. {{state.status}})
-    const interpolate = (val: string) => {
+    // Value Interpolator (e.g. {{state.status}} or {{state.list.join(', ')}})
+    const interpolate = (val: any): any => {
         if (typeof val !== 'string') return val;
-        return val.replace(/{{([^}]+)}}/g, (match, path) => {
-            const keys = path.trim().replace(/^state\./, '').split('.');
-            let current = state;
-            for (const key of keys) {
-                if (current === undefined) return '';
-                current = current[key];
+
+        const expressionRegex = /{{([^}]+)}}/g;
+
+        // Check if the entire string is a single interpolation (to return raw objects)
+        const matchFull = val.match(/^{{([^}]+)}}$/);
+        if (matchFull) {
+            try {
+                const fn = new Function('state', `return ${matchFull[1].trim()}`);
+                return fn(state);
+            } catch (e) {
+                console.warn('Interpolation failed:', matchFull[1], e);
+                return undefined;
             }
-            return current !== undefined ? String(current) : '';
+        }
+
+        // Otherwise replace matches in the string
+        return val.replace(expressionRegex, (match, expression) => {
+            try {
+                const fn = new Function('state', `return ${expression.trim()}`);
+                const result = fn(state);
+                return result !== undefined ? String(result) : '';
+            } catch (e) {
+                console.warn('Interpolation failed:', expression, e);
+                return '';
+            }
         });
     };
 
     const renderElement = (el: any, index: number) => {
-        const customStyle = config.view?.styles?.[el.style] || {};
+        // Handle conditional visibility
+        if (el.visible !== undefined) {
+            const isVisible = interpolate(el.visible);
+            if (!isVisible || isVisible === 'false') return null;
+        }
+
+        const rawStyle = config.view?.styles?.[el.style] || {};
+        const customStyle: any = {};
+        Object.keys(rawStyle).forEach(key => {
+            customStyle[key] = interpolate(rawStyle[key]);
+            // Web-style display logic mapped to React Native
+            if (key === 'display' && customStyle[key] === 'none') {
+                customStyle.height = 0;
+                customStyle.opacity = 0;
+                customStyle.overflow = 'hidden';
+            }
+        });
 
         switch (el.type) {
             case 'text':
@@ -374,7 +407,14 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                         style={[styles.engineButton, { backgroundColor: colors.primary }, customStyle]}
                         onPress={() => {
                             HapticFeedback.light();
-                            executeAction(el.onPress);
+                            // Interpolate individual params
+                            const finalParams: any = {};
+                            if (el.params) {
+                                Object.keys(el.params).forEach(k => {
+                                    finalParams[k] = interpolate(el.params[k]);
+                                });
+                            }
+                            executeAction(el.onPress, finalParams);
                         }}
                     >
                         <Text style={styles.engineButtonText}>{interpolate(el.label)}</Text>
@@ -403,13 +443,15 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                 return (
                     <TextInput
                         key={index}
-                        style={[styles.engineInput, { color: colors.text, borderColor: colors.border }]}
+                        style={[styles.engineInput, { color: colors.text, borderColor: colors.border, height: 50 }, customStyle]}
                         placeholder={el.placeholder}
                         placeholderTextColor={colors.textSecondary}
                         value={String(state[bindingField] || '')}
                         onChangeText={(txt) => {
                             setState((prev: any) => ({ ...prev, [bindingField]: txt }));
                         }}
+                        secureTextEntry={el.secureTextEntry}
+                        autoCapitalize={el.autoCapitalize || 'none'}
                     />
                 );
             default:
@@ -418,13 +460,13 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
     };
 
     if (!config?.view?.elements) {
-        return <Text style={{ color: colors.textSecondary }}>Empty or invalid definition.</Text>;
+        return <View style={{ padding: 20 }}><Text style={{ color: colors.textSecondary }}>Empty or invalid definition.</Text></View>;
     }
 
     return (
-        <View style={styles.engineContainer}>
+        <ScrollView contentContainerStyle={styles.engineContainer}>
             {config.view.elements.map((el: any, i: number) => renderElement(el, i))}
-        </View>
+        </ScrollView>
     );
 };
 

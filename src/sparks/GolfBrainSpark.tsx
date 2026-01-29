@@ -4136,9 +4136,9 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       if (updatedShots.length === 0 && updatedPutts.length === 0) {
         // Remove this hole from the scorecard
         onSaveHoleData(currentHole, [], []);
-        // Navigate to previous hole or close if this is the first hole
+        // Navigate to summary or close if this is the first hole
         if (currentHole > 1) {
-          onPreviousHole();
+          onViewSummary();
         } else {
           onClose();
         }
