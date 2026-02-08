@@ -1,0 +1,11 @@
+{
+    "name": "video-overlay",
+    "version": "1.0.0",
+    "main": "src/index.ts",
+    "dependencies": {
+        "expo-modules-core": "~2.0.0"
+    },
+    "devDependencies": {
+        "typescript": "~5.3.3"
+    }
+}

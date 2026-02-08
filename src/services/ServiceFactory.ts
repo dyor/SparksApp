@@ -109,12 +109,10 @@ export class ServiceFactory {
 
         // Fallback to Web SDK if Native is not available or not initialized
         if (isWebFirebaseAvailable) {
-          const { getFirebaseApp } = require('./firebaseConfig');
-          const app = await getFirebaseApp();
+          const { getFirestoreDb } = require('./firebaseConfig');
+          const db = await getFirestoreDb();
 
-          if (app) {
-            const { getFirestore } = require('firebase/firestore');
-            const db = getFirestore(app);
+          if (db) {
             await SimpleAnalyticsService.initialize(db, false);
             this.analyticsServiceInitialized = true;
             console.log('✅ Analytics initialized with Web Firebase');

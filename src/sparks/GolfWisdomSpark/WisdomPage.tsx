@@ -21,7 +21,7 @@ export const WisdomPage: React.FC<WisdomPageProps> = ({ quote, onShare }) => {
 
         try {
             HapticFeedback.light();
-            
+
             // Capture the view as an image
             const uri = await captureRef(viewRef.current, {
                 format: 'png',

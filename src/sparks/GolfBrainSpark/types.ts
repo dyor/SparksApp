@@ -19,23 +19,25 @@ export interface Shot {
   id: string;
   type: "shot" | "putt";
   direction?:
-    | "good"
-    | "fire"
-    | "left"
-    | "right"
-    | "long"
-    | "short"
-    | "left and short"
-    | "left and long"
-    | "right and short"
-    | "right and long"
-    | "penalty";
+  | "good"
+  | "fire"
+  | "left"
+  | "right"
+  | "long"
+  | "short"
+  | "left and short"
+  | "left and long"
+  | "right and short"
+  | "right and long"
+  | "penalty";
   lie?: "fairway" | "rough" | "sand" | "green" | "ob" | "water"; // For shots
   puttDistance?: "<4ft" | "5-10ft" | "10+ft"; // For putts
   club?: string; // For shots
   videoUri?: string; // For swing recordings
   timestamp: number;
   poorShot?: boolean; // For 💩 feature
+  trimStart?: number; // in milliseconds
+  trimEnd?: number;   // in milliseconds
 }
 
 export interface HoleScore {

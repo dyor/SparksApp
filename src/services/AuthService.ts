@@ -22,7 +22,7 @@ import {
   getDoc,
   Timestamp,
 } from "firebase/firestore";
-import { getFirebaseApp, getFirebaseAppSync } from "./firebaseConfig";
+import { getFirebaseApp, getFirebaseAppSync, getFirestoreDb } from "./firebaseConfig";
 import { RemoteConfigService } from "./RemoteConfigService";
 
 // Gracefully handle GoogleSignin in Expo Go (where native modules aren't available)
@@ -576,12 +576,10 @@ class AuthService {
     uid: string
   ): Promise<UserProfile | null> {
     try {
-      const app = await getFirebaseApp();
-      if (!app) {
+      const db = await getFirestoreDb();
+      if (!db) {
         return null;
       }
-
-      const db = getFirestore(app);
       const userDoc = await getDoc(doc(db, "users", uid));
 
       if (userDoc.exists()) {
@@ -589,8 +587,12 @@ class AuthService {
       }
 
       return null;
-    } catch (error) {
-      console.error("❌ AuthService: Error getting user profile", error);
+    } catch (error: any) {
+      if (error && error.message && error.message.includes("offline")) {
+        console.warn("⚠️ AuthService: Client is offline, could not fetch user profile");
+      } else {
+        console.error("❌ AuthService: Error getting user profile", error);
+      }
       return null;
     }
   }
@@ -602,12 +604,11 @@ class AuthService {
     firebaseUser: FirebaseUser
   ): Promise<void> {
     try {
-      const app = await getFirebaseApp();
-      if (!app) {
-        throw new Error("Failed to initialize Firebase app");
+      const db = await getFirestoreDb();
+      if (!db) {
+        throw new Error("Failed to initialize Firestore");
       }
 
-      const db = getFirestore(app);
       const userRef = doc(db, "users", firebaseUser.uid);
       const userDoc = await getDoc(userRef);
 
@@ -633,11 +634,12 @@ class AuthService {
         await setDoc(userRef, userData, { merge: true });
         console.log("✅ AuthService: Updated user profile");
       }
-    } catch (error) {
-      console.error(
-        "❌ AuthService: Error creating/updating user profile",
-        error
-      );
+    } catch (error: any) {
+      if (error && error.message && error.message.includes("offline")) {
+        console.warn("⚠️ AuthService: Client is offline, could not update user profile");
+      } else {
+        console.error("❌ AuthService: Error creating/updating user profile", error);
+      }
       // Don't throw - profile creation is not critical for sign-in
     }
   }

@@ -14,6 +14,10 @@ import {
   Image,
 } from "react-native";
 import { Video, ResizeMode, AVPlaybackStatus, VideoFullscreenUpdate } from "expo-av";
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import { overlayImage } from 'video-overlay';
+import { captureRef } from 'react-native-view-shot';
 
 import { PanGestureHandler, State, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSparkStore } from "../store";
@@ -608,6 +612,7 @@ const RoundSummaryScreen: React.FC<{
   onEndRound?: () => void;
   handicap?: number;
   getBumpsForHole: (hole: Hole) => number;
+  onHighlightReel?: () => void;
   colors: any;
 }> = ({
   round,
@@ -618,6 +623,7 @@ const RoundSummaryScreen: React.FC<{
   onEndRound,
   handicap,
   getBumpsForHole,
+  onHighlightReel,
   colors,
 }) => {
     console.log("RoundSummaryScreen props:", {
@@ -1666,8 +1672,9 @@ const RoundSummaryScreen: React.FC<{
         )}
 
         {/* Shots with Videos Listing */}
+        {/* Shots with Videos Listing */}
         <View style={styles.clubBreakdown}>
-          <Text style={styles.clubBreakdownTitle}>Shots with Videos</Text>
+          <Text style={styles.clubBreakdownTitle}>Round Videos</Text>
           {(() => {
             const shotsWithVideos: { hole: number, shot: Shot, shotNumber: number }[] = [];
             (round.holeScores || []).forEach(hs => {
@@ -1678,6 +1685,12 @@ const RoundSummaryScreen: React.FC<{
               });
             });
 
+            // Sort by Hole then Shot
+            shotsWithVideos.sort((a, b) => {
+              if (a.hole !== b.hole) return a.hole - b.hole;
+              return a.shotNumber - b.shotNumber;
+            });
+
             if (shotsWithVideos.length === 0) {
               return <Text style={{ color: colors.textSecondary, fontStyle: 'italic', paddingVertical: 8 }}>No videos recorded yet.</Text>;
             }
@@ -1685,8 +1698,12 @@ const RoundSummaryScreen: React.FC<{
             return shotsWithVideos.map((item) => (
               <View key={item.shot.id} style={[styles.clubRow, { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 12 }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.clubName}>Hole {item.hole} - Shot {item.shotNumber}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{item.shot.club}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.clubName}>Hole {item.hole} - Shot {item.shotNumber}</Text>
+                    {item.shot.direction === 'fire' && <Text style={{ marginLeft: 6 }}>🔥</Text>}
+                    {item.shot.poorShot && <Text style={{ marginLeft: 6 }}>💩</Text>}
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{item.shot.club || 'Putter'}</Text>
                 </View>
                 <TouchableOpacity
                   style={{
@@ -1704,9 +1721,282 @@ const RoundSummaryScreen: React.FC<{
             ));
           })()}
         </View>
+
+        {/* Reels Section */}
+        {(() => {
+          const highlights = (round.holeScores || []).flatMap(hs =>
+            (hs.shots || []).filter(s => s.videoUri && (s.direction === 'fire' || s.poorShot))
+          );
+
+          if (highlights.length > 0) {
+            return (
+              <View style={[styles.clubBreakdown, { marginTop: 0 }]}>
+                <Text style={styles.clubBreakdownTitle}>Highlight Reel</Text>
+                <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>
+                  {highlights.length} clips ready for your highlight reel.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FFD700',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 8
+                  }}
+                  onPress={onHighlightReel}
+                >
+                  <Text style={{ fontSize: 18 }}>🎬</Text>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#000' }}>Generate Highlight Reel</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return null;
+        })()}
       </ScrollView>
     );
   };
+
+// Highlight Reel Modal Component
+const HighlightReelModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  videos: { hole: number, shot: Shot, shotNumber: number }[];
+  colors: any;
+}> = ({ visible, onClose, videos, colors }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const videoRef = useRef<Video>(null);
+
+  // Reset index when modal opens
+  useEffect(() => {
+    if (visible) {
+      setCurrentIndex(0);
+      setIsPlaying(true);
+    }
+  }, [visible]);
+
+  if (videos.length === 0) return null;
+
+  const currentVideo = videos[currentIndex];
+
+  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (status.isLoaded && status.didJustFinish) {
+      if (currentIndex < videos.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        onClose();
+      }
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
+        <Video
+          ref={videoRef}
+          key={currentVideo.shot.id}
+          source={{ uri: currentVideo.shot.videoUri! }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode={ResizeMode.CONTAIN}
+          shouldPlay={isPlaying}
+          useNativeControls
+          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+        />
+
+        {/* Overlay for transitions */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 60,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }}
+        >
+          <Text style={{
+            color: '#fff',
+            fontSize: 24,
+            fontWeight: 'bold',
+            textAlign: 'center',
+            textShadowColor: 'rgba(0,0,0,0.8)',
+            textShadowOffset: { width: 0, height: 2 },
+            textShadowRadius: 4
+          }}>
+            Hole {currentVideo.hole} - Shot {currentVideo.shotNumber}
+          </Text>
+          <Text style={{
+            color: '#fff',
+            fontSize: 32,
+            marginTop: 8,
+            textShadowColor: 'rgba(0,0,0,0.8)',
+            textShadowOffset: { width: 0, height: 2 },
+            textShadowRadius: 4
+          }}>
+            {currentVideo.shot.direction === 'fire' ? '🔥 FIRE SHOT 🔥' : '💩 POOR SHOT 💩'}
+          </Text>
+        </View>
+
+        {/* Progress Bar (Playback) */}
+        <View style={{ position: 'absolute', bottom: 100, left: 20, right: 20, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2 }}>
+          <View style={{
+            width: `${((currentIndex + 1) / videos.length) * 100}%`,
+            height: '100%',
+            backgroundColor: '#FFD700',
+            borderRadius: 2
+          }} />
+          <Text style={{ color: '#fff', fontSize: 12, marginTop: 4, textAlign: 'right' }}>
+            {currentIndex + 1} / {videos.length}
+          </Text>
+        </View>
+
+        {/* Close Button */}
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+          onPress={onClose}
+        >
+          <Text style={{ color: '#fff', fontSize: 24 }}>✕</Text>
+        </TouchableOpacity>
+
+        {/* Save With Overlays Button */}
+        {!isExporting && (
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              bottom: 40,
+              left: 20,
+              backgroundColor: '#FFD700',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              borderRadius: 25,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              zIndex: 50
+            }}
+            onPress={async () => {
+              const { status } = await MediaLibrary.requestPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission needed', 'Please allow access to your photos.');
+                return;
+              }
+
+              setIsExporting(true);
+              setIsPlaying(false);
+              setExportStatus('Starting...');
+              let savedCount = 0;
+
+              try {
+                const cacheDir = FileSystem.cacheDirectory + 'overlays/';
+                await FileSystem.deleteAsync(cacheDir, { idempotent: true });
+                await FileSystem.makeDirectoryAsync(cacheDir);
+
+                for (let i = 0; i < videos.length; i++) {
+                  const video = videos[i];
+                  if (!video.shot.videoUri) continue;
+
+                  setExportStatus(`Processing clip ${i + 1}/${videos.length}...`);
+
+                  // 1. Render Overlay
+                  setProcessingVideo(video);
+                  // wait for render
+                  await new Promise(r => setTimeout(r, 500));
+
+                  // 2. Capture Image
+                  const overlayUri = await captureRef(overlayRef, {
+                    format: 'png',
+                    quality: 1.0,
+                  });
+
+                  // 3. Native Processing (Burn in)
+                  const outputVideo = `${cacheDir}processed_${i}.mp4`;
+
+                  try {
+                    await overlayImage(video.shot.videoUri, overlayUri, outputVideo);
+
+                    // 4. Save to Photos
+                    await MediaLibrary.saveToLibraryAsync(outputVideo);
+                    savedCount++;
+                  } catch (err) {
+                    console.error(`Failed clip ${i}:`, err);
+                  }
+                }
+
+                Alert.alert(
+                  'Highlights Saved!',
+                  `${savedCount} clips with overlays have been saved to Photos.`
+                );
+              } catch (e) {
+                console.error(e);
+                Alert.alert('Error', 'Export failed.');
+              } finally {
+                setIsExporting(false);
+                setExportStatus('');
+                setProcessingVideo(null);
+                setExportProgress(0);
+              }
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>💾</Text>
+            <Text style={{ color: '#000', fontWeight: 'bold' }}>Save Clips with Overlays</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Hidden Overlay Generator */}
+        <View
+          ref={overlayRef}
+          collapsable={false}
+          style={{
+            position: 'absolute',
+            top: processingVideo ? 0 : 5000, // Move offscreen if not processing
+            left: processingVideo ? 0 : 5000,
+            width: 1080, // High res for export
+            height: 1920,
+            backgroundColor: 'transparent',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            paddingTop: 200,
+            opacity: processingVideo ? 1 : 0
+          }}
+        >
+          <Text style={{
+            color: '#fff',
+            fontSize: 60,
+            fontWeight: 'bold',
+            textAlign: 'center',
+            textShadowColor: 'rgba(0,0,0,1)',
+            textShadowOffset: { width: 0, height: 4 },
+            textShadowRadius: 8
+          }}>
+            Hole {processingVideo?.hole} - Shot {processingVideo?.shotNumber}
+          </Text>
+          <Text style={{
+            color: '#fff',
+            fontSize: 80,
+            marginTop: 20,
+            textShadowColor: 'rgba(0,0,0,1)',
+            textShadowOffset: { width: 0, height: 4 },
+            textShadowRadius: 8
+          }}>
+            {processingVideo?.shot.direction === 'fire' ? '🔥 FIRE SHOT 🔥' : '💩 POOR SHOT 💩'}
+          </Text>
+        </View>
+
+        {/* Export Progress Overlay */}
+        {isExporting && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 20 }}>Processing Highlights...</Text>
+            <Text style={{ color: '#FFD700', fontSize: 16 }}>{exportStatus}</Text>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+};
 
 // Course Edit Modal
 
@@ -5564,6 +5854,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
 
       <GestureHandlerRootView style={{ flex: 1 }}>
         <PanGestureHandler
+          activeOffsetX={[-20, 20]}
+          failOffsetY={[-20, 20]}
           onHandlerStateChange={({ nativeEvent }) => {
             if (nativeEvent.state === State.END) {
               const { translationX, velocityX } = nativeEvent;
@@ -6176,12 +6468,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
                             "direction",
                             outcome
                           );
-                          updateShot(
-                            shotInfo.shot.id,
-                            shotInfo.type === "shot" ? "shot" : "putt",
-                            "poorShot",
-                            false
-                          );
                         }}
                         onPoopSelect={(outcome) => {
                           updateShot(
@@ -6467,6 +6753,7 @@ export const GolfBrainSpark: React.FC<
     const [tempHoleData, setTempHoleData] = useState<
       Record<number, { shots: Shot[]; putts: Shot[] }>
     >({});
+    const [showHighlightReel, setShowHighlightReel] = useState(false);
     const holeDetailRef = useRef<{ saveCurrentData: () => void }>(null);
 
     useEffect(() => {
@@ -6799,7 +7086,8 @@ export const GolfBrainSpark: React.FC<
           const holeScore: HoleScore = {
             holeNumber,
             courseId: currentRound.courseId,
-            shots: [...(shots || []), ...(putts || [])],
+            completedAt: Date.now(),
+            shots: [...(shots || []).map(s => ({ ...s, poorShot: s.poorShot })), ...(putts || []).map(p => ({ ...p, poorShot: p.poorShot }))],
             totalScore: totalShots,
             par:
               selectedCourse?.holes.find((h) => h.number === holeNumber)?.par ||
@@ -6808,7 +7096,6 @@ export const GolfBrainSpark: React.FC<
               totalShots -
               (selectedCourse?.holes.find((h) => h.number === holeNumber)?.par ||
                 4),
-            completedAt: Date.now(),
           };
 
           console.log("Saving hole score to permanent database:", holeScore);
@@ -6929,7 +7216,7 @@ export const GolfBrainSpark: React.FC<
         })) as Shot[];
         const result = {
           ...tempData,
-          shots: tempData.shots || [],
+          shots: (tempData.shots || []).map(s => ({ ...s, poorShot: s.poorShot })),
           putts: migratedPutts,
         };
         console.log("Returning temp data:", result);
@@ -6944,7 +7231,10 @@ export const GolfBrainSpark: React.FC<
         if (existingHoleScore) {
           const shots = (existingHoleScore.shots || []).filter(
             (shot) => shot.type === "shot"
-          );
+          ).map(shot => ({
+            ...shot,
+            poorShot: shot.poorShot // Ensure this is preserved
+          }));
           const putts = (existingHoleScore.shots || [])
             .filter((shot) => shot.type === "putt")
             .map((putt) => ({
@@ -7636,6 +7926,7 @@ export const GolfBrainSpark: React.FC<
             onEndRound={handleActuallyEndRound}
             handicap={data.settings.handicap}
             getBumpsForHole={getBumpsForHole}
+            onHighlightReel={() => setShowHighlightReel(true)}
             colors={colors}
           />
         )}
@@ -7733,6 +8024,28 @@ export const GolfBrainSpark: React.FC<
             ))}
           </View>
         )}
+
+        <HighlightReelModal
+          visible={showHighlightReel}
+          onClose={() => setShowHighlightReel(false)}
+          videos={(() => {
+            const reel: { hole: number, shot: Shot, shotNumber: number }[] = [];
+            (currentRound?.holeScores || []).forEach(hs => {
+              (hs.shots || []).forEach((s, idx) => {
+                if (s.videoUri && (s.direction === 'fire' || s.poorShot)) {
+                  reel.push({ hole: hs.holeNumber, shot: s, shotNumber: idx + 1 });
+                }
+              });
+            });
+            // Sort by Hole then Shot
+            reel.sort((a, b) => {
+              if (a.hole !== b.hole) return a.hole - b.hole;
+              return a.shotNumber - b.shotNumber;
+            });
+            return reel;
+          })()}
+          colors={colors}
+        />
       </View>
     );
   };

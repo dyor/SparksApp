@@ -31,18 +31,24 @@
 1.  **[x] Locate `RecordSwing` component:** Find the `RecordSwing.tsx` file in the `src/components` directory.
 2.  **[x] Update `recordAsync` options:** In `RecordSwing.tsx`, find the call to `camera.recordAsync()` and ensure the options object includes `mute: false` to enable audio recording.
 
-## NEW PLAN: Round Review Chart Improvements - Jan 11
+## NEW PLAN: Video Review & Highlight Generation - Jan 31
 
-### 1. Unified Chart Implementation
-- [ ] **Replace Custom Dot Charts:** Transition from the current absolute-positioned `View` dots to the new common `SparkChart` component (defined in `SPARKCHARTSPLAN.md`).
-- [ ] **Add Connecting Lines:** Ensure charts show actual lines connecting hole scores, not just floating data points.
-- [ ] **Dynamic Scaling:** Improve the Y-axis scaling to better handle rounds with high variability in scores.
+### 1. Round Video Gallery
+- [x] **Scan Round for Videos:** Logic to extract all `videoUri` items across all holes and shots.
+- [x] **Video List UI:** Add a scrollable section in `RoundSummaryScreen` showing all recorded shots.
+- [x] **Metadata Display:**
+    *   Hole number and Shot/Putt identifier (e.g., "Hole 4, Shot 1").
+    *   Visual "Quality" badge: 🔥 for `direction: "fire"` and 💩 for `poorShot: true`.
+- [x] **Instant Playback:** Ability to tap a video in the list to open it in a fullscreen modal or inline player.
 
-### 2. Enhanced Visualization
-- [ ] **Emoji Markers:** Maintain and improve the placement of 🔥 (fire) and 💩 (poop) emojis directly on the chart lines.
-- [ ] **Zero Line Support:** Clearly mark the "Even Par" (zero) line for both Gross and Net charts.
-- [ ] **Multi-Line Comparison:** (Optional) Explore showing Gross and Net on the same chart with different colors/styles.
+### 2. "YouTube Short" Highlight Generation
+- [x] **Highlight filtering:** Automatically select all 🔥 and 💩 videos from the round.
+- [x] **Sequential Player:** Implement a "Highlight Reel" mode that plays selected videos back-to-back.
+- [x] **Transition Support:** Add subtle overlays between clips (e.g., "Hole 7 - Great Shot!").
+- [x] **Video Export:** capability to stitch clips together with overlays and save to Photos.
+- [ ] **Trimming Foundation:** (Follow-up) Adopt the `SoundboardSpark` pattern of `trimStart`/`trimEnd` to allow users to polish clips before "generating" the final reel.
 
-### 3. Polish & Interactive Features
-- [ ] **Tooltips:** Add the ability to tap a data point to see the exact score and details for that hole.
-- [ ] **Consistent Theming:** Ensure chart colors (primary for gross, green for net) are consistently applied through the new component.
+### 3. Implementation Steps
+1.  **[x] Update `Shot` Interface:** Add `trimStart` and `trimEnd` (optional) for future-proofing.
+2.  **[x] Enhance `RoundSummaryScreen`:** Add the `VideoListing` component at the bottom of the summary.
+3.  **[x] Create `HighlightReelModal`:** A dedicated view for sequential video playback and exporting of highlights.

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getFirestore, Firestore, initializeFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
 import { RemoteConfigService } from "./RemoteConfigService";
 
 /**
@@ -106,10 +106,20 @@ export async function getFirestoreDb(): Promise<Firestore | null> {
     return null;
   }
   try {
+    // Try to initialize with persistence for offline support
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        cacheSizeBytes: CACHE_SIZE_UNLIMITED
+      })
+    });
+  } catch (error: any) {
+    // If already initialized, get existing instance
+    if (error.code === 'failed-precondition' || error.message?.includes('already initialized')) {
+      return getFirestore(app);
+    }
+    console.error("❌ Error getting Firestore with persistence:", error);
+    // Fallback to standard initialization
     return getFirestore(app);
-  } catch (error) {
-    console.error("❌ Error getting Firestore:", error);
-    return null;
   }
 }
 

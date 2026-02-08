@@ -1,6 +1,6 @@
 {
   "name": "sparksapp",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -81,6 +81,7 @@
     "react-refresh": "^0.14.0",
     "styled-components": "^6.1.19",
     "typescript": "~5.8.3",
+    "video-overlay": "file:modules/video-overlay",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

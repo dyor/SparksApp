@@ -224,6 +224,9 @@ export class SparkletService {
 
         if (!snapshot.exists()) throw new Error('Sparklet not found');
 
+        const data = snapshot.data();
+        const ownerId = this.getOwnerId();
+
         // Create copy with new title, owner, and status
         const newData: any = {
             ...data,
@@ -268,11 +271,12 @@ export class SparkletService {
 
         try {
             // Step 2: Proceed with AI Generation (The "Weaving")
-            const vision = `Title: ${submission.title}. Description: ${submission.description}. Audience: ${submission.targetAudience}`;
+            const vision = `Title: ${submission.title}. Purpose: ${submission.purpose}. Similar To: ${submission.similarity || 'New unique concept'}.`;
             const definition = await this.generateSparkletDefinition(vision);
 
             // Step 3: Create the actual live sparklet
-            await this.createDynamicSparklet(definition);
+            // Note: generateSparkletDefinition returns { definition, summary }
+            await this.createDynamicSparklet(definition.definition);
 
             // Step 4: Update submission status
             await setDoc(doc(db, 'sparkletSubmissions', submissionRef.id), { status: 'completed' }, { merge: true });

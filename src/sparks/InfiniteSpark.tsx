@@ -150,7 +150,7 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
             >
                 <SettingsContainer>
                     <SettingsScrollView>
@@ -204,29 +204,35 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
                     <View style={{ width: 60 }} />
                 </View>
 
-                <View style={styles.sparkletContainer}>
-                    {activeSparkletId === 'sparklets-wizard' ? (
-                        <SparkletWizard
-                            onComplete={() => {
-                                loadSparklets();
-                                handleBack();
-                            }}
-                            onCancel={handleBack}
-                        />
-                    ) : sparklet?.definition ? (
-                        <UniversalSparkletEngine definitionJson={sparklet.definition} />
-                    ) : isLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={colors.primary} />
-                        </View>
-                    ) : (
-                        <View style={styles.placeholderContainer}>
-                            <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
-                                {sparklet?.metadata.title || activeSparkletId} definition is missing.
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
+                >
+                    <View style={styles.sparkletContainer}>
+                        {activeSparkletId === 'sparklets-wizard' ? (
+                            <SparkletWizard
+                                onComplete={() => {
+                                    loadSparklets();
+                                    handleBack();
+                                }}
+                                onCancel={handleBack}
+                            />
+                        ) : sparklet?.definition ? (
+                            <UniversalSparkletEngine definitionJson={sparklet.definition} />
+                        ) : isLoading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={colors.primary} />
+                            </View>
+                        ) : (
+                            <View style={styles.placeholderContainer}>
+                                <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
+                                    {sparklet?.metadata.title || activeSparkletId} definition is missing.
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </KeyboardAvoidingView>
             </SafeAreaView>
         );
     }
@@ -339,7 +345,12 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
     const { colors } = useTheme();
     const config = useMemo(() => {
         try {
-            return JSON.parse(definitionJson);
+            const parsed = JSON.parse(definitionJson);
+            // Safeguard: Handle double-wrapped definitions (e.g. from previous AI generation bugs)
+            if (parsed && parsed.definition && parsed.definition.view) {
+                return parsed.definition;
+            }
+            return parsed;
         } catch (e) {
             console.error('Failed to parse definition:', e);
             return {};
@@ -419,8 +430,13 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
 
         const expressionRegex = /{{([^}]+)}}/g;
 
-        // Combine state and and other local context (like 'element' in grids)
-        const evalContext = { state: stateRef.current, ...context };
+        // Combine state and context (support both 'element' and 'item' aliases)
+        const evalContext = {
+            state: stateRef.current,
+            ...context,
+            element: context.element || context.item,
+            item: context.item || context.element
+        };
 
         // Check if the entire string is a single interpolation (to return raw objects)
         const matchFull = val.match(/^{{([^}]+)}}$/);
@@ -556,20 +572,36 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                 if (el.dataSource) {
                     const fieldName = el.dataSource.replace(/^state\./, '');
                     const items = state[fieldName] || [];
+
+                    // Calculate column width if repeat(N, 1fr) is used
+                    let columnWidth = '48%'; // Default 2 columns
+                    const gridStyle = config.view?.styles?.[el.style] || {};
+                    if (gridStyle.gridTemplateColumns) {
+                        const match = String(gridStyle.gridTemplateColumns).match(/repeat\((\d+),\s*1fr\)/);
+                        if (match) {
+                            const cols = parseInt(match[1]);
+                            columnWidth = `${Math.floor(98 / cols)}%`;
+                        }
+                    }
+
                     return (
                         <View key={index} style={[styles.engineGrid, customStyle]}>
                             {items.map((item: any, i: number) => {
                                 if (el.elements && el.elements.length > 0) {
-                                    // Render custom template for each grid item
-                                    return el.elements.map((template: any, subIndex: number) =>
-                                        renderElement(template, i * 100 + subIndex, { element: item })
+                                    // Wrap in a container to enforce the column width
+                                    return (
+                                        <View key={i} style={{ width: columnWidth as any }}>
+                                            {el.elements.map((template: any, subIndex: number) =>
+                                                renderElement(template, i * 100 + subIndex, { item })
+                                            )}
+                                        </View>
                                     );
                                 }
                                 // Fallback to simple cell if no template provided
                                 return (
                                     <TouchableOpacity
                                         key={i}
-                                        style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                                        style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface, width: columnWidth as any }]}
                                         onPress={() => executeAction(el.onPress, { index: i })}
                                     >
                                         <Text style={[styles.engineCellText, { color: item === 'X' ? colors.primary : '#ef4444' }]}>
@@ -781,10 +813,11 @@ const styles = StyleSheet.create({
     },
     // Engine Styles
     engineContainer: {
-        flex: 1,
+        flexGrow: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
+        paddingBottom: 100,
     },
     engineText: {
         fontSize: 16,

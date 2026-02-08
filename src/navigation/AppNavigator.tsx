@@ -433,10 +433,11 @@ const CustomTabBar: React.FC<
                 // Get root screen name first
                 const rootScreenName = routeState.routes[0].name;
 
-                // If already at root, do nothing
-                if (routeState.index === 0) {
+                // If already at root and focused, we can return early
+                // But if not focused, we need to navigate to the tab
+                if (isFocused && routeState.index === 0) {
                   console.log(
-                    "🏠 Home Tab - Already at root (index=0), returning early"
+                    "🏠 Home Tab - Already focused at root (index=0), returning early"
                   );
                   return;
                 }

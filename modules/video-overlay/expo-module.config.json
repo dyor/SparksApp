@@ -1,0 +1,16 @@
+{
+    "platforms": [
+        "ios",
+        "android"
+    ],
+    "ios": {
+        "modules": [
+            "VideoOverlayModule"
+        ]
+    },
+    "android": {
+        "modules": [
+            "modules.videooverlay.VideoOverlayModule"
+        ]
+    }
+}

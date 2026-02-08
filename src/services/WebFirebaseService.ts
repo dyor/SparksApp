@@ -57,8 +57,8 @@ export class WebFirebaseService {
         return;
       }
 
-      // Initialize Firestore
-      this.db = getFirestore(app);
+      const { getFirestoreDb } = require("./firebaseConfig");
+      this.db = await getFirestoreDb();
 
       // Try to initialize Auth (optional)
       try {
@@ -189,10 +189,9 @@ export class WebFirebaseService {
     if (!this._initialized || !this.db) {
       const configValid = validateFirebaseConfig();
       throw new Error(
-        `Firebase not initialized. ${
-          !configValid 
-            ? "Missing configuration (check .env file or Remote Config)." 
-            : "Initialization failed (check logs)."
+        `Firebase not initialized. ${!configValid
+          ? "Missing configuration (check .env file or Remote Config)."
+          : "Initialization failed (check logs)."
         }`
       );
     }

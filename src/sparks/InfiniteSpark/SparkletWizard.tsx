@@ -94,12 +94,8 @@ const PAYMENT_OPTIONS = [
 
 const JOURNEY_THEMES = [
     { icon: '🧙‍♂️', title: 'Meet the Wizard' },
-    { icon: '🥚', title: 'Dragon Egg' },
     { icon: '🐉', title: 'Glorious Sparklet' },
-    { icon: '🏰', title: 'Loyal Villagers' },
-    { icon: '💰', title: 'Riches' },
-    { icon: '💎', title: 'Wizard\'s Reward' },
-    { icon: '🍺', title: 'Tavern' },
+    { icon: '🥚', title: 'Dragon Egg' },
     { icon: '✨', title: 'Final Checkpoint' },
     { icon: '🎉', title: 'Success!' },
 ];
@@ -116,19 +112,35 @@ export const SparkletWizard: React.FC<SparkletWizardProps> = ({ onComplete, onCa
 
     const [formData, setFormData] = useState({
         title: '',
-        description: '',
-        targetAudience: '',
-        monetization: '',
-        investment: 'Exactly $0',
+        purpose: '',
+        similarity: 'New (Original Idea)',
         email: '',
     });
 
+    const [existingSparklets, setExistingSparklets] = useState<string[]>(['New (Original Idea)']);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [reviewIconIndex, setReviewIconIndex] = useState(0);
     const reviewIconOpacity = useRef(new Animated.Value(1)).current;
 
-    const totalSteps = 7;
+    const totalSteps = 4;
+
+    // Fetch existing sparklets for similarity selection
+    useEffect(() => {
+        const fetchSparklets = async () => {
+            try {
+                const sparklets = await SparkletService.getAllSparklets();
+                const publishedTitles = sparklets
+                    .filter(s => s.metadata.status === 'published' || s.metadata.isPublished)
+                    .map(s => s.metadata.title);
+
+                setExistingSparklets(['New (Original Idea)', ...Array.from(new Set(publishedTitles))]);
+            } catch (error) {
+                console.error('Error fetching sparklets for wizard:', error);
+            }
+        };
+        fetchSparklets();
+    }, []);
 
     // Animation loop for review page
     useEffect(() => {
@@ -154,17 +166,14 @@ export const SparkletWizard: React.FC<SparkletWizardProps> = ({ onComplete, onCa
     const canProceedToNext = () => {
         switch (currentPage) {
             case 1: return formData.title.trim().length >= 3;
-            case 2: return formData.description.trim().length >= 20;
-            case 3: return formData.targetAudience.trim().length >= 5;
-            case 4: return formData.monetization.trim().length >= 2;
-            case 5: return formData.investment !== '';
-            case 6: return formData.email.includes('@');
+            case 2: return formData.purpose.trim().length >= 10;
+            case 3: return formData.email.includes('@');
             default: return true;
         }
     };
 
     const handleNext = () => {
-        if (currentPage < 8 && canProceedToNext()) {
+        if (currentPage < 5 && canProceedToNext()) {
             HapticFeedback.medium();
             setCurrentPage(currentPage + 1);
         }
@@ -188,7 +197,7 @@ export const SparkletWizard: React.FC<SparkletWizardProps> = ({ onComplete, onCa
                 type: 'dynamic_request',
             });
             setSubmitted(true);
-            setCurrentPage(8);
+            setCurrentPage(5);
         } catch (error) {
             console.error('Error submitting Sparklet:', error);
             Alert.alert('Summoning Failed', 'The magic fizzled out. Please try again.');
@@ -211,91 +220,123 @@ export const SparkletWizard: React.FC<SparkletWizardProps> = ({ onComplete, onCa
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             {renderProgressBar()}
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                {currentPage === 0 && (
-                    <View style={styles.pageContent}>
-                        <Text style={styles.introEmoji}>🧙‍♂️</Text>
-                        <Text style={[styles.title, { color: colors.text }]}>Greetings, Builder!</Text>
-                        <Text style={[styles.description, { color: colors.textSecondary }]}>
-                            Summon a dynamic Sparklet. Describe your vision, and I will brew the code.
-                        </Text>
-                        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => setCurrentPage(1)}>
-                            <Text style={styles.buttonText}>Enter the Forge 🔥</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={onCancel} style={styles.laterButton}>
-                            <Text style={{ color: colors.textSecondary }}>Maybe Later</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-                {currentPage >= 1 && currentPage <= 6 && (
-                    <View style={styles.pageContent}>
-                        <Text style={styles.formIcon}>{JOURNEY_THEMES[currentPage].icon}</Text>
-                        <Text style={[styles.title, { color: colors.text }]}>
-                            {currentPage === 1 && 'What is its name?'}
-                            {currentPage === 2 && 'Describe its powers...'}
-                            {currentPage === 3 && 'Who will use it?'}
-                            {currentPage === 4 && 'Will it cost gold?'}
-                            {currentPage === 5 && 'Your investment?'}
-                            {currentPage === 6 && 'Where to notify you?'}
-                        </Text>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+                >
+                    {currentPage === 0 && (
+                        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                            <View style={styles.pageContent}>
+                                <Text style={styles.introEmoji}>🧙‍♂️</Text>
+                                <Text style={[styles.title, { color: colors.text }]}>Greetings, Builder!</Text>
+                                <Text style={[styles.description, { color: colors.textSecondary }]}>
+                                    Summon a dynamic Sparklet. Describe your vision, and I will brew the code.
+                                </Text>
+                                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => setCurrentPage(1)}>
+                                    <Text style={styles.buttonText}>Enter the Forge 🔥</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={onCancel} style={styles.laterButton}>
+                                    <Text style={{ color: colors.textSecondary }}>Maybe Later</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    )}
+                    {currentPage >= 1 && currentPage <= 3 && (
+                        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                            <View style={styles.pageContent}>
+                                <Text style={styles.formIcon}>{JOURNEY_THEMES[currentPage].icon}</Text>
+                                <Text style={[styles.title, { color: colors.text }]}>
+                                    {currentPage === 1 && 'What is its name?'}
+                                    {currentPage === 2 && 'What is its purpose?'}
+                                    {currentPage === 3 && 'Where is your email address?'}
+                                </Text>
 
-                        {currentPage === 5 ? (
-                            <Dropdown
-                                options={PAYMENT_OPTIONS}
-                                selectedValue={formData.investment}
-                                onSelect={(val) => updateFormData('investment', val)}
-                                style={[styles.input, { borderColor: colors.border }]}
-                                textStyle={{ color: colors.text }}
-                            />
-                        ) : (
-                            <TextInput
-                                style={[styles.input, { borderColor: colors.border, color: colors.text, height: (currentPage === 2 || currentPage === 3) ? 100 : 50 }]}
-                                value={currentPage === 1 ? formData.title : currentPage === 2 ? formData.description : currentPage === 3 ? formData.targetAudience : currentPage === 4 ? formData.monetization : formData.email}
-                                onChangeText={(t) => updateFormData(currentPage === 1 ? 'title' : currentPage === 2 ? 'description' : currentPage === 3 ? 'targetAudience' : currentPage === 4 ? 'monetization' : 'email', t)}
-                                placeholder="Type here..."
-                                placeholderTextColor={colors.textSecondary}
-                                multiline={currentPage === 2 || currentPage === 3}
-                                autoFocus
-                            />
-                        )}
+                                {currentPage === 2 && (
+                                    <View style={{ width: '100%', marginBottom: 15 }}>
+                                        <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 13 }}>Similar to an existing Sparklet? (Optional)</Text>
+                                        <Dropdown
+                                            options={existingSparklets}
+                                            selectedValue={formData.similarity}
+                                            onSelect={(val) => updateFormData('similarity', val)}
+                                            placeholder="Select existing..."
+                                            style={[styles.input, { borderColor: colors.border, marginBottom: 15 }]}
+                                            textStyle={{ color: colors.text }}
+                                        />
+                                        <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 13 }}>New functionality/vision:</Text>
+                                        <TextInput
+                                            style={[styles.input, { borderColor: colors.border, color: colors.text, height: 100, textAlignVertical: 'top' }]}
+                                            value={formData.purpose}
+                                            onChangeText={(t) => updateFormData('purpose', t)}
+                                            placeholder="Describe what it does..."
+                                            placeholderTextColor={colors.textSecondary}
+                                            multiline
+                                            autoFocus
+                                        />
+                                    </View>
+                                )}
 
-                        <View style={styles.navRow}>
-                            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                                <Text style={{ color: colors.textSecondary }}>Back</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleNext} disabled={!canProceedToNext()} style={[styles.nextButton, { backgroundColor: canProceedToNext() ? colors.primary : colors.border }]}>
-                                <Text style={styles.buttonText}>Next</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-                {currentPage === 7 && (
-                    <View style={styles.pageContent}>
-                        <Animated.Text style={[styles.reviewEmoji, { opacity: reviewIconOpacity }]}>{['🧙‍♂️', '🥚', '🐉', '🏰', '💰', '💎', '🍺', '✨'][reviewIconIndex]}</Animated.Text>
-                        <Text style={[styles.title, { color: colors.text }]}>Final Checkpoint ✨</Text>
-                        <View style={styles.reviewList}>
-                            <Text style={[styles.reviewText, { color: colors.text }]}>• Name: {formData.title}</Text>
-                            <Text style={[styles.reviewText, { color: colors.text }]}>• Powers: {formData.description.substring(0, 40)}...</Text>
-                        </View>
-                        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleSubmit} disabled={submitting}>
-                            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Summon Sparklet! ✨</Text>}
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleBack} style={{ marginTop: 10 }}><Text style={{ color: colors.textSecondary }}>Wait, let me change something</Text></TouchableOpacity>
-                    </View>
-                )}
-                {currentPage === 8 && (
-                    <View style={styles.pageContent}>
-                        <Text style={styles.introEmoji}>🎉</Text>
-                        <Text style={[styles.title, { color: colors.text }]}>It is Done!</Text>
-                        <Text style={[styles.description, { color: colors.textSecondary }]}>
-                            The Wizard is now weaving the code. Check the list in a moment.
-                        </Text>
-                        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={onComplete}>
-                            <Text style={styles.buttonText}>Return Home</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </KeyboardAvoidingView>
+                                {(currentPage === 1 || currentPage === 3) && (
+                                    <TextInput
+                                        style={[styles.input, { borderColor: colors.border, color: colors.text, height: 50 }]}
+                                        value={currentPage === 1 ? formData.title : formData.email}
+                                        onChangeText={(t) => updateFormData(currentPage === 1 ? 'title' : 'email', t)}
+                                        placeholder="Type here..."
+                                        placeholderTextColor={colors.textSecondary}
+                                        autoFocus
+                                    />
+                                )}
+
+                                <View style={styles.navRow}>
+                                    <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                                        <Text style={{ color: colors.textSecondary }}>Back</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={handleNext} disabled={!canProceedToNext()} style={[styles.nextButton, { backgroundColor: canProceedToNext() ? colors.primary : colors.border }]}>
+                                        <Text style={styles.buttonText}>Next</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </ScrollView>
+                    )}
+                    {currentPage === 4 && (
+                        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                            <View style={styles.pageContent}>
+                                <Animated.Text style={[styles.reviewEmoji, { opacity: reviewIconOpacity }]}>{['🧙‍♂️', '🥚', '🐉', '🏰', '💰', '💎', '🍺', '✨'][reviewIconIndex]}</Animated.Text>
+                                <Text style={[styles.title, { color: colors.text }]}>Final Checkpoint ✨</Text>
+                                <View style={styles.reviewList}>
+                                    <Text style={[styles.reviewText, { color: colors.text }]}>• Name: {formData.title}</Text>
+                                    <Text style={[styles.reviewText, { color: colors.text }]}>• Similarity: {formData.similarity}</Text>
+                                    <Text style={[styles.reviewText, { color: colors.text }]}>• Purpose: {formData.purpose.substring(0, 50)}...</Text>
+                                    <Text style={[styles.reviewText, { color: colors.text }]}>• Email: {formData.email}</Text>
+                                </View>
+                                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleSubmit} disabled={submitting}>
+                                    {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Summon Sparklet! ✨</Text>}
+                                </TouchableOpacity>
+                                {!submitting && (
+                                    <TouchableOpacity onPress={handleBack} style={{ marginTop: 10 }}>
+                                        <Text style={{ color: colors.textSecondary }}>Wait, let me change something</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </ScrollView>
+                    )}
+                    {currentPage === 5 && (
+                        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                            <View style={styles.pageContent}>
+                                <Text style={styles.introEmoji}>🎉</Text>
+                                <Text style={[styles.title, { color: colors.text }]}>It is Done!</Text>
+                                <Text style={[styles.description, { color: colors.textSecondary }]}>
+                                    The Wizard is now weaving the code. Check the list in a moment.
+                                </Text>
+                                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={onComplete}>
+                                    <Text style={styles.buttonText}>Return Home</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    )}
+                </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
         </View>
     );
 };
@@ -305,6 +346,7 @@ const styles = StyleSheet.create({
     progressBarContainer: { padding: 10, borderBottomWidth: 1 },
     progressTrack: { height: 4, width: '100%', borderRadius: 2, overflow: 'hidden' },
     progressFill: { height: '100%' },
+    scrollContent: { flexGrow: 1 },
     pageContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
     introEmoji: { fontSize: 60, marginBottom: 10 },
     title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
