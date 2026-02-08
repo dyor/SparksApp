@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.40",
+    "version": "1.0.41",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -98,7 +98,8 @@
             ]
           }
         ]
-      }
+      },
+      "buildNumber": "1.0.41"
     },
     "android": {
       "compileSdkVersion": 35,
@@ -109,21 +110,32 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "VIBRATE",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "MODIFY_AUDIO_SETTINGS",
-        "WAKE_LOCK",
-        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.40"
+      "versionName": "1.0.41",
+      "package": "com.mattdyor.sparks"
     },
     "extra": {
       "eas": {

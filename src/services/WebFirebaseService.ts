@@ -8,6 +8,7 @@ import {
   signInAnonymously,
   User,
 } from "firebase/auth";
+import "firebase/firestore";
 import {
   getFirestore,
   collection,

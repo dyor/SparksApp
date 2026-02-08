@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, Firestore, initializeFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
-// Side-effect import to ensure component registration
+// Side-effect import MUST come before other firestore imports to ensure component registration
 import "firebase/firestore";
+import { getFirestore, Firestore, initializeFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
 import { RemoteConfigService } from "./RemoteConfigService";
 
 /**

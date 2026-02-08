@@ -280,9 +280,13 @@ export class SparkletService {
 
             // Step 4: Update submission status
             await setDoc(doc(db, 'sparkletSubmissions', submissionRef.id), { status: 'completed' }, { merge: true });
-        } catch (e) {
+        } catch (e: any) {
             console.error('AI Generation failed:', e);
-            await setDoc(doc(db, 'sparkletSubmissions', submissionRef.id), { status: 'failed' }, { merge: true });
+            await setDoc(doc(db, 'sparkletSubmissions', submissionRef.id), {
+                status: 'failed',
+                error: e.message || String(e),
+                updatedAt: Timestamp.now()
+            }, { merge: true });
             throw e;
         }
 

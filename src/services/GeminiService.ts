@@ -105,7 +105,7 @@ export const GeminiService = {
         const apiKey = await getApiKey();
 
         // Using configuration from RecAIpeSpark which is confirmed working
-        // Model: gemini-2.5-flash (as seen in working code)
+        // Model: gemini-2.5-flash (Latest high-performance model)
         // API Version: v1
         const contents: any[] = [{
             parts: [{ text: prompt }]
@@ -172,7 +172,10 @@ export const GeminiService = {
             if (GeminiService.isApiKeyError(errorMsg)) {
                 GeminiService.handleApiKeyError(errorMsg);
             }
-            throw new Error(errorMsg);
+
+            // Format a descriptive error that will be saved to Firestore
+            const descriptiveError = `Gemini API Error: [${response.status} ${errorStatus || ''}] ${errorMsg}${errorCode ? ` (Code: ${errorCode})` : ''}`;
+            throw new Error(descriptiveError);
         }
 
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -190,10 +193,21 @@ export const GeminiService = {
 
         try {
             // Clean markdown code blocks if present
-            const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+            let cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+
+            // If it's still not valid JSON, try to find the first '{' and last '}'
+            if (!cleanText.startsWith('{')) {
+                const firstBrace = cleanText.indexOf('{');
+                const lastBrace = cleanText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                }
+            }
+
             return JSON.parse(cleanText) as T;
         } catch (e) {
-            console.error('JSON Parse Error', e);
+            console.error('JSON Parse Error. Raw text:', text);
+            console.error('Error details:', e);
             throw new Error('Failed to parse (JSON)');
         }
     },
