@@ -1,5 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, Firestore, initializeFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+// Side-effect import to ensure component registration
+import "firebase/firestore";
 import { RemoteConfigService } from "./RemoteConfigService";
 
 /**
@@ -96,38 +98,62 @@ export function getFirebaseAppSync(): FirebaseApp | undefined {
   return undefined;
 }
 
+// Track Firestore instance to avoid multiple initialization attempts
+let firestoreInstance: Firestore | null = null;
+
 /**
  * Gets or initializes Firestore database instance
  * @returns Firestore instance or null if initialization fails
  */
 export async function getFirestoreDb(): Promise<Firestore | null> {
+  // If already initialized, return the instance
+  if (firestoreInstance) {
+    return firestoreInstance;
+  }
+
   const app = await getFirebaseApp();
   if (!app) {
     return null;
   }
   try {
     // Try to initialize with persistence for offline support
-    return initializeFirestore(app, {
+    console.log("🔥 [firebaseConfig] Initializing Firestore with persistence...");
+    firestoreInstance = initializeFirestore(app, {
       localCache: persistentLocalCache({
         cacheSizeBytes: CACHE_SIZE_UNLIMITED
       })
     });
+    console.log("✅ [firebaseConfig] Firestore initialized with persistence");
+    return firestoreInstance;
   } catch (error: any) {
     // If already initialized, get existing instance
     if (error.code === 'failed-precondition' || error.message?.includes('already initialized')) {
-      return getFirestore(app);
+      console.log("🔥 [firebaseConfig] Firestore already initialized, fetching existing instance");
+      firestoreInstance = getFirestore(app);
+      return firestoreInstance;
     }
-    console.error("❌ Error getting Firestore with persistence:", error);
-    // Fallback to standard initialization
-    return getFirestore(app);
+
+    console.warn("⚠️ [firebaseConfig] Could not use persistence, falling back to default:", error.message);
+
+    try {
+      firestoreInstance = getFirestore(app);
+      console.log("✅ [firebaseConfig] Firestore initialized (no persistence)");
+      return firestoreInstance;
+    } catch (fallbackError: any) {
+      console.error("❌ [firebaseConfig] FATAL: Failed to initialize Firestore:", fallbackError);
+      return null;
+    }
   }
 }
 
 // Legacy export for backward compatibility
 export let db: Firestore | null = null;
 
-// Initialize the legacy db export asynchronously
-getFirestoreDb().then(database => {
-  db = database;
-});
+// Initialize the legacy db export asynchronously safely
+export async function initializeLegacyDb() {
+  db = await getFirestoreDb();
+}
+
+// Do not auto-initialize at top level as it can cause race conditions
+// with WebFirebaseService. instead, let the first caller trigger it.
 

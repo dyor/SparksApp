@@ -248,9 +248,9 @@ export const SparkletWizard: React.FC<SparkletWizardProps> = ({ onComplete, onCa
                             <View style={styles.pageContent}>
                                 <Text style={styles.formIcon}>{JOURNEY_THEMES[currentPage].icon}</Text>
                                 <Text style={[styles.title, { color: colors.text }]}>
-                                    {currentPage === 1 && 'What is its name?'}
-                                    {currentPage === 2 && 'What is its purpose?'}
-                                    {currentPage === 3 && 'Where is your email address?'}
+                                    {currentPage === 1 && 'What is your Sparklet name?'}
+                                    {currentPage === 2 && 'What will your Sparklet do?'}
+                                    {currentPage === 3 && 'What is your email address?'}
                                 </Text>
 
                                 {currentPage === 2 && (

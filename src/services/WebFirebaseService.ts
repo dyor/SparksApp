@@ -46,6 +46,9 @@ export class WebFirebaseService {
   private static currentUser: User | null = null;
 
   static async initialize(): Promise<void> {
+    if (this._initialized) {
+      return;
+    }
     console.log("🚀 WebFirebaseService.initialize() called");
 
     try {
@@ -187,7 +190,8 @@ export class WebFirebaseService {
     >
   ): Promise<string> {
     if (!this._initialized || !this.db) {
-      const configValid = validateFirebaseConfig();
+      const { getEffectiveFirebaseConfig } = require('./firebaseConfig');
+      const configValid = validateFirebaseConfig(getEffectiveFirebaseConfig());
       throw new Error(
         `Firebase not initialized. ${!configValid
           ? "Missing configuration (check .env file or Remote Config)."
