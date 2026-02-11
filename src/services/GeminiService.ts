@@ -188,23 +188,38 @@ export const GeminiService = {
 
     generateJSON: async <T>(prompt: string, images: string[] = []): Promise<T> => {
         // Append JSON instruction
-        const jsonPrompt = `${prompt}\n\nOutput strictly valid JSON.`;
+        const jsonPrompt = `${prompt}\n\nIMPORTANT: Return ONLY a valid JSON object. Do not include markdown code blocks, backticks, or any introductory text.`;
         const text = await GeminiService.generateContent(jsonPrompt, images);
 
         try {
-            // Clean markdown code blocks if present
-            let cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+            // First pass: clean up common markdown debris
+            let cleanText = text.replace(/```(json)?/g, '').replace(/```/g, '').trim();
 
-            // If it's still not valid JSON, try to find the first '{' and last '}'
-            if (!cleanText.startsWith('{')) {
-                const firstBrace = cleanText.indexOf('{');
-                const lastBrace = cleanText.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+            // Try direct parse first
+            try {
+                return JSON.parse(cleanText) as T;
+            } catch (e) {
+                // If direct parse fails, try to extract based on delimiters
+                const startObj = cleanText.indexOf('{');
+                const endObj = cleanText.lastIndexOf('}');
+                const startArr = cleanText.indexOf('[');
+                const endArr = cleanText.lastIndexOf(']');
+
+                // Determine which pair is "outer"
+                let candidate = '';
+                if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
+                    candidate = cleanText.substring(startObj, endObj + 1);
+                } else if (startArr !== -1 && endArr !== -1) {
+                    candidate = cleanText.substring(startArr, endArr + 1);
                 }
-            }
 
-            return JSON.parse(cleanText) as T;
+                if (candidate) {
+                    return JSON.parse(candidate) as T;
+                }
+
+                // If no delimiters found, throw the original error
+                throw e;
+            }
         } catch (e) {
             console.error('JSON Parse Error. Raw text:', text);
             console.error('Error details:', e);

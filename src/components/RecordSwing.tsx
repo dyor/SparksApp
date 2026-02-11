@@ -6,11 +6,15 @@ import {
   Modal,
   StyleSheet,
   Alert,
+  Linking,
+  AppState,
+  Platform,
 } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { Video, ResizeMode, AVPlaybackStatus, VideoFullscreenUpdate } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
 import { HapticFeedback } from "../utils/haptics";
+import PermissionService from "../services/PermissionService";
 
 export interface RecordedSwing {
   uri: string;
@@ -73,7 +77,18 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
   // Cleanup on unmount
   useEffect(() => {
+    // Refresh permissions when coming back to foreground
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        console.log("⛳️ RecordSwing: App back to foreground, refreshing permissions...");
+        requestCameraPermission();
+        requestMicPermission();
+        requestMediaLibraryPermission();
+      }
+    });
+
     return () => {
+      subscription.remove();
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
       }
@@ -84,41 +99,27 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   }, []);
 
   const handleRecordSwing = async () => {
+    console.log("⛳️ handleRecordSwing: triggered");
     try {
-      // Check camera permission
-      if (!cameraPermission?.granted) {
-        const { granted } = await requestCameraPermission();
-        if (!granted) {
-          Alert.alert(
-            "Permission Required",
-            "Camera permission is required to record your swing."
-          );
-          return;
-        }
-      }
+      // Force refresh of permissions internally just in case hooks are stale
+      console.log("⛳️ handleRecordSwing: checking current permission status...");
+      const currentCamera = await PermissionService.checkCameraPermission();
+      const currentMic = await PermissionService.checkMicrophonePermission();
+      const currentMedia = await PermissionService.checkMediaLibraryPermission();
 
-      // Check media library permission
-      if (!mediaLibraryPermission?.granted) {
-        const { granted } = await requestMediaLibraryPermission();
-        if (!granted) {
-          Alert.alert(
-            "Permission Required",
-            "Media library permission is required to save your swing video."
-          );
-          return;
-        }
-      }
+      console.log("⛳️ handleRecordSwing: Permission Status ->", {
+        camera: currentCamera.status,
+        mic: currentMic.status,
+        media: currentMedia.status
+      });
 
-      // Check microphone permission
-      if (!micPermission?.granted) {
-        const { granted } = await requestMicPermission();
-        if (!granted) {
-          Alert.alert(
-            "Permission Required",
-            "Microphone permission is required to record video with audio."
-          );
-          return;
-        }
+      console.log("⛳️ handleRecordSwing: calling requestMultiple...");
+      const granted = await PermissionService.requestMultiple(['camera', 'mediaLibrary', 'microphone']);
+      console.log("⛳️ handleRecordSwing: permissions granted =", granted);
+
+      if (!granted) {
+        console.log("⛳️ handleRecordSwing: permissions NOT granted, stopping.");
+        return;
       }
 
       // Reset state
@@ -126,10 +127,11 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       setIsCameraReady(false);
 
       // Show camera and start countdown
+      console.log("⛳️ handleRecordSwing: setting showCamera = true");
       setShowCamera(true);
       // Wait for onCameraReady to start countdown (handled in CameraView prop)
     } catch (error) {
-      console.error("Error starting record swing:", error);
+      console.error("⛳️ handleRecordSwing: FATAL ERROR ->", error);
       Alert.alert("Error", "Failed to start recording");
     }
   };
@@ -467,34 +469,84 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
               ? `Stop Recording (${recordingDuration}s)`
               : "Record Swing"}
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity >
+
+      {/* Permission Fallback UI */}
+      {
+        (!cameraPermission?.granted || !micPermission?.granted || !mediaLibraryPermission?.granted) && (
+          <TouchableOpacity
+            style={{
+              marginTop: 4,
+              padding: 8,
+              backgroundColor: `${colors.error}15`,
+              borderRadius: 8,
+              borderStyle: 'dashed',
+              borderWidth: 1,
+              borderColor: colors.error,
+              marginBottom: 8
+            }}
+          >
+            <Text style={{ color: colors.error, fontSize: 11, textAlign: 'center', fontWeight: '600' }}>
+              ⚠️ Permissions Required: {[
+                !cameraPermission?.granted && 'Camera',
+                !micPermission?.granted && 'Microphone',
+                !mediaLibraryPermission?.granted && (Platform.OS === 'android' ? 'Photos/Videos' : 'Photo Library')
+              ].filter(Boolean).join(', ')}
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  console.log("⛳️ RecordSwing: Opening app settings for permissions...");
+                  Linking.openSettings();
+                }}
+                style={{ padding: 4 }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>Open Settings</Text>
+              </TouchableOpacity>
+              <View style={{ width: 1, backgroundColor: colors.textSecondary, height: 10, alignSelf: 'center', opacity: 0.3 }} />
+              <TouchableOpacity
+                onPress={() => {
+                  console.log("⛳️ RecordSwing: Manual permission refresh...");
+                  requestCameraPermission();
+                  requestMicPermission();
+                  requestMediaLibraryPermission();
+                }}
+                style={{ padding: 4 }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        )}
 
       {/* Video Thumbnail */}
-      {recordedSwing && (
-        <TouchableOpacity
-          style={styles.videoThumbnailContainer}
-          onPress={openVideoPlayer}
-          activeOpacity={0.7}
-          testID="video-thumbnail"
-        >
-          <Video
-            source={{ uri: recordedSwing.uri }}
-            style={styles.videoThumbnail}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            usePoster
-          />
-          <View style={styles.videoThumbnailTextContainer}>
-            <Text style={styles.videoThumbnailTitle}>
-              📹 Hole {recordedSwing.holeNumber} Shot {recordedSwing.shotNumber}{" "}
-              - {recordedSwing.club}
-            </Text>
-            <Text style={styles.videoThumbnailSubtext}>
-              Tap to view • All swings in Golf Swings folder
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
+      {
+        recordedSwing && (
+          <TouchableOpacity
+            style={styles.videoThumbnailContainer}
+            onPress={openVideoPlayer}
+            activeOpacity={0.7}
+            testID="video-thumbnail"
+          >
+            <Video
+              source={{ uri: recordedSwing.uri }}
+              style={styles.videoThumbnail}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={false}
+              usePoster
+            />
+            <View style={styles.videoThumbnailTextContainer}>
+              <Text style={styles.videoThumbnailTitle}>
+                📹 Hole {recordedSwing.holeNumber} Shot {recordedSwing.shotNumber}{" "}
+                - {recordedSwing.club}
+              </Text>
+              <Text style={styles.videoThumbnailSubtext}>
+                Tap to view • All swings in Golf Swings folder
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )
+      }
 
       {/* Camera Modal */}
       <Modal
@@ -504,19 +556,19 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         onRequestClose={cancelRecording}
       >
         <View style={styles.cameraModal}>
-          {cameraPermission?.granted && (
+          {cameraPermission?.granted ? (
             <CameraView
               ref={cameraRef}
               style={styles.cameraView}
               facing="front" // Back to front camera per user request
               mode="video"
               onCameraReady={() => {
-                console.log("Camera ready");
+                console.log("⛳️ CameraView: onCameraReady fired");
                 setIsCameraReady(true);
                 startCountdown();
               }}
               onMountError={(error) => {
-                console.error("Camera mount error:", error);
+                console.error("⛳️ CameraView: mount error:", error);
                 Alert.alert("Camera Error", `Failed to start camera: ${error.message}`);
                 setShowCamera(false);
               }}
@@ -561,6 +613,38 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
                 )}
               </View>
             </CameraView>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30, backgroundColor: '#1a1a1a' }}>
+              <Text style={{ color: '#fff', fontSize: 24, marginBottom: 10 }}>⚠️</Text>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 10 }}>
+                Permissions Required
+              </Text>
+              <Text style={{ color: '#ccc', fontSize: 14, textAlign: 'center', marginBottom: 30 }}>
+                Camera and microphone access are needed to record your swing.
+                Please enable them in your device settings.
+              </Text>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 24,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  width: '100%',
+                  alignItems: 'center'
+                }}
+                onPress={() => Linking.openSettings()}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Open Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ marginTop: 25 }}
+                onPress={cancelRecording}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </Modal>

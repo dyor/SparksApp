@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, TextInput, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, TextInput, RefreshControl, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Sparklet } from '../types/sparklet';
 import { HapticFeedback } from '../utils/haptics';
@@ -109,6 +109,33 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
     const handleBack = () => {
         HapticFeedback.light();
         setActiveSparkletId(null);
+    };
+
+    const handleDeleteSparklet = (sparklet: Sparklet) => {
+        HapticFeedback.warning();
+        Alert.alert(
+            'Delete Sparklet',
+            `Are you sure you want to delete "${sparklet.metadata.title}"? This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            await SparkletService.deleteSparklet(sparklet.metadata.id);
+                            HapticFeedback.success();
+                            loadSparklets();
+                        } catch (err: any) {
+                            console.error('Failed to delete sparklet:', err);
+                            Alert.alert('Error', 'Failed to delete sparklet. Please try again.');
+                            setIsLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     // --- Settings View Logic ---
@@ -278,6 +305,8 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
                                         key={sparklet.metadata.id}
                                         style={[styles.card, { backgroundColor: colors.surface }]}
                                         onPress={() => handleSparkletPress(sparklet)}
+                                        onLongPress={() => handleDeleteSparklet(sparklet)}
+                                        delayLongPress={600}
                                     >
                                         <View style={styles.cardContent}>
                                             <Text style={styles.cardIcon}>{sparklet.metadata.icon}</Text>
@@ -412,6 +441,16 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                 }
             };
 
+            // NEW: Helper to run other actions synchronously
+            helpersProxy.runAction = (actionName: string, actionParams: any) => {
+                const actionBody = config.actions[actionName];
+                if (!actionBody) return stateRef.current;
+                const actionFn = new Function('state', 'params', 'helpers', actionBody);
+                const result = actionFn(stateRef.current, actionParams, helpersProxy);
+                // Return the full state that WOULD result from this action
+                return result && typeof result === 'object' ? { ...stateRef.current, ...result } : stateRef.current;
+            };
+
             const fn = new Function('state', 'params', 'helpers', config.actions[name]);
             const result = fn(stateRef.current, params, helpersProxy);
             if (result && typeof result === 'object') {
@@ -478,7 +517,8 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
             if (isHidden === true || isHidden === 'true') return null;
         }
 
-        const rawStyle = config.view?.styles?.[el.style] || {};
+        const styleName = interpolate(el.style, context);
+        const rawStyle = config.view?.styles?.[styleName] || {};
         const customStyle: any = {};
         Object.keys(rawStyle).forEach(key => {
             let val = interpolate(rawStyle[key], context);
@@ -549,10 +589,15 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                     }
                 });
 
+                // Intelligent default text color for contrast
+                const bBg = buttonStyle.backgroundColor;
+                const isLightBg = bBg && (bBg === '#eee' || bBg === '#f3f4f6' || bBg === '#fff' || bBg === '#ffffff' || bBg === 'white' || bBg === 'rgba(255,255,255,1)');
+                const defaultTextStyle = isLightBg ? { color: '#000' } : {};
+
                 return (
                     <TouchableOpacity
                         key={index}
-                        style={[styles.engineButton, { backgroundColor: colors.primary }, buttonStyle]}
+                        style={[styles.engineButton, buttonStyle]}
                         onPress={() => {
                             HapticFeedback.light();
                             // Interpolate individual params
@@ -565,7 +610,7 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                             executeAction(el.onPress, finalParams);
                         }}
                     >
-                        <Text style={[styles.engineButtonText, textStyle]}>{interpolate(el.label || el.value, context)}</Text>
+                        <Text style={[styles.engineButtonText, defaultTextStyle, textStyle]}>{interpolate(el.label || el.value, context)}</Text>
                     </TouchableOpacity>
                 );
             case 'grid': {
@@ -573,43 +618,42 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                     const fieldName = el.dataSource.replace(/^state\./, '');
                     const items = state[fieldName] || [];
 
-                    // Calculate column width if repeat(N, 1fr) is used
-                    let columnWidth = '48%'; // Default 2 columns
+                    // IMPROVED MATH:
+                    // Use a 'columns' property from the element, or fallback to gridTemplateColumns
+                    let numCols = 2;
                     const gridStyle = config.view?.styles?.[el.style] || {};
-                    if (gridStyle.gridTemplateColumns) {
-                        const match = String(gridStyle.gridTemplateColumns).match(/repeat\((\d+),\s*1fr\)/);
-                        if (match) {
-                            const cols = parseInt(match[1]);
-                            columnWidth = `${Math.floor(98 / cols)}%`;
-                        }
+
+                    if (el.columns) {
+                        numCols = parseInt(interpolate(el.columns, context));
+                    } else if (gridStyle.gridTemplateColumns) {
+                        const match = String(gridStyle.gridTemplateColumns).match(/repeat\((\d+),/);
+                        if (match) numCols = parseInt(match[1]);
                     }
 
+                    // Calculate percentage width (subtracting a tiny bit for margins/borders)
+                    const columnWidth = `${(100 / numCols) - 0.5}%`;
+
                     return (
-                        <View key={index} style={[styles.engineGrid, customStyle]}>
-                            {items.map((item: any, i: number) => {
-                                if (el.elements && el.elements.length > 0) {
-                                    // Wrap in a container to enforce the column width
-                                    return (
-                                        <View key={i} style={{ width: columnWidth as any }}>
-                                            {el.elements.map((template: any, subIndex: number) =>
-                                                renderElement(template, i * 100 + subIndex, { item })
-                                            )}
-                                        </View>
-                                    );
-                                }
-                                // Fallback to simple cell if no template provided
-                                return (
-                                    <TouchableOpacity
-                                        key={i}
-                                        style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface, width: columnWidth as any }]}
-                                        onPress={() => executeAction(el.onPress, { index: i })}
-                                    >
-                                        <Text style={[styles.engineCellText, { color: item === 'X' ? colors.primary : '#ef4444' }]}>
-                                            {String(item)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
+                        <View key={index} style={[styles.engineGrid, { width: '100%' }, customStyle]}>
+                            {items.map((item: any, i: number) => (
+                                <View key={i} style={{ width: columnWidth as any, padding: 1 }}>
+                                    {el.elements && el.elements.length > 0 ? (
+                                        el.elements.map((template: any, subIndex: number) =>
+                                            renderElement(template, i * 100 + subIndex, { item, index: i })
+                                        )
+                                    ) : (
+                                        // Fallback cell if no template elements provided
+                                        <TouchableOpacity
+                                            style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface, width: '100%', height: 50 }]}
+                                            onPress={() => executeAction(el.onPress, { index: i, item })}
+                                        >
+                                            <Text style={[styles.engineCellText, { color: colors.text, fontSize: 16 }]}>
+                                                {String(item)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            ))}
                         </View>
                     );
                 }
@@ -826,9 +870,10 @@ const styles = StyleSheet.create({
     engineButton: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 25,
-        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        backgroundColor: '#3b82f6', // Default blue
+        borderRadius: 4,
         marginBottom: 10,
     },
     engineButtonText: {
@@ -858,7 +903,23 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 8,
         paddingHorizontal: 15,
-        marginBottom: 20,
+        marginBottom: 15,
         fontSize: 16,
+    },
+    // Common layout helpers for AI
+    engineRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingVertical: 10,
+    },
+    engineStatBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
     }
 });

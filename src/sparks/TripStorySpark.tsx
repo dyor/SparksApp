@@ -30,6 +30,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PermissionService from '../services/PermissionService';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -374,7 +375,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       // Check AsyncStorage directly for the Zustand persisted data
       const storageKey = 'sparks-data-storage';
       const rawData = await AsyncStorage.getItem(storageKey);
-      
+
       if (!rawData) {
         return { recovered: false, tripsFound: 0, message: 'No data found in storage' };
       }
@@ -389,7 +390,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       // Check for trip-story data in the parsed structure
       const tripStoryData = parsedData?.state?.sparkData?.['trip-story'];
-      
+
       if (!tripStoryData || !tripStoryData.trips || !Array.isArray(tripStoryData.trips) || tripStoryData.trips.length === 0) {
         return { recovered: false, tripsFound: 0, message: 'No trip data found in storage' };
       }
@@ -399,21 +400,21 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       // Restore the data using setSparkData (synchronous)
       setSparkData('trip-story', tripStoryData);
-      
+
       // Reload trips to apply the recovered data
       loadTrips();
 
-      return { 
-        recovered: true, 
-        tripsFound, 
-        message: `Successfully recovered ${tripsFound} trip${tripsFound !== 1 ? 's' : ''}!` 
+      return {
+        recovered: true,
+        tripsFound,
+        message: `Successfully recovered ${tripsFound} trip${tripsFound !== 1 ? 's' : ''}!`
       };
     } catch (error) {
       console.error('Error during recovery:', error);
-      return { 
-        recovered: false, 
-        tripsFound: 0, 
-        message: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      return {
+        recovered: false,
+        tripsFound: 0,
+        message: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   };
@@ -476,6 +477,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   // Load trips on mount
   useEffect(() => {
     loadTrips();
+    // Request permissions immediately
+    PermissionService.requestMultiple(['camera', 'mediaLibrary', 'location']).catch(err =>
+      console.warn('Initial TripStory permission request failed:', err)
+    );
   }, []);
 
   // Save active state whenever it changes
@@ -2368,7 +2373,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             }} />
           )}
 
-          <ScrollView 
+          <ScrollView
             style={styles.modalContent}
             scrollEnabled={!isPhotoZoomed}
             keyboardShouldPersistTaps="handled"
@@ -2388,7 +2393,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
                 const onPinchGestureEvent = Animated.event(
                   [{ nativeEvent: { scale: pinchScale } }],
-                  { 
+                  {
                     useNativeDriver: true,
                     listener: (event: any) => {
                       console.log('📌 Pinch gesture event, scale:', event.nativeEvent.scale);
@@ -2425,7 +2430,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
                 const onPanGestureEvent = Animated.event(
                   [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
-                  { 
+                  {
                     useNativeDriver: true,
                     listener: (event: any) => {
                       // Only process pan events when zoomed
@@ -2494,14 +2499,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                             shouldCancelWhenOutside={false}
                             avgTouches={true}
                           >
-                            <Animated.View 
-                              collapsable={false} 
+                            <Animated.View
+                              collapsable={false}
                               style={{ width: '100%' }}
                               onStartShouldSetResponder={() => true}
                               onMoveShouldSetResponder={() => true}
                             >
                               <Animated.Image
-                                source={{ uri: absoluteUri }} 
+                                source={{ uri: absoluteUri }}
                                 style={[styles.photoPreviewFullWidth, animatedStyle]}
                                 resizeMode="contain"
                                 onLoad={() => {
@@ -2521,11 +2526,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       </PinchGestureHandler>
                     </GestureHandlerRootView>
                     {!isPhotoZoomed && (
-                      <Text style={{ 
-                        textAlign: 'center', 
-                        marginTop: 8, 
+                      <Text style={{
+                        textAlign: 'center',
+                        marginTop: 8,
                         color: colors.textSecondary,
-                        fontSize: 12 
+                        fontSize: 12
                       }}>
                         Pinch to zoom
                       </Text>

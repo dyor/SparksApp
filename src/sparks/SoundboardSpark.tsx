@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking, AppState } from 'react-native';
 import { Audio } from 'expo-av';
+import { useMicrophonePermissions } from 'expo-camera';
 import { IOSOutputFormat, IOSAudioQuality, AndroidOutputFormat, AndroidAudioEncoder } from 'expo-av/build/Audio/RecordingConstants';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import PermissionService from '../services/PermissionService';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -392,14 +394,31 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (recordingRef.current) clearInterval(recordingRef.current);
 
-      // Cleanup sound is handled by the dedicated useEffect below
-
       if (recordingObjectRef.current) {
         recordingObjectRef.current.stopAndUnloadAsync().catch(err =>
           console.log('ℹ️ SoundboardSpark: No active recording to cleanup on unmount')
         );
       }
     };
+  }, []);
+
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+
+  // Request microphone permission immediately on mount
+  useEffect(() => {
+    PermissionService.requestMicrophonePermission(false).catch(err =>
+      console.warn('Initial microphone permission request failed:', err)
+    );
+  }, []);
+
+  // Refresh permissions on active
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        requestMicPermission();
+      }
+    });
+    return () => subscription.remove();
   }, []);
 
 
@@ -445,28 +464,8 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     try {
       console.log('🎤 setupAudioMode: forRecording =', forRecording);
 
-      const { status: existingStatus, canAskAgain } = await Audio.getPermissionsAsync();
-      console.log('🎤 setupAudioMode: status =', existingStatus, 'canAskAgain =', canAskAgain);
-
-      if (existingStatus !== 'granted') {
-        if (!canAskAgain) {
-          Alert.alert(
-            'Microphone Required',
-            'Microphone access is disabled. Please enable it in your device settings to record sounds.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() }
-            ]
-          );
-          return false;
-        }
-
-        const { status } = await Audio.requestPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Microphone access is required to record sounds.');
-          return false;
-        }
-      }
+      const granted = await PermissionService.requestMicrophonePermission(true);
+      if (!granted) return false;
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: forRecording,
@@ -1524,6 +1523,31 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       </View>
 
       {renderRecordingInterface()}
+
+      {/* Permission Fallback UI */}
+      {(!micPermission || !micPermission.granted) && (
+        <TouchableOpacity
+          style={{
+            marginTop: 0,
+            padding: 12,
+            backgroundColor: `${colors.error}15`,
+            borderRadius: 12,
+            borderStyle: 'dashed',
+            borderWidth: 1,
+            borderColor: colors.error,
+            marginBottom: 20,
+            marginHorizontal: 0
+          }}
+          onPress={() => Linking.openSettings()}
+        >
+          <Text style={{ color: colors.error, fontSize: 13, textAlign: 'center', fontWeight: '700' }}>
+            🎤 Microphone Access Required
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+            Tap to open Settings and allow Microphone access to record sounds
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {categories.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryTabs}>

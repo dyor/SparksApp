@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import PermissionService from '../services/PermissionService';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -141,15 +142,8 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
   const requestPermissions = async () => {
     try {
-      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-      const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      const { status: mediaLibraryStatus } = await MediaLibrary.requestPermissionsAsync();
-
-      setHasPermissions(
-        cameraStatus === 'granted' &&
-        mediaStatus === 'granted' &&
-        mediaLibraryStatus === 'granted'
-      );
+      const granted = await PermissionService.requestMultiple(['camera', 'mediaLibrary']);
+      setHasPermissions(granted);
     } catch (error) {
       console.warn('Permission request failed:', error);
       setHasPermissions(false);

@@ -2,6 +2,24 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
+### Version 1.0.41 released Feb 8, 2026
+
+Fixes for Firebase connectivity and AI generation stability. Infinite Spark is now more stable and can generate more complex Sparklets.
+
+- **Infinite Spark & AI Engine**:
+    - **Robust JSON Parsing**: Implemented a "resilient parsing" logic in `GeminiService` that detects and extracts valid JSON objects even when the AI includes extra conversational text.
+    - **Rich Error Logging**: Enhanced failed Sparklet submissions to capture exact Gemini API error messages (status codes, forbidden keys, rate limits) directly in Firestore for remote debugging.
+    - **UI Polish**: Refined the Sparklet Wizard flow with clearer prompts and better navigation consistency.
+- **Firebase & Infrastructure**:
+    - **Resolved "Service Unavailable" Errors**: Fixed a critical race condition where Firestore was accessed before its modular component was registered. Implemented side-effect imports to guarantee service availability on app startup.
+    - **Dependency Alignment**: Synchronized the root `firebase` SDK with native sub-dependencies (pinning to 12.6.0) to resolve internal registry conflicts that were breaking simulator builds.
+    - **Build Improvement Plan**:
+        - Locked EAS CLI to Version >= 16.32.0 in `eas.json` for consistent CI/CD environments.
+        - Enforced TLS 1.2+ by migrating the npm registry to HTTPS.
+        - Cleaned up `app.json` by removing redundant fields now managed by native build scripts and EAS Remote Versioning.
+
+---
+
 ### Version 1.0.38 released Jan 29, 2026
 
 Significant upgrades to the Infinite Spark engine, transforming it into a general-purpose platform for building any Sparklet. Major feature additions and UX refinements for Goal Tracker and Golf Brain sparks.

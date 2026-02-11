@@ -23,6 +23,7 @@ import { PanGestureHandler, State, GestureHandlerRootView } from "react-native-g
 import { useSparkStore } from "../store";
 import { HapticFeedback } from "../utils/haptics";
 import { useTheme } from "../contexts/ThemeContext";
+import PermissionService from "../services/PermissionService";
 import { SparkChart, ChartSeries } from "../components/SparkChart";
 import {
   SettingsContainer,
@@ -6713,6 +6714,16 @@ export const GolfBrainSpark: React.FC<
     const [currentHole, setCurrentHole] = useState(1);
     const [currentShotIndex, setCurrentShotIndex] = useState(0);
     const [currentRound, setCurrentRound] = useState<Round | null>(null);
+
+    // Request camera and media library permissions immediately on mount
+    useEffect(() => {
+      console.log("⛳️ GolfBrainSpark: Initial permission request...");
+      PermissionService.requestMultiple(['camera', 'mediaLibrary', 'microphone']).then(granted => {
+        console.log("⛳️ GolfBrainSpark: Initial permissions granted =", granted);
+      }).catch(err =>
+        console.warn('⛳️ Initial GolfBrain permission request failed:', err)
+      );
+    }, []);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [showHandicapOnboarding, setShowHandicapOnboarding] = useState(false);

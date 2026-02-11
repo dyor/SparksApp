@@ -9,6 +9,7 @@ import {
     doc,
     getDoc,
     setDoc,
+    deleteDoc,
     orderBy
 } from 'firebase/firestore';
 import { Sparklet, SparkletMetadata } from '../types/sparklet';
@@ -23,36 +24,56 @@ A Sparklet is a self-contained logic and UI definition stored as a JSON object.
 
 ### The Infinite Schema:
 1. metadata: { title, icon, description, category }
-2. initialState: A JSON object for starting state (e.g., { score: 0, active: false }).
-3. actions: A map of JS strings. 
-   - Each string MUST be the FUNCTION BODY ONLY.
-   - Available variables: 'state' (latest data), 'params' (from UI call), 'helpers' (utility proxy).
-   - IMPORTANT: Always return a NEW state object. Use the spread operator: return { ...state, ...updates }.
-   - SCHEDULING: Use 'helpers.scheduleAction(actionName, params, delayMs)' for timers, loops, or delayed responses.
-   - CANCELLATION: Use 'helpers.cancelAction(actionName)' to stop a scheduled action.
+   - IMPORTANT: 'icon' MUST BE A SINGLE EMOJI ONLY (e.g., "🎮"). DO NOT USE WORDS.
+2. initialState: A JSON object for starting state (e.g., { board: [], status: 'playing' }).
+3. actions: A map of JS strings (FUNCTION BODY ONLY).
+   - Use 'state', 'params', and 'helpers'. Always return a NEW state diff { ...state, ...updates }.
+   - COMPOSITION: Use 'const nextState = helpers.runAction("otherAction", params)' to get the result of another action.
+   - TIMERS: Use 'helpers.scheduleAction("tick", {}, 1000)' for game loops.
 4. view: A UI schema:
    - elements: An array of element objects.
-   - SUPPORTED TYPES: 
-     - 'text': Display value. Supports interpolations like {{state.key}} or {{state.list.length}}.
-     - 'button': label, onPress (action name), params (object).
-     - 'input': placeholder, binding (path like 'state.text'), secureTextEntry.
-     - 'container' or 'view': A layout box that can nest other 'elements' inside it.
-     - 'grid': dataSource (array path), onPress (receives {index}).
-   - COMMON PROPS: 
-     - 'style': string name corresponding to a key in the styles map.
-     - 'hidden': boolean or {{expression}} to hide element (e.g. "{{state.lives <= 0}}").
-   - STYLES: A map of style names to React Native-compatible style objects. 
-     - Supports absolute positioning (top, left, right, bottom, zIndex).
-     - Supports 'transform' strings (e.g. "translate(-50%, -50%)").
-     - Supports 'boxShadow' strings (e.g. "0px 4px 8px rgba(0,0,0,0.2)").
-     - Dimensions: Use Numbers for sizes. Web units like 'px' or 'em' are allowed but Numbers are preferred.
+   - 'text': { type: 'text', value: 'Score: {{state.score}}', style: 'label' }
+   - 'button': { type: 'button', label: 'Click Me', onPress: 'handleClick', params: { x: 1 } }
+   - 'grid': { type: 'grid', dataSource: 'state.cells', columns: 10, elements: [...] }
+     - Inside grid 'elements', use {{item}} for the data and {{index}} for the index.
+   - 'container'/'view': { type: 'container', elements: [...], style: 'row' } (Use for layout)
 
-### Your Mission:
-Generate a functional, robust, and visually polished Sparklet JSON. For games, implement the core game loop in 'actions' and handle ghost/timer cycles via 'scheduleAction'. Use 'container' nesting to create structured layouts.
+### Design Guidelines:
+- UX: For games like Minesweeper, use a 'grid' with 'elements' template. The template should usually be a 'button' or 'container' with a background color.
+- CONTRAST: Always specify 'color' if using a light 'backgroundColor' (e.g., use dark text on light gray revealed cells).
+- COMPOSITION: Keep actions small. Use runAction to chain logic (e.g., 'checkWin' called from 'move').
+- LAYOUT: Use 'container' with style 'engineRow' to group stats. Use 'engineStatBox' for small icon+text badges.
+- INITIALIZATION: For grids, ensure the 'initialState' contains the full array of data (e.g. 100 objects for a 10x10 board).
 
-Your output must be a single JSON object with two fields:
-1. "definition": The full Sparklet JSON object as described above.
-2. "summary": A concise (1-2 sentence) human-readable summary of the specific code changes or enhancements made.
+### Example Stat Bar:
+{
+  "type": "container",
+  "style": "engineRow",
+  "elements": [
+    { "type": "container", "style": "engineStatBox", "elements": [{ "type": "text", "value": "🚩 {{state.flags}}" }] },
+    { "type": "container", "style": "engineStatBox", "elements": [{ "type": "text", "value": "⏱️ {{state.timer}}" }] }
+  ]
+}
+
+### Example Grid Element (Minesweeper):
+{
+  "type": "grid",
+  "dataSource": "state.board",
+  "columns": 10,
+  "elements": [{
+    "type": "button",
+    "label": "{{item.revealed ? item.value : ''}}",
+    "onPress": "revealCell",
+    "params": { "index": "{{index}}" },
+    "style": "{{item.revealed ? 'cellRevealed' : 'cellHidden'}}"
+  }],
+  "styles": {
+    "cellHidden": { "backgroundColor": "#888", "height": 40 },
+    "cellRevealed": { "backgroundColor": "#eee", "color": "#000", "height": 40 }
+  }
+}
+
+Your output must be a single JSON object: { "definition": { ... }, "summary": "..." }
 `;
 
 export class SparkletService {
@@ -196,11 +217,18 @@ export class SparkletService {
         const db = (WebFirebaseService as any).db;
         if (!db) throw new Error('Firestore not available');
 
+        // Failsafe for icon: AI sometimes puts a word like "bomb". We want an emoji.
+        let icon = aiGeneratedDef.metadata?.icon || '⚡️';
+        if (/[a-zA-Z0-9]{3,}/.test(icon)) {
+            // If it contains a word-like string of alphanumeric chars, revert to default
+            icon = '⚡️';
+        }
+
         // Extract metadata from the AI response or provide defaults
         return await addDoc(collection(db, SPARKLETS_COLLECTION), {
             title: aiGeneratedDef.metadata?.title || 'New Sparklet',
             description: aiGeneratedDef.metadata?.description || 'A sparklet birthed by AI.',
-            icon: aiGeneratedDef.metadata?.icon || '⚡️',
+            icon: icon,
             category: aiGeneratedDef.metadata?.category || 'community',
             isBeta: true,
             type: 'ai_generated',
@@ -298,6 +326,29 @@ export class SparkletService {
      */
     static async requestPublication(id: string): Promise<void> {
         await this.updateSparkletStatus(id, 'pending');
+    }
+
+    /**
+     * Delete a sparklet (only if owner matches)
+     */
+    static async deleteSparklet(id: string): Promise<void> {
+        await WebFirebaseService.initialize();
+        const db = (WebFirebaseService as any).db;
+        if (!db) throw new Error('Firestore not available');
+
+        const ownerId = this.getOwnerId();
+        const docRef = doc(db, SPARKLETS_COLLECTION, id);
+        const snapshot = await getDoc(docRef);
+
+        if (!snapshot.exists()) return;
+
+        // Security check: must be owner to delete
+        // If it's a 'system' sparklet, it probably shouldn't be deleted via UI 
+        if (snapshot.data().ownerId !== ownerId && ownerId !== 'system') {
+            throw new Error('Not authorized to delete this sparklet');
+        }
+
+        await deleteDoc(docRef);
     }
 
     /**
