@@ -3649,10 +3649,15 @@ const HandicapOnboardingModal: React.FC<{
     },
     modalContent: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 20,
-      width: 300,
-      maxWidth: "90%",
+      borderRadius: 16,
+      padding: 24,
+      width: "92%",
+      maxWidth: 400,
+      elevation: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     title: {
       fontSize: 18,
@@ -3673,15 +3678,18 @@ const HandicapOnboardingModal: React.FC<{
     },
     buttonRow: {
       flexDirection: "row",
-      justifyContent: "center",
-      gap: 8,
+      justifyContent: "space-between",
+      gap: 12,
+      width: '100%',
     },
     button: {
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 8,
+      flex: 1,
+      paddingVertical: 14,
+      paddingHorizontal: 8,
+      borderRadius: 10,
       alignItems: "center",
-      minWidth: 120,
+      justifyContent: 'center',
+      minHeight: 48,
     },
     cancelButton: {
       backgroundColor: colors.background,
@@ -3738,7 +3746,7 @@ const HandicapOnboardingModal: React.FC<{
               onPress={onClose}
             >
               <Text style={[styles.buttonText, styles.cancelButtonText]}>
-                Close ✕
+                Exit Golf Brain ✕
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -4515,7 +4523,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     );
 
     if (itemToUpdate) {
-      updateShot(itemToUpdate.id, swing.type, "videoUri", swing.uri);
+      updateShot(itemToUpdate.id, swing.type || "shot", "videoUri", swing.uri);
       HapticFeedback.success();
     } else {
       console.warn(

@@ -42,6 +42,7 @@ import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import { InfiniteSpark } from "../sparks/InfiniteSpark";
+import RecordSwingSpark from "../sparks/RecordSwingSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -551,6 +552,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       properties: ["Beta"],
     },
     component: InfiniteSpark,
+  },
+  "record-swing": {
+    metadata: {
+      id: "record-swing",
+      title: "Record Swing",
+      description: "Standalone swing recorder with voice activation and customizable delay.",
+      icon: "🎥🏌️",
+      category: "golf",
+      createdAt: "2026-02-14T00:00:00.000Z",
+      rating: 4.2,
+    },
+    component: RecordSwingSpark,
   },
 };
 

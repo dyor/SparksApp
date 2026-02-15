@@ -18,21 +18,23 @@ import PermissionService from "../services/PermissionService";
 
 export interface RecordedSwing {
   uri: string;
-  holeNumber: number;
-  shotNumber: number;
-  type: "shot" | "putt";
-  club: string;
+  holeNumber?: number;
+  shotNumber?: number;
+  type?: "shot" | "putt";
+  club?: string;
   timestamp: number;
 }
 
 export interface RecordSwingProps {
-  holeNumber: number;
-  shotNumber: number;
-  type: "shot" | "putt";
-  club: string;
+  holeNumber?: number;
+  shotNumber?: number;
+  type?: "shot" | "putt";
+  club?: string;
+  triggerCount?: number;
   countdownSeconds?: number;
   durationSeconds?: number;
   onRecordingComplete?: (swing: RecordedSwing) => void;
+  isWaitingForVoice?: boolean;
   colors: {
     primary: string;
     surface: string;
@@ -43,13 +45,15 @@ export interface RecordSwingProps {
 }
 
 export const RecordSwing: React.FC<RecordSwingProps> = ({
-  holeNumber,
-  shotNumber,
-  type,
-  club,
+  holeNumber = 0,
+  shotNumber = 0,
+  type = "shot",
+  club = "Standard",
   countdownSeconds = 5,
   durationSeconds = 30,
   onRecordingComplete,
+  triggerCount = 0,
+  isWaitingForVoice = false,
   colors,
 }) => {
   // State
@@ -70,10 +74,54 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const modalVideoRef = useRef<Video>(null);
 
+  const handleRecordSwing = async () => {
+    console.log("⛳️ handleRecordSwing: triggered");
+    try {
+      console.log("⛳️ handleRecordSwing: checking status from hooks...", {
+        camera: cameraPermission?.status,
+        mic: micPermission?.status,
+        media: mediaLibraryPermission?.status
+      });
+
+      let allGranted = true;
+      if (cameraPermission?.status !== 'granted') {
+        const res = await requestCameraPermission();
+        if (res.status !== 'granted') allGranted = false;
+      }
+      if (allGranted && micPermission?.status !== 'granted') {
+        const res = await requestMicPermission();
+        if (res.status !== 'granted') allGranted = false;
+      }
+      if (allGranted && mediaLibraryPermission?.status !== 'granted') {
+        const res = await requestMediaLibraryPermission();
+        if (res.status !== 'granted') allGranted = false;
+      }
+
+      console.log("⛳️ handleRecordSwing: allGranted =", allGranted);
+      if (!allGranted) return;
+
+      setRecordedSwing(null);
+      setIsCameraReady(false);
+      setShowCamera(true);
+      console.log("⛳️ handleRecordSwing: showCamera -> true");
+    } catch (error) {
+      console.error("⛳️ handleRecordSwing ERROR:", error);
+      Alert.alert("Error", "Failed to start recording");
+    }
+  };
+
   // Refs
   const cameraRef = useRef<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle external trigger
+  useEffect(() => {
+    if (triggerCount && triggerCount > 0) {
+      console.log("⛳️ RecordSwing: External trigger detected, triggerCount =", triggerCount);
+      handleRecordSwing();
+    }
+  }, [triggerCount]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -98,43 +146,6 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
     };
   }, []);
 
-  const handleRecordSwing = async () => {
-    console.log("⛳️ handleRecordSwing: triggered");
-    try {
-      // Force refresh of permissions internally just in case hooks are stale
-      console.log("⛳️ handleRecordSwing: checking current permission status...");
-      const currentCamera = await PermissionService.checkCameraPermission();
-      const currentMic = await PermissionService.checkMicrophonePermission();
-      const currentMedia = await PermissionService.checkMediaLibraryPermission();
-
-      console.log("⛳️ handleRecordSwing: Permission Status ->", {
-        camera: currentCamera.status,
-        mic: currentMic.status,
-        media: currentMedia.status
-      });
-
-      console.log("⛳️ handleRecordSwing: calling requestMultiple...");
-      const granted = await PermissionService.requestMultiple(['camera', 'mediaLibrary', 'microphone']);
-      console.log("⛳️ handleRecordSwing: permissions granted =", granted);
-
-      if (!granted) {
-        console.log("⛳️ handleRecordSwing: permissions NOT granted, stopping.");
-        return;
-      }
-
-      // Reset state
-      setRecordedSwing(null);
-      setIsCameraReady(false);
-
-      // Show camera and start countdown
-      console.log("⛳️ handleRecordSwing: setting showCamera = true");
-      setShowCamera(true);
-      // Wait for onCameraReady to start countdown (handled in CameraView prop)
-    } catch (error) {
-      console.error("⛳️ handleRecordSwing: FATAL ERROR ->", error);
-      Alert.alert("Error", "Failed to start recording");
-    }
-  };
 
   const startCountdown = () => {
     if (countdownTimerRef.current) return;
@@ -467,7 +478,9 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
             ? `${countdown}`
             : isRecording
               ? `Stop Recording (${recordingDuration}s)`
-              : "Record Swing"}
+              : isWaitingForVoice
+                ? "🎙️ Listening..."
+                : "Record Swing"}
         </Text>
       </TouchableOpacity >
 
@@ -520,33 +533,31 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         )}
 
       {/* Video Thumbnail */}
-      {
-        recordedSwing && (
-          <TouchableOpacity
-            style={styles.videoThumbnailContainer}
-            onPress={openVideoPlayer}
-            activeOpacity={0.7}
-            testID="video-thumbnail"
-          >
-            <Video
-              source={{ uri: recordedSwing.uri }}
-              style={styles.videoThumbnail}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              usePoster
-            />
-            <View style={styles.videoThumbnailTextContainer}>
-              <Text style={styles.videoThumbnailTitle}>
-                📹 Hole {recordedSwing.holeNumber} Shot {recordedSwing.shotNumber}{" "}
-                - {recordedSwing.club}
-              </Text>
-              <Text style={styles.videoThumbnailSubtext}>
-                Tap to view • All swings in Golf Swings folder
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )
-      }
+      {recordedSwing && (
+        <TouchableOpacity
+          style={styles.videoThumbnailContainer}
+          onPress={openVideoPlayer}
+          activeOpacity={0.7}
+          testID="video-thumbnail"
+        >
+          <Video
+            source={{ uri: recordedSwing.uri }}
+            style={styles.videoThumbnail}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            usePoster
+          />
+          <View style={styles.videoThumbnailTextContainer}>
+            <Text style={styles.videoThumbnailTitle}>
+              📹 {recordedSwing.type === "putt" ? "Putt" : "Shot"}{" "}
+              {recordedSwing.club ? `- ${recordedSwing.club}` : ""}
+            </Text>
+            <Text style={styles.videoThumbnailSubtext}>
+              Tap to view • All swings in Golf Swings folder
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Camera Modal */}
       <Modal

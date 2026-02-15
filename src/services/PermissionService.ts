@@ -37,6 +37,9 @@ class PermissionService {
     }
 
     static async requestCameraPermission(showAlert = true): Promise<boolean> {
+        const current = await Camera.getCameraPermissionsAsync();
+        if (current.status === 'granted') return true;
+
         const { status, canAskAgain } = await Camera.requestCameraPermissionsAsync();
 
         if (status !== 'granted' && !canAskAgain && showAlert) {
@@ -55,6 +58,9 @@ class PermissionService {
     }
 
     static async requestMicrophonePermission(showAlert = true): Promise<boolean> {
+        const current = await Camera.getMicrophonePermissionsAsync();
+        if (current.status === 'granted') return true;
+
         const { status, canAskAgain } = await Camera.requestMicrophonePermissionsAsync();
 
         if (status !== 'granted' && !canAskAgain && showAlert) {
@@ -73,6 +79,9 @@ class PermissionService {
     }
 
     static async requestMediaLibraryPermission(showAlert = true): Promise<boolean> {
+        const current = await MediaLibrary.getPermissionsAsync();
+        if (current.status === 'granted') return true;
+
         const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync();
 
         if (status !== 'granted' && !canAskAgain && showAlert) {
@@ -110,32 +119,61 @@ class PermissionService {
         for (const type of types) {
             let granted = false;
             let statusStr = 'unknown';
+
+            // Check current status first - calling request...Async when already granted 
+            // can sometimes hang or cause AppState toggles on Android
             switch (type) {
                 case 'camera':
-                    const camRes = await Camera.requestCameraPermissionsAsync();
-                    granted = camRes.status === 'granted';
-                    statusStr = camRes.status;
+                    const currentCam = await Camera.getCameraPermissionsAsync();
+                    if (currentCam.status === 'granted') {
+                        granted = true;
+                        statusStr = 'granted (cached)';
+                    } else {
+                        const res = await Camera.requestCameraPermissionsAsync();
+                        granted = res.status === 'granted';
+                        statusStr = res.status;
+                    }
                     break;
                 case 'microphone':
-                    const micRes = await Camera.requestMicrophonePermissionsAsync();
-                    granted = micRes.status === 'granted';
-                    statusStr = micRes.status;
+                    const currentMic = await Camera.getMicrophonePermissionsAsync();
+                    if (currentMic.status === 'granted') {
+                        granted = true;
+                        statusStr = 'granted (cached)';
+                    } else {
+                        const res = await Camera.requestMicrophonePermissionsAsync();
+                        granted = res.status === 'granted';
+                        statusStr = res.status;
+                    }
                     break;
                 case 'mediaLibrary':
-                    const libRes = await MediaLibrary.requestPermissionsAsync();
-                    granted = libRes.status === 'granted';
-                    statusStr = libRes.status;
+                    const currentMedia = await MediaLibrary.getPermissionsAsync();
+                    if (currentMedia.status === 'granted') {
+                        granted = true;
+                        statusStr = 'granted (cached)';
+                    } else {
+                        const res = await MediaLibrary.requestPermissionsAsync();
+                        granted = res.status === 'granted';
+                        statusStr = res.status;
+                    }
                     break;
                 case 'location':
-                    const locRes = await Location.requestForegroundPermissionsAsync();
-                    granted = locRes.status === 'granted';
-                    statusStr = locRes.status;
+                    const currentLoc = await Location.getForegroundPermissionsAsync();
+                    if (currentLoc.status === 'granted') {
+                        granted = true;
+                        statusStr = 'granted (cached)';
+                    } else {
+                        const res = await Location.requestForegroundPermissionsAsync();
+                        granted = res.status === 'granted';
+                        statusStr = res.status;
+                    }
                     break;
             }
             console.log(`🛡 PermissionService: ${type} status = ${statusStr}, granted = ${granted}`);
             results.push(granted);
-            // Small delay between requests to avoid UI glitches on Android
-            await new Promise(resolve => setTimeout(resolve, 100));
+            if (!granted) {
+                // If one fails, we can stop or continue, but let's give it a breather
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
 
         const allGranted = results.every(granted => granted);
