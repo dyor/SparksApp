@@ -34,25 +34,69 @@ class VoiceCommandServiceClass {
         onError: (error: string) => void,
         onStateChange: (isListening: boolean) => void
     ) {
-        if (this.isListening) return;
+        console.log('🎙️ VoiceCommandService: startListening called');
+
+        // Update callbacks always so they are fresh
+        this.onResultCallback = onResult;
+        this.onErrorCallback = onError;
+        this.onStateChangeCallback = onStateChange;
+
+        if (this.isListening) {
+            console.log('🎙️ VoiceCommandService: Already listening, updated callbacks');
+            // Ensure the UI knows we are listening
+            this.onStateChangeCallback(true);
+            return;
+        }
 
         if (isExpoGo()) {
             onError('Speech recognition is not available in Expo Go. Please use a development build.');
             return;
         }
 
-        this.onResultCallback = onResult;
-        this.onErrorCallback = onError;
-        this.onStateChangeCallback = onStateChange;
+        // Safety check for the native module
+        if (!ExpoSpeechRecognitionModule) {
+            console.error('🎙️ VoiceCommandService: ExpoSpeechRecognitionModule is not available');
+            onError('Speech recognition native module is not linked. Please rebuild your app.');
+            return;
+        }
 
         try {
+            console.log('🎙️ VoiceCommandService: Requesting permissions...');
             const hasPermissions = await this.requestPermissions();
             if (!hasPermissions) {
+                console.warn('🎙️ VoiceCommandService: Permission denied');
                 throw new Error('Microphone permission denied');
             }
 
+            console.log('🎙️ VoiceCommandService: Starting native session...');
             this.isListening = true;
             this.onStateChangeCallback(true);
+
+            // Listen for results
+            const resultListener = ExpoSpeechRecognitionModule.addResultListener((event: any) => {
+                const transcript = event.results[0]?.transcript || "";
+                if (this.onResultCallback) {
+                    this.onResultCallback(transcript, event.isFinal);
+                }
+            });
+
+            // Listen for errors
+            const errorListener = ExpoSpeechRecognitionModule.addErrorListener((event: any) => {
+                this.isListening = false;
+                if (this.onStateChangeCallback) this.onStateChangeCallback(false);
+                if (this.onErrorCallback) this.onErrorCallback(event.message || 'Speech recognition error');
+            });
+
+            // Listen for end
+            const endListener = ExpoSpeechRecognitionModule.addEndListener(() => {
+                this.isListening = false;
+                if (this.onStateChangeCallback) this.onStateChangeCallback(false);
+
+                // Cleanup listeners
+                resultListener.remove();
+                errorListener.remove();
+                endListener.remove();
+            });
 
             await ExpoSpeechRecognitionModule.start({
                 lang: 'en-US',

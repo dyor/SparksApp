@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -786,20 +786,29 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
   // Save data whenever activities or timerState change - with dataLoaded guard
   useEffect(() => {
-    if (!dataLoaded || !isHydrated) return;
+    if (!dataLoaded || !isHydrated) {
+      console.log('💾 TeeTimeTimerSpark: Save blocked - not hydrated or not loaded');
+      return;
+    }
+
+    // Safety check: Don't save empty activities if we had some before
+    if (activities.length === 0 && defaultActivities.length > 0) {
+      console.warn('⚠️ TeeTimeTimerSpark: Attempted to save empty activities list, blocked.');
+      return;
+    }
 
     const saveData = {
       activities,
       timerState: {
         ...timerState,
-        teeTime: timerState.teeTime ? timerState.teeTime.toISOString() : null,
-        startTime: timerState.startTime ? timerState.startTime.toISOString() : null,
-        completedActivities: Array.from(timerState.completedActivities),
+        teeTime: timerState.teeTime ? (timerState.teeTime instanceof Date ? timerState.teeTime.toISOString() : timerState.teeTime) : null,
+        startTime: timerState.startTime ? (timerState.startTime instanceof Date ? timerState.startTime.toISOString() : timerState.startTime) : null,
+        completedActivities: Array.from(timerState.completedActivities || []),
       },
       lastUsed: new Date().toISOString(),
     };
 
-    console.log('💾 TeeTimeTimerSpark: Auto-saving to store...', activities.length, 'activities');
+    console.log(`💾 TeeTimeTimerSpark: Auto-saving ${activities.length} activities to store...`);
     setSparkData('tee-time-timer', saveData);
 
     onStateChange?.({
@@ -807,12 +816,12 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       isActive: timerState.isActive,
       hasTeeTime: timerState.teeTime !== null,
     });
-  }, [activities, timerState, dataLoaded, isHydrated, setSparkData, onStateChange]);
+  }, [activities, timerState, dataLoaded, isHydrated]);
 
   // Timer logic
   useEffect(() => {
     if (timerState.isActive) {
-      activateKeepAwake(); // Keep screen awake when timer is active
+      activateKeepAwakeAsync(); // Keep screen awake when timer is active
       intervalRef.current = setInterval(() => {
         setCurrentTime(new Date());
       }, 1000);
@@ -1132,9 +1141,29 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
   const saveActivities = useCallback((newActivities: Activity[]) => {
     console.log('💾 TeeTimeTimerSpark: saveActivities called with', newActivities.length, 'activities');
+
+    // 1. Update local state immediately
     setActivities([...newActivities]);
+
+    // 2. Explicitly save to store to prevent race conditions with re-mounts/renders
+    // This ensures that even if the component re-mounts immediately after this call,
+    // the store already has the latest 7 activities.
+    const saveData = {
+      activities: newActivities,
+      timerState: {
+        ...timerState,
+        teeTime: timerState.teeTime ? (timerState.teeTime instanceof Date ? timerState.teeTime.toISOString() : timerState.teeTime) : null,
+        startTime: timerState.startTime ? (timerState.startTime instanceof Date ? timerState.startTime.toISOString() : timerState.startTime) : null,
+        completedActivities: Array.from(timerState.completedActivities || []),
+      },
+      lastUsed: new Date().toISOString(),
+    };
+
+    console.log(`💾 TeeTimeTimerSpark: Explicitly saving ${newActivities.length} activities to store...`);
+    setSparkData('tee-time-timer', saveData);
+
     HapticFeedback.success();
-  }, []);
+  }, [timerState, setSparkData]);
 
   const styles = StyleSheet.create({
     container: {

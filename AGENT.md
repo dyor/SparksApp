@@ -1,6 +1,8 @@
-# Agent Instructions
+# 🤖 Agent Instructions
 
-> [!NOTE]
-> The agent instructions have been moved to **[AGENTS.md](AGENTS.md)** for better naming convention.
+> [!IMPORTANT]
+> This file is now deprecated. All agent instructions, workflows, and guidelines have been migrated to a new skill-based documentation framework.
 >
-> Please refer to [AGENTS.md](AGENTS.md) for the complete guide.
+> **Please refer to the central agent skills reference for all instructions:**
+>
+> *   `CONTEXT/GENERAL/SKILLS.md`

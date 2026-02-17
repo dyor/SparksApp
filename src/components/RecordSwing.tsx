@@ -11,17 +11,21 @@ import {
   Platform,
 } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import { Video, ResizeMode, AVPlaybackStatus, VideoFullscreenUpdate } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import * as MediaLibrary from "expo-media-library";
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { HapticFeedback } from "../utils/haptics";
 import PermissionService from "../services/PermissionService";
 
 export interface RecordedSwing {
   uri: string;
+  thumbnail?: string;
   holeNumber?: number;
   shotNumber?: number;
   type?: "shot" | "putt";
   club?: string;
+  quality?: "good" | "bad";
+  distance?: string;
   timestamp: number;
 }
 
@@ -42,6 +46,7 @@ export interface RecordSwingProps {
     textSecondary: string;
     error: string;
   };
+  muteVideo?: boolean;
 }
 
 export const RecordSwing: React.FC<RecordSwingProps> = ({
@@ -55,6 +60,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   triggerCount = 0,
   isWaitingForVoice = false,
   colors,
+  muteVideo = false,
 }) => {
   // State
   const [isRecording, setIsRecording] = useState(false);
@@ -72,7 +78,23 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const modalVideoRef = useRef<Video>(null);
+
+  // Video Player
+  const player = useVideoPlayer(recordedSwing?.uri || "", (player) => {
+    player.loop = true;
+    player.play();
+  });
+
+  useEffect(() => {
+    player.playbackRate = playbackRate;
+  }, [player, playbackRate]);
+
+  useEffect(() => {
+    const subscription = player.addListener("playingChange", (event) => {
+      setIsPlaying(event.isPlaying);
+    });
+    return () => subscription.remove();
+  }, [player]);
 
   const handleRecordSwing = async () => {
     console.log("⛳️ handleRecordSwing: triggered");
@@ -117,9 +139,14 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
   // Handle external trigger
   useEffect(() => {
-    if (triggerCount && triggerCount > 0) {
-      console.log("⛳️ RecordSwing: External trigger detected, triggerCount =", triggerCount);
+    if (triggerCount === 0) return;
+
+    if (triggerCount > 0) {
+      console.log("⛳️ RecordSwing: Start trigger detected, triggerCount =", triggerCount);
       handleRecordSwing();
+    } else if (triggerCount < 0 && isRecording) {
+      console.log("⛳️ RecordSwing: Stop trigger detected, triggerCount =", triggerCount);
+      stopRecording();
     }
   }, [triggerCount]);
 
@@ -179,7 +206,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       setRecordingDuration(0);
       HapticFeedback.success();
 
-      // Start duration timer BEFORE starting recording
+      // Start duration timer
       let duration = 0;
       recordingTimerRef.current = setInterval(() => {
         duration++;
@@ -194,12 +221,13 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       // Start recording
       const video = await cameraRef.current.recordAsync({
         maxDuration: durationSeconds,
-        mute: false, // Use mute: true to avoid audio session conflicts/permissions
+        mute: muteVideo,
       });
 
       // Recording stopped (either manually or auto-stop)
       if (video && video.uri) {
-        await saveVideoToGallery(video.uri);
+        // Capture the duration safely before it's reset
+        await saveVideoToGallery(video.uri, duration);
       }
     } catch (error: any) {
       console.error("Error during recording:", error);
@@ -240,10 +268,41 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
     }
   };
 
-  const saveVideoToGallery = async (uri: string) => {
+  const saveVideoToGallery = async (uri: string, duration: number) => {
     try {
-      // Save to media library
+      // 1. Generate middle-frame thumbnail
+      let thumbnailUri = undefined;
+      try {
+        // Safe check for the native module
+        if (VideoThumbnails && typeof VideoThumbnails.getThumbnailAsync === 'function') {
+          // Use duration to find the middle.
+          // duration is in seconds, getThumbnailAsync expects milliseconds.
+          const midTime = Math.floor((duration / 2) * 1000);
+          console.log(`⛳️ Generating thumbnail for ${uri} at ${midTime}ms (duration: ${duration}s)`);
+
+          const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, {
+            time: midTime,
+            quality: 0.7,
+          });
+          thumbnailUri = thumbUri;
+        } else {
+          console.warn("⛳️ VideoThumbnails native module not available. Thumbnail will be missing.");
+        }
+      } catch (e) {
+        console.warn("Failed to generate middle-frame thumbnail:", e);
+      }
+
+      // 2. Save to media library
       const asset = await MediaLibrary.createAssetAsync(uri);
+
+      // Also save thumbnail if it exists
+      if (thumbnailUri) {
+        try {
+          await MediaLibrary.createAssetAsync(thumbnailUri);
+        } catch (e) {
+          console.warn("Failed to save thumbnail to media library:", e);
+        }
+      }
 
       // Get album or create it
       const album = await MediaLibrary.getAlbumAsync("Golf Swings");
@@ -256,6 +315,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       // Create RecordedSwing object with metadata
       const swing: RecordedSwing = {
         uri,
+        thumbnail: thumbnailUri,
         holeNumber,
         shotNumber,
         type,
@@ -532,32 +592,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
           </TouchableOpacity>
         )}
 
-      {/* Video Thumbnail */}
-      {recordedSwing && (
-        <TouchableOpacity
-          style={styles.videoThumbnailContainer}
-          onPress={openVideoPlayer}
-          activeOpacity={0.7}
-          testID="video-thumbnail"
-        >
-          <Video
-            source={{ uri: recordedSwing.uri }}
-            style={styles.videoThumbnail}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            usePoster
-          />
-          <View style={styles.videoThumbnailTextContainer}>
-            <Text style={styles.videoThumbnailTitle}>
-              📹 {recordedSwing.type === "putt" ? "Putt" : "Shot"}{" "}
-              {recordedSwing.club ? `- ${recordedSwing.club}` : ""}
-            </Text>
-            <Text style={styles.videoThumbnailSubtext}>
-              Tap to view • All swings in Golf Swings folder
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
+
 
       {/* Camera Modal */}
       <Modal
@@ -583,7 +618,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
                 Alert.alert("Camera Error", `Failed to start camera: ${error.message}`);
                 setShowCamera(false);
               }}
-              mute={false}
+              mute={muteVideo}
             >
               <View style={styles.cameraOverlay}>
                 {countdown !== null && (
@@ -670,43 +705,21 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         <View style={styles.videoPlayerModal}>
           {recordedSwing && (
             <>
-              <Video
-                ref={modalVideoRef}
-                source={{ uri: recordedSwing.uri }}
+              <VideoView
+                player={player}
                 style={styles.videoPlayer}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                useNativeControls
-                isLooping
-                rate={playbackRate}
-                shouldCorrectPitch={false}
-                onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
-                  if (status.isLoaded) {
-                    setIsPlaying(status.isPlaying);
-                  }
-                }}
-                onFullscreenUpdate={(event) => {
-                  if (
-                    event.fullscreenUpdate ===
-                    VideoFullscreenUpdate.PLAYER_DID_DISMISS
-                  ) {
-                    if (modalVideoRef.current) {
-                      modalVideoRef.current.pauseAsync();
-                    }
-                  }
-                }}
+                contentFit="contain"
+                allowsFullscreen
+                allowsPictureInPicture
               />
               <View style={styles.speedControls}>
                 {[1.0, 0.5, 0.25].map((rate) => (
                   <TouchableOpacity
                     key={rate}
                     style={styles.speedButton}
-                    onPress={async () => {
+                    onPress={() => {
                       setPlaybackRate(rate);
-                      if (modalVideoRef.current) {
-                        await modalVideoRef.current.playAsync();
-                        await modalVideoRef.current.presentFullscreenPlayer();
-                      }
+                      player.play();
                       HapticFeedback.light();
                     }}
                   >

@@ -112,11 +112,120 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     saveData({ ...data, currentScreen: screen, currentGoalId: goalId });
   };
 
+  // Helper function to parse YYYY-MM-DD as local date (not UTC)
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed
+  };
+
+  // Helper function to format date as YYYY-MM-DD
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper to get effective start date (with backward compatibility)
+  const getGoalStartDate = (goal: Goal): Date => {
+    if (goal.startDate) {
+      return parseLocalDate(goal.startDate);
+    }
+    // Backward compatibility: default to start of current year
+    return new Date(new Date().getFullYear(), 0, 1);
+  };
+
+  // Helper to get effective end date (with backward compatibility)
+  const getGoalEndDate = (goal: Goal): Date => {
+    if (goal.endDate) {
+      return parseLocalDate(goal.endDate);
+    }
+    // Backward compatibility: default to end of current year
+    return new Date(new Date().getFullYear(), 11, 31);
+  };
+
+  // Calculate human-readable duration label
+  const calculateDurationLabel = (startDate: Date, endDate: Date): string => {
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = Math.round(diffDays / 30.44); // Average days per month
+
+    // If it's approximately a year (11-13 months), call it "year"
+    if (diffMonths >= 11 && diffMonths <= 13) {
+      return 'year';
+    }
+
+    // Otherwise, return "X months"
+    return `${diffMonths} month${diffMonths !== 1 ? 's' : ''}`;
+  };
+
+  // Calculate statistics for a goal
+  const calculateStats = (goal: Goal) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const goalStartDate = getGoalStartDate(goal);
+    goalStartDate.setHours(0, 0, 0, 0);
+
+    const goalEndDate = getGoalEndDate(goal);
+    goalEndDate.setHours(0, 0, 0, 0);
+
+    // Days since start of goal (including today)
+    const daysSinceStart = Math.max(0, Math.floor((now.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    // Total days in goal period
+    const totalDays = Math.floor((goalEndDate.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Actual count up to today (within goal date range)
+    const todayStr = formatDateString(now);
+    const actualCount = goal.entries.filter(e => {
+      const entryDate = parseLocalDate(e.date);
+      const todayDate = parseLocalDate(todayStr);
+      return entryDate >= goalStartDate && entryDate <= todayDate && entryDate <= goalEndDate;
+    }).length;
+
+    // Forecast for entire goal period (based on current pace)
+    const currentPace = daysSinceStart > 0 ? (actualCount / daysSinceStart) : 0;
+    const forecastForPeriod = Math.floor(currentPace * totalDays);
+
+    // Calculate current rate (forecast compared to goal)
+    const currentRate = goal.targetPerYear > 0 ? (currentPace * totalDays / goal.targetPerYear) : 0;
+
+    // Determine forecast color: green if hitting/exceeding goal, red if missing, black if exact
+    let forecastColor = '#000000'; // black for exact match
+    if (forecastForPeriod > goal.targetPerYear) {
+      forecastColor = '#34C759'; // green for exceeding
+    } else if (forecastForPeriod < goal.targetPerYear) {
+      forecastColor = '#FF3B30'; // red for missing
+    }
+
+    return {
+      actualCount,
+      targetPerYear: goal.targetPerYear,
+      forecastForYear: forecastForPeriod, // Keep name for compatibility but it's now for the period
+      forecastColor,
+      currentRate,
+      daysSinceStartOfYear: daysSinceStart, // Keep name for compatibility
+      daysInYear: totalDays, // Keep name for compatibility
+      goalStartDate,
+      goalEndDate,
+    };
+  };
+
   // Get current goal
   const currentGoal = useMemo(() => {
     if (!data.currentGoalId) return null;
     return data.goals.find(g => g.id === data.currentGoalId) || null;
   }, [data.goals, data.currentGoalId]);
+
+  // Sort goals by performance (lowest rate first)
+  const sortedGoals = useMemo(() => {
+    return [...data.goals].sort((a, b) => {
+      const statsA = calculateStats(a);
+      const statsB = calculateStats(b);
+      return statsA.currentRate - statsB.currentRate;
+    });
+  }, [data.goals]);
 
   // Navigate to goal detail
   const handleGoalPress = (goal: Goal) => {
@@ -418,101 +527,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     );
   };
 
-  // Helper function to parse YYYY-MM-DD as local date (not UTC)
-  const parseLocalDate = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day); // month is 0-indexed
-  };
 
-  // Helper function to format date as YYYY-MM-DD
-  const formatDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Helper to get effective start date (with backward compatibility)
-  const getGoalStartDate = (goal: Goal): Date => {
-    if (goal.startDate) {
-      return parseLocalDate(goal.startDate);
-    }
-    // Backward compatibility: default to start of current year
-    return new Date(new Date().getFullYear(), 0, 1);
-  };
-
-  // Helper to get effective end date (with backward compatibility)
-  const getGoalEndDate = (goal: Goal): Date => {
-    if (goal.endDate) {
-      return parseLocalDate(goal.endDate);
-    }
-    // Backward compatibility: default to end of current year
-    return new Date(new Date().getFullYear(), 11, 31);
-  };
-
-  // Calculate human-readable duration label
-  const calculateDurationLabel = (startDate: Date, endDate: Date): string => {
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const diffMonths = Math.round(diffDays / 30.44); // Average days per month
-
-    // If it's approximately a year (11-13 months), call it "year"
-    if (diffMonths >= 11 && diffMonths <= 13) {
-      return 'year';
-    }
-
-    // Otherwise, return "X months"
-    return `${diffMonths} month${diffMonths !== 1 ? 's' : ''}`;
-  };
-
-  // Calculate statistics for a goal
-  const calculateStats = (goal: Goal) => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    const goalStartDate = getGoalStartDate(goal);
-    goalStartDate.setHours(0, 0, 0, 0);
-
-    const goalEndDate = getGoalEndDate(goal);
-    goalEndDate.setHours(0, 0, 0, 0);
-
-    // Days since start of goal (including today)
-    const daysSinceStart = Math.max(0, Math.floor((now.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-
-    // Total days in goal period
-    const totalDays = Math.floor((goalEndDate.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    // Actual count up to today (within goal date range)
-    const todayStr = formatDateString(now);
-    const actualCount = goal.entries.filter(e => {
-      const entryDate = parseLocalDate(e.date);
-      const todayDate = parseLocalDate(todayStr);
-      return entryDate >= goalStartDate && entryDate <= todayDate && entryDate <= goalEndDate;
-    }).length;
-
-    // Forecast for entire goal period (based on current pace)
-    const currentPace = daysSinceStart > 0 ? (actualCount / daysSinceStart) : 0;
-    const forecastForPeriod = Math.floor(currentPace * totalDays);
-
-    // Determine forecast color: green if hitting/exceeding goal, red if missing, black if exact
-    let forecastColor = '#000000'; // black for exact match
-    if (forecastForPeriod > goal.targetPerYear) {
-      forecastColor = '#34C759'; // green for exceeding
-    } else if (forecastForPeriod < goal.targetPerYear) {
-      forecastColor = '#FF3B30'; // red for missing
-    }
-
-    return {
-      actualCount,
-      targetPerYear: goal.targetPerYear,
-      forecastForYear: forecastForPeriod, // Keep name for compatibility but it's now for the period
-      forecastColor,
-      daysSinceStartOfYear: daysSinceStart, // Keep name for compatibility
-      daysInYear: totalDays, // Keep name for compatibility
-      goalStartDate,
-      goalEndDate,
-    };
-  };
 
   // Get recent entries (last 20)
   const recentEntries = useMemo(() => {
@@ -1120,8 +1135,9 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
             </Text>
           </View>
         ) : (
-          data.goals.map(goal => {
+          sortedGoals.map(goal => {
             const stats = calculateStats(goal);
+            const isBehind = stats.currentRate < 1.0;
             return (
               <View key={goal.id} style={[styles.goalCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                 <TouchableOpacity
@@ -1167,7 +1183,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                 {!hasEntryForToday(goal) && (
                   <TouchableOpacity
                     style={{
-                      backgroundColor: colors.primary,
+                      backgroundColor: isBehind ? colors.error : colors.success || '#34C759',
                       width: 44,
                       height: 44,
                       borderRadius: 22,

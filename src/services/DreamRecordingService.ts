@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { AudioModule, setAudioModeAsync, AudioPlayer, AudioRecorder } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 
 export interface RecordingResult {
@@ -7,7 +7,7 @@ export interface RecordingResult {
 }
 
 class DreamRecordingServiceClass {
-  private recording: Audio.Recording | null = null;
+  private recorder: AudioRecorder | null = null;
   private recordingTimer: NodeJS.Timeout | null = null;
   private maxDuration: number = 120; // 120 seconds max
 
@@ -16,12 +16,9 @@ class DreamRecordingServiceClass {
    */
   private async setupAudioMode(isRecording: boolean) {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: isRecording,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: isRecording,
+        playsInSilentMode: true,
       });
     } catch (error) {
       console.error('Failed to setup audio mode:', error);
@@ -33,7 +30,7 @@ class DreamRecordingServiceClass {
    */
   async requestPermissions(): Promise<boolean> {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await AudioModule.requestPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       console.error('Failed to request permissions:', error);
@@ -46,7 +43,7 @@ class DreamRecordingServiceClass {
    */
   async hasPermissions(): Promise<boolean> {
     try {
-      const { status } = await Audio.getPermissionsAsync();
+      const { status } = await AudioModule.getPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       return false;
@@ -68,13 +65,12 @@ class DreamRecordingServiceClass {
       }
 
       // Cleanup any existing recording
-      if (this.recording) {
+      if (this.recorder && this.recorder.isRecording) {
         try {
-          await this.recording.stopAndUnloadAsync();
+          await this.recorder.stop();
         } catch (error) {
           console.warn('Failed to cleanup existing recording:', error);
         }
-        this.recording = null;
       }
 
       // Setup audio mode
@@ -83,28 +79,11 @@ class DreamRecordingServiceClass {
       // Add a small delay to ensure cleanup is complete
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Configure recording options
-      const recordingOptions = {
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        android: {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        ios: {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        },
-      };
-
       // Create recording
-      const { recording } = await Audio.Recording.createAsync(recordingOptions);
-      this.recording = recording;
+      this.recorder = AudioModule.createAudioRecorder();
+      if (this.recorder) {
+        await this.recorder.record();
+      }
       this.maxDuration = maxDurationSeconds;
 
       // Setup auto-stop timer
@@ -129,17 +108,19 @@ class DreamRecordingServiceClass {
         this.recordingTimer = null;
       }
 
-      if (!this.recording) {
+      if (!this.recorder) {
         return null;
       }
 
-      // Get status to determine duration
-      const status = await this.recording.getStatusAsync();
-      const duration = status.durationMillis ? status.durationMillis / 1000 : 0;
+      // Determine duration before stopping if possible
+      const duration = this.recorder.currentTime;
 
-      // Stop and unload
-      await this.recording.stopAndUnloadAsync();
-      const uri = this.recording.getURI();
+      // Stop
+      if (this.recorder.isRecording) {
+        await this.recorder.stop();
+      }
+
+      const uri = this.recorder.uri;
 
       // Reset recording
       const result: RecordingResult = {
@@ -147,7 +128,7 @@ class DreamRecordingServiceClass {
         duration,
       };
 
-      this.recording = null;
+      this.recorder = null;
 
       return result;
     } catch (error: any) {
@@ -160,15 +141,14 @@ class DreamRecordingServiceClass {
    * Get current recording status
    */
   async getStatus(): Promise<{ isRecording: boolean; duration: number }> {
-    if (!this.recording) {
+    if (!this.recorder) {
       return { isRecording: false, duration: 0 };
     }
 
     try {
-      const status = await this.recording.getStatusAsync();
       return {
-        isRecording: status.isRecording || false,
-        duration: status.durationMillis ? status.durationMillis / 1000 : 0,
+        isRecording: this.recorder.isRecording || false,
+        duration: this.recorder.currentTime || 0,
       };
     } catch (error) {
       return { isRecording: false, duration: 0 };
@@ -178,14 +158,14 @@ class DreamRecordingServiceClass {
   /**
    * Play back a recorded audio file
    */
-  async playRecording(uri: string): Promise<Audio.Sound> {
+  async playRecording(uri: string): Promise<AudioPlayer> {
     try {
       await this.setupAudioMode(false);
 
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      await sound.playAsync();
+      const player = AudioModule.createAudioPlayer(uri);
+      player.play();
 
-      return sound;
+      return player;
     } catch (error: any) {
       console.error('Failed to play recording:', error);
       throw new Error(error.message || 'Failed to play recording');

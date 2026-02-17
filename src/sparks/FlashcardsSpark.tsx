@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, TextInput, Alert, Animated } from 'react-native';
 import * as Speech from 'expo-speech';
 import { setAudioModeAsync } from 'expo-audio';
-import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -442,7 +442,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
     // Keep screen awake during auto-play mode
     if (autoPlayActive) {
-      activateKeepAwake();
+      activateKeepAwakeAsync();
     } else {
       deactivateKeepAwake();
     }

@@ -127,7 +127,8 @@ export class RemoteConfigService {
                 val = value.asString();
                 source = value.getSource();
             } else {
-                const value = this._remoteConfig.getValue(key);
+                const { getValue } = require("@react-native-firebase/remote-config");
+                const value = getValue(key);
                 val = value.asString();
                 source = value.getSource();
             }
@@ -186,7 +187,8 @@ export class RemoteConfigService {
                 const { getValue } = require("firebase/remote-config");
                 configJson = getValue(this._remoteConfig, 'web_firebase_config').asString();
             } else {
-                configJson = this._remoteConfig.getValue('web_firebase_config').asString();
+                const { getValue } = require("@react-native-firebase/remote-config");
+                configJson = getValue('web_firebase_config').asString();
             }
 
             if (configJson && configJson.trim() !== '' && configJson !== '{}') {

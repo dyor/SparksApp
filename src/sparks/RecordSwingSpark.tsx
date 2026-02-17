@@ -10,11 +10,14 @@ import {
     Modal,
     TextInput,
     Dimensions,
+    Image,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { RecordSwing, RecordedSwing } from '../components/RecordSwing';
 import { RecordSwingStorageService, RecordSwingSettings } from '../services/RecordSwingStorageService';
 import { VoiceCommandService } from '../services/VoiceCommandService';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
+import { isExpoGo } from '../utils/expoGoDetection';
 import { HapticFeedback } from '../utils/haptics';
 import { BaseSpark } from '../components/BaseSpark';
 import {
@@ -25,7 +28,8 @@ import {
     SaveCancelButtons,
     SettingsFeedbackSection,
 } from '../components/SettingsComponents';
-import { AVPlaybackStatus, VideoFullscreenUpdate, Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import { VoiceTranscript } from '../components/shared';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,6 +46,11 @@ const RecordSwingSettingsView: React.FC<{
 }> = ({ settings, onSave, onCancel, sparkId = 'record-swing' }) => {
     const { colors } = useTheme();
     const [tempSettings, setTempSettings] = useState<RecordSwingSettings>({ ...settings });
+
+    // Keep temp settings in sync if prop settings change (e.g. after initial load)
+    useEffect(() => {
+        setTempSettings({ ...settings });
+    }, [settings]);
 
     const handleSave = () => {
         onSave(tempSettings);
@@ -86,6 +95,52 @@ const RecordSwingSettingsView: React.FC<{
                             How long to record for each swing
                         </Text>
                     </View>
+                    <View style={settingStyles.item}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[settingStyles.label, { color: colors.text }]}>Auto-play after recording</Text>
+                                <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
+                                    Automatically play the swing at full speed when finished
+                                </Text>
+                            </View>
+                            <Switch
+                                value={!!tempSettings.autoPlay}
+                                onValueChange={(val) => setTempSettings(prev => ({ ...prev, autoPlay: val }))}
+                                trackColor={{ false: '#767577', true: colors.primary }}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={settingStyles.item}>
+                        <Text style={[settingStyles.label, { color: colors.text }]}>Voice Assistant Duration (seconds)</Text>
+                        <TextInput
+                            style={[settingStyles.input, { color: colors.text, borderColor: colors.border }]}
+                            keyboardType="numeric"
+                            value={(tempSettings.voiceAssistantDurationSeconds ?? 20).toString()}
+                            onChangeText={(val) => {
+                                const parsed = parseInt(val);
+                                setTempSettings(prev => ({ ...prev, voiceAssistantDurationSeconds: isNaN(parsed) ? 1 : Math.max(1, parsed) }));
+                            }}
+                        />
+                        <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
+                            How long the voice session stays active after tapping
+                        </Text>
+                    </View>
+                    <View style={settingStyles.item}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[settingStyles.label, { color: colors.text }]}>Voice Control during recording</Text>
+                                <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
+                                    Allows "Stop Recording" via voice, but mutes video audio
+                                </Text>
+                            </View>
+                            <Switch
+                                value={!!tempSettings.voiceControlDuringRecording}
+                                onValueChange={(val) => setTempSettings(prev => ({ ...prev, voiceControlDuringRecording: val }))}
+                                trackColor={{ false: '#767577', true: colors.primary }}
+                            />
+                        </View>
+                    </View>
                 </SettingsSection>
 
                 <View style={{ marginTop: 20 }}>
@@ -123,14 +178,197 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
     const [settings, setSettings] = useState<RecordSwingSettings>({
         countdownSeconds: 5,
         durationSeconds: 15,
+        autoPlay: false,
+        voiceAssistantDurationSeconds: 20,
+        voiceControlDuringRecording: false,
     });
     const [isListening, setIsListening] = useState(false);
+    const [currentTranscript, setCurrentTranscript] = useState('');
     const [loading, setLoading] = useState(true);
     const [triggerCount, setTriggerCount] = useState(0);
     const [selectedVideo, setSelectedVideo] = useState<RecordedSwing | null>(null);
     const [playbackRate, setPlaybackRate] = useState(1.0);
     const [isPlaying, setIsPlaying] = useState(false);
-    const modalVideoRef = useRef<Video>(null);
+    const [voiceContext, setVoiceContext] = useState<'idle' | 'recording' | 'reviewing'>('idle');
+    const [lastRecording, setLastRecording] = useState<RecordedSwing | null>(null);
+
+    // -- Voice Logic --
+    const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const startVoiceListening = useCallback(async () => {
+        console.log('🎙️ RecordSwingSpark: startVoiceListening triggered');
+        try {
+            if (isExpoGo()) {
+                Alert.alert("Not Available", "Speech recognition is not available in Expo Go. Please use a development build.");
+                return;
+            }
+
+            if (!ExpoSpeechRecognitionModule) {
+                Alert.alert("Module Error", "Speech recognition native module is not linked. Please rebuild your app.");
+                return;
+            }
+
+            if (voiceTimeoutRef.current) {
+                clearTimeout(voiceTimeoutRef.current);
+                voiceTimeoutRef.current = null;
+            }
+
+            setCurrentTranscript('');
+            const hasPermissions = await VoiceCommandService.requestPermissions();
+            if (!hasPermissions) {
+                Alert.alert("Permission Required", "Microphone permission is needed for voice activation.");
+                return;
+            }
+
+            await ExpoSpeechRecognitionModule.start({
+                lang: 'en-US',
+                interimResults: true,
+                maxAlternatives: 1,
+                continuous: true, // Use continuous to prevent premature ending
+                requiresOnDeviceRecognition: false,
+                addsPunctuation: true,
+            });
+
+            // Set timeout to stop listening
+            const duration = settings.voiceAssistantDurationSeconds || 20;
+            console.log(`🎙️ Voice session starting with ${duration}s timeout`);
+            voiceTimeoutRef.current = setTimeout(() => {
+                console.log('🎙️ Voice session timeout reached');
+                toggleListening(false);
+            }, duration * 1000);
+
+        } catch (error: any) {
+            console.error('🎙️ RecordSwingSpark: Failed to start voice listening:', error);
+            setIsListening(false);
+            setCurrentTranscript('');
+            Alert.alert("Error", error.message || "Failed to start voice recognition");
+        }
+    }, [voiceContext, lastRecording, settings.voiceAssistantDurationSeconds]);
+
+    const handleUpdateRecording = async (timestamp: number, updates: Partial<RecordedSwing>) => {
+        setRecordings(prev => prev.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r));
+        // Also update in storage
+        const data = await RecordSwingStorageService.getData();
+        const updatedRecordings = data.recordings.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r);
+        await RecordSwingStorageService.saveData({ ...data, recordings: updatedRecordings });
+    };
+
+    const handleTriggerRecording = () => {
+        setTriggerCount(prev => prev + 1);
+        HapticFeedback.success();
+    };
+
+    const toggleListening = (value: boolean) => {
+        console.log('🎙️ RecordSwingSpark: toggleListening called with:', value);
+        if (value) {
+            startVoiceListening();
+        } else {
+            console.log('🎙️ RecordSwingSpark: stopping voice session');
+            if (voiceTimeoutRef.current) {
+                clearTimeout(voiceTimeoutRef.current);
+                voiceTimeoutRef.current = null;
+            }
+            ExpoSpeechRecognitionModule.stop();
+            setVoiceContext('idle');
+        }
+    };
+
+    // -- Voice Event Hooks --
+    useSpeechRecognitionEvent("start", () => {
+        console.log('🎙️ Voice Event: start');
+        setIsListening(true);
+    });
+    useSpeechRecognitionEvent("end", () => {
+        console.log('🎙️ Voice Event: end');
+        setIsListening(false);
+        setCurrentTranscript("");
+    });
+    useSpeechRecognitionEvent("result", (event) => {
+        const text = event.results[0]?.transcript || "";
+        console.log('🎙️ Voice Event: result', text);
+        setCurrentTranscript(text);
+
+        const lowerText = text.toLowerCase();
+
+        // 1. Record Swing (Idle)
+        if (voiceContext === 'idle' && lowerText.includes('record swing')) {
+            setVoiceContext('recording');
+            handleTriggerRecording();
+            setCurrentTranscript('');
+            return;
+        }
+
+        // 2. Stop Recording (Recording)
+        if (voiceContext === 'recording' && lowerText.includes('stop recording')) {
+            setTriggerCount(prev => prev > 0 ? -Math.abs(prev) - 1 : prev - 1);
+            setVoiceContext('reviewing');
+            setCurrentTranscript('');
+            return;
+        }
+
+        // 3. Quality & Distance (Reviewing)
+        if (voiceContext === 'reviewing') {
+            let updated = false;
+            const updates: Partial<RecordedSwing> = {};
+
+            if (lowerText.includes('good shot')) {
+                updates.quality = 'good';
+                updated = true;
+            } else if (lowerText.includes('bad shot')) {
+                updates.quality = 'bad';
+                updated = true;
+            }
+
+            const yardMatch = lowerText.match(/(\d+)\s*yards?/);
+            if (yardMatch) {
+                updates.distance = yardMatch[1] + ' yards';
+                updated = true;
+            }
+
+            if (updated && lastRecording) {
+                handleUpdateRecording(lastRecording.timestamp, updates);
+                setCurrentTranscript('');
+                HapticFeedback.success();
+            }
+        }
+    });
+    useSpeechRecognitionEvent("error", (event) => {
+        console.warn("🎙️ Voice Event: error", event.error, event.message);
+        setIsListening(false);
+        setCurrentTranscript("");
+        // Only show alert for real errors, not just speech-not-found
+        if (event.error !== 'no-speech') {
+            Alert.alert("Voice Activation Error", event.message || event.error);
+        }
+    });
+
+    // -- Effects & Video --
+
+    // Video Player
+    const player = useVideoPlayer(selectedVideo?.uri || '', (player) => {
+        player.loop = true;
+        player.play();
+    });
+
+    useEffect(() => {
+        if (selectedVideo?.uri) {
+            console.log('🎥 RecordSwingSpark: Updating player source to:', selectedVideo.uri);
+            player.replace(selectedVideo.uri);
+            player.play();
+        }
+    }, [selectedVideo?.uri, player]);
+
+    useEffect(() => {
+        player.playbackRate = playbackRate;
+    }, [player, playbackRate]);
+
+    useEffect(() => {
+        // Subscribe to player status
+        const subscription = player.addListener('playingChange', (event) => {
+            setIsPlaying(event.isPlaying);
+        });
+        return () => subscription.remove();
+    }, [player]);
 
     // Load data on mount
     useEffect(() => {
@@ -147,52 +385,26 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
     const handleRecordingComplete = useCallback(async (recording: RecordedSwing) => {
         const updatedData = await RecordSwingStorageService.addRecording(recording);
         setRecordings(updatedData.recordings);
+        setLastRecording(recording);
         HapticFeedback.success();
 
-        // Resume listening if it was on
-        if (isListening) {
-            startVoiceListening();
-        }
-    }, [isListening]);
-
-    // Voice Command Logic
-    const startVoiceListening = useCallback(async () => {
-        try {
-            await VoiceCommandService.startListening(
-                (text, isFinal) => {
-                    console.log('Voice Command:', text);
-                    if (text.toLowerCase().includes('record swing')) {
-                        VoiceCommandService.stopListening(); // Stop listening while recording
-                        handleTriggerRecording();
-                    }
-                },
-                (error) => {
-                    console.error('Voice Command Error:', error);
-                    setIsListening(false);
-                },
-                (listening) => {
-                    setIsListening(listening);
-                }
-            );
-        } catch (error) {
-            console.error('Failed to start voice listening:', error);
-            setIsListening(false);
-        }
-    }, []);
-
-    const handleTriggerRecording = () => {
-        setTriggerCount(prev => prev + 1);
-        HapticFeedback.success();
-    };
-
-    const toggleListening = (value: boolean) => {
-        if (value) {
-            startVoiceListening();
+        // 1. Auto-play if enabled
+        if (settings.autoPlay) {
+            setSelectedVideo(recording);
+            setVoiceContext('reviewing');
         } else {
-            VoiceCommandService.stopListening();
-            setIsListening(false);
+            setVoiceContext('reviewing'); // Still allow quality tagging even if not auto-played
         }
-    };
+
+        // 2. Resume listening if it was on
+        if (isListening) {
+            setTimeout(() => {
+                startVoiceListening();
+            }, 500);
+        }
+    }, [isListening, settings.autoPlay, startVoiceListening]);
+
+
 
     const deleteRecording = async (timestamp: number) => {
         Alert.alert(
@@ -224,17 +436,23 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             style={[styles.card, { backgroundColor: colors.surface }]}
             onPress={() => setSelectedVideo(item)}
         >
-            <Video
-                source={{ uri: item.uri }}
-                style={styles.thumbnail}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                usePoster
-            />
+            <View style={[styles.thumbnail, { backgroundColor: colors.border + '40' }]}>
+                {item.thumbnail ? (
+                    <Image
+                        source={{ uri: item.thumbnail }}
+                        style={styles.thumbnailImage}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 24 }}>📹</Text>
+                    </View>
+                )}
+            </View>
             <View style={styles.cardContent}>
                 <View style={styles.cardHeader}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>
-                        Swing Recording
+                        Swing {item.quality ? (item.quality === 'good' ? '✅' : '❌') : ''}
                     </Text>
                     <TouchableOpacity onPress={() => deleteRecording(item.timestamp)}>
                         <Text style={{ color: colors.error, padding: 4 }}>Delete</Text>
@@ -243,6 +461,11 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
                     {new Date(item.timestamp).toLocaleString()}
                 </Text>
+                {item.distance && (
+                    <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700', marginTop: 2 }}>
+                        📏 {item.distance}
+                    </Text>
+                )}
                 <Text style={[styles.playIndicator, { color: colors.primary }]}>▶️ Tap to Play</Text>
             </View>
         </TouchableOpacity>
@@ -268,20 +491,41 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     <Text style={[styles.title, { color: colors.text }]}>🏌️‍♂️ Record Swing</Text>
                 </View>
 
-                <View style={[styles.listenContainer, { backgroundColor: colors.surface }]}>
-                    <View style={styles.listenInfo}>
-                        <Text style={[styles.listenLabel, { color: colors.text }]}>
-                            {isListening ? '🎤 Listening for "Record Swing"...' : 'Voice Activation'}
-                        </Text>
-                        <Text style={[styles.listenSubtext, { color: colors.textSecondary }]}>
-                            Say "Record Swing" to start hands-free
-                        </Text>
+                <View style={[styles.voiceActivationContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={[
+                            styles.micButton,
+                            { backgroundColor: isListening ? '#ff4444' : colors.primary }
+                        ]}
+                        onPress={() => {
+                            console.log('🎙️ RecordSwingSpark: Mic Button Pressed, isListening:', isListening);
+                            if (isListening) {
+                                toggleListening(false);
+                            } else {
+                                toggleListening(true);
+                            }
+                        }}
+                    >
+                        <Text style={styles.micIcon}>{isListening ? '⏹️' : '🎙️'}</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.listenLabel, { color: colors.text }]}>
+                        {isListening ? (
+                            voiceContext === 'idle' ? 'Listening for "Record Swing"...' :
+                                voiceContext === 'recording' ? 'Listening for "Stop Recording"...' :
+                                    'Listening for "Good Shot" / Distance...'
+                        ) : 'Tap for Voice Activation'}
+                    </Text>
+                    <Text style={[styles.listenSubtext, { color: colors.textSecondary }]}>
+                        Say "Record Swing" to start hands-free
+                    </Text>
+
+                    <View style={{ width: '100%', marginTop: 8 }}>
+                        <VoiceTranscript
+                            transcript={currentTranscript}
+                            isListening={isListening}
+                        />
                     </View>
-                    <Switch
-                        value={isListening}
-                        onValueChange={toggleListening}
-                        trackColor={{ false: '#767577', true: colors.primary }}
-                    />
                 </View>
 
                 <View style={styles.recordSection}>
@@ -291,6 +535,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                         durationSeconds={settings.durationSeconds}
                         triggerCount={triggerCount}
                         isWaitingForVoice={isListening}
+                        muteVideo={settings.voiceControlDuringRecording}
                         colors={colors}
                     />
                 </View>
@@ -313,36 +558,20 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     visible={!!selectedVideo}
                     transparent={false}
                     animationType="slide"
-                    onRequestClose={() => setSelectedVideo(null)}
+                    onRequestClose={() => {
+                        setSelectedVideo(null);
+                        setVoiceContext('idle');
+                    }}
                 >
                     <View style={[styles.videoPlayerModal, { backgroundColor: '#000' }]}>
                         {selectedVideo && (
                             <>
-                                <Video
-                                    ref={modalVideoRef}
-                                    source={{ uri: selectedVideo.uri }}
+                                <VideoView
+                                    player={player}
                                     style={styles.fullVideo}
-                                    resizeMode={ResizeMode.CONTAIN}
-                                    shouldPlay
-                                    useNativeControls
-                                    isLooping
-                                    rate={playbackRate}
-                                    shouldCorrectPitch={false}
-                                    onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
-                                        if (status.isLoaded) {
-                                            setIsPlaying(status.isPlaying);
-                                        }
-                                    }}
-                                    onFullscreenUpdate={(event) => {
-                                        if (
-                                            event.fullscreenUpdate ===
-                                            VideoFullscreenUpdate.PLAYER_DID_DISMISS
-                                        ) {
-                                            if (modalVideoRef.current) {
-                                                modalVideoRef.current.pauseAsync();
-                                            }
-                                        }
-                                    }}
+                                    contentFit="contain"
+                                    allowsFullscreen
+                                    allowsPictureInPicture
                                 />
                                 <View style={styles.playbackControls}>
                                     <View style={styles.speedControls}>
@@ -353,11 +582,9 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                                                     styles.speedButton,
                                                     playbackRate === rate && { backgroundColor: colors.primary }
                                                 ]}
-                                                onPress={async () => {
+                                                onPress={() => {
                                                     setPlaybackRate(rate);
-                                                    if (modalVideoRef.current) {
-                                                        await modalVideoRef.current.playAsync();
-                                                    }
+                                                    player.play();
                                                     HapticFeedback.light();
                                                 }}
                                             >
@@ -372,6 +599,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                                         onPress={() => {
                                             setSelectedVideo(null);
                                             setPlaybackRate(1.0);
+                                            setVoiceContext('idle');
                                         }}
                                     >
                                         <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>Close</Text>
@@ -405,15 +633,29 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    listenContainer: {
-        flexDirection: 'row',
+    voiceActivationContainer: {
         alignItems: 'center',
-        padding: 16,
-        borderRadius: 12,
+        padding: 20,
+        borderRadius: 16,
         marginBottom: 20,
+        borderWidth: 1,
     },
-    listenInfo: {
-        flex: 1,
+    micButton: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    micIcon: {
+        fontSize: 32,
+        color: '#fff',
     },
     listenLabel: {
         fontSize: 16,
@@ -422,6 +664,7 @@ const styles = StyleSheet.create({
     },
     listenSubtext: {
         fontSize: 12,
+        textAlign: 'center',
     },
     recordSection: {
         marginBottom: 30,
@@ -448,6 +691,10 @@ const styles = StyleSheet.create({
     thumbnail: {
         width: 100,
         height: 80,
+    },
+    thumbnailImage: {
+        width: '100%',
+        height: '100%',
     },
     cardContent: {
         flex: 1,

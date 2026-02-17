@@ -26,7 +26,7 @@ import { HapticFeedback } from "../utils/haptics";
 import { GeminiService } from "../services/GeminiService";
 import { useNavigation } from "@react-navigation/native";
 import { useSparkStore } from "../store";
-import { getSparkById } from "../components/sparkRegistryData";
+import { getSparkMetadataById } from "../components/sparkMetadata";
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -596,7 +596,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
               ) : (
                 history.map((item) => {
                   const sparkMeta = item.targetSpark
-                    ? getSparkById(item.targetSpark)
+                    ? getSparkMetadataById(item.targetSpark)
                     : null;
 
                   return (
@@ -634,7 +634,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
                               onPress={() => navigateToSpark(item.targetSpark!)}
                             >
                               <Text style={{ fontSize: 12 }}>
-                                {sparkMeta.metadata.icon}
+                                {sparkMeta.icon}
                               </Text>
                               <Text
                                 style={[

@@ -10,7 +10,7 @@ import {
   Animated,
   TextInput,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { AudioPlayer } from 'expo-audio';
 import { useTheme } from '../contexts/ThemeContext';
 import { SparkProps } from '../types/spark';
 import { HapticFeedback } from '../utils/haptics';
@@ -54,7 +54,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
   const [isEditingInterpretation, setIsEditingInterpretation] = useState(false);
 
   // Playback
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Animation
@@ -80,8 +80,8 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
       if (durationTimerRef.current) {
         clearInterval(durationTimerRef.current);
       }
-      if (sound) {
-        sound.unloadAsync();
+      if (player) {
+        player.pause();
       }
     };
   }, [sound]);
@@ -212,17 +212,13 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
     if (!recordedUri) return;
 
     try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const newSound = await DreamRecordingService.playRecording(recordedUri);
-      setSound(newSound);
+      const newPlayer = await DreamRecordingService.playRecording(recordedUri);
+      setPlayer(newPlayer);
       setIsPlaying(true);
       HapticFeedback.light();
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
+      newPlayer.addListener('playbackStateChange', (event) => {
+        if (event.playbackState === 'finished') {
           setIsPlaying(false);
         }
       });
@@ -344,9 +340,9 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
     setCurrentDream(null);
     setViewingFromHistory(false);
     setIsEditingInterpretation(false);
-    if (sound) {
-      sound.unloadAsync();
-      setSound(null);
+    if (player) {
+      player.pause();
+      setPlayer(null);
     }
     setIsPlaying(false);
   };

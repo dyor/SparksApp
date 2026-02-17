@@ -29,7 +29,7 @@ import {
 import { AISettingsNote } from '../components/AISettingsNote';
 import { HapticFeedback } from '../utils/haptics';
 import { StarRating } from '../components/StarRating';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 
 interface Recipe {
     id: string;
@@ -690,7 +690,7 @@ Generate the recipe now:`;
         const [timeLeft, setTimeLeft] = useState(0); // in seconds
         const [totalTime, setTotalTime] = useState(0);
         const [isFinished, setIsFinished] = useState(false);
-        const [sound, setSound] = useState<Audio.Sound | null>(null);
+        const alarmPlayer = useAudioPlayer('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
         // Extraction: Find the duration in the {{...}} syntax
         const match = timerRegex.exec(text);
@@ -698,22 +698,10 @@ Generate the recipe now:`;
         const durationText = match ? match[1] : null;
         const cleanText = text.replace(timerRegex, (m, g) => g);
 
-        useEffect(() => {
-            return () => {
-                if (sound) {
-                    sound.unloadAsync();
-                }
-            };
-        }, [sound]);
-
-        const playAlarm = async () => {
+        const playAlarm = () => {
             if (isSilent) return;
             try {
-                const { sound: alarmSound } = await Audio.Sound.createAsync(
-                    { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-                    { shouldPlay: true }
-                );
-                setSound(alarmSound);
+                alarmPlayer.play();
             } catch (error) {
                 console.log('Error playing sound:', error);
             }
@@ -793,7 +781,7 @@ Generate the recipe now:`;
                                             <TouchableOpacity
                                                 onPress={() => {
                                                     setIsFinished(false);
-                                                    if (sound) sound.stopAsync();
+                                                    alarmPlayer.pause();
                                                 }}
                                                 style={{ backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}
                                             >

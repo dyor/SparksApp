@@ -6,6 +6,9 @@ const STORAGE_KEY = 'record-swing-spark-data';
 export interface RecordSwingSettings {
     countdownSeconds: number;
     durationSeconds: number;
+    autoPlay: boolean;
+    voiceAssistantDurationSeconds: number;
+    voiceControlDuringRecording: boolean;
 }
 
 export interface RecordSwingData {
@@ -15,21 +18,29 @@ export interface RecordSwingData {
 
 export const RecordSwingStorageService = {
     async getData(): Promise<RecordSwingData> {
+        const defaults: RecordSwingData = {
+            recordings: [],
+            settings: {
+                countdownSeconds: 5,
+                durationSeconds: 15,
+                autoPlay: false,
+                voiceAssistantDurationSeconds: 20,
+                voiceControlDuringRecording: false
+            }
+        };
         try {
             const json = await AsyncStorage.getItem(STORAGE_KEY);
             if (json) {
-                return JSON.parse(json);
+                const parsed = JSON.parse(json);
+                return {
+                    recordings: parsed.recordings || [],
+                    settings: { ...defaults.settings, ...parsed.settings }
+                };
             }
         } catch (error) {
             console.error('Error loading Record Swing data:', error);
         }
-        return {
-            recordings: [],
-            settings: {
-                countdownSeconds: 5,
-                durationSeconds: 15
-            }
-        };
+        return defaults;
     },
 
     async saveData(data: RecordSwingData): Promise<void> {
@@ -54,9 +65,9 @@ export const RecordSwingStorageService = {
         return data;
     },
 
-    async updateSettings(settings: RecordSwingSettings): Promise<RecordSwingData> {
+    async updateSettings(settings: Partial<RecordSwingSettings>): Promise<RecordSwingData> {
         const data = await this.getData();
-        data.settings = settings;
+        data.settings = { ...data.settings, ...settings };
         await this.saveData(data);
         return data;
     }

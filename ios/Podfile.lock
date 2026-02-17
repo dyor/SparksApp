@@ -372,6 +372,10 @@ PODS:
     - ExpoModulesCore
   - ExpoSplashScreen (0.30.10):
     - ExpoModulesCore
+  - ExpoVideo (2.2.3):
+    - ExpoModulesCore
+  - ExpoVideoThumbnails (9.1.3):
+    - ExpoModulesCore
   - EXTaskManager (13.1.6):
     - ExpoModulesCore
     - UMAppLoader
@@ -2475,6 +2479,8 @@ DEPENDENCIES:
   - ExpoSpeech (from `../node_modules/expo-speech/ios`)
   - ExpoSpeechRecognition (from `../node_modules/expo-speech-recognition/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
+  - ExpoVideo (from `../node_modules/expo-video/ios`)
+  - ExpoVideoThumbnails (from `../node_modules/expo-video-thumbnails/ios`)
   - EXTaskManager (from `../node_modules/expo-task-manager/ios`)
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
@@ -2665,6 +2671,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-speech-recognition/ios"
   ExpoSplashScreen:
     :path: "../node_modules/expo-splash-screen/ios"
+  ExpoVideo:
+    :path: "../node_modules/expo-video/ios"
+  ExpoVideoThumbnails:
+    :path: "../node_modules/expo-video-thumbnails/ios"
   EXTaskManager:
     :path: "../node_modules/expo-task-manager/ios"
   EXUpdatesInterface:
@@ -2876,6 +2886,8 @@ SPEC CHECKSUMS:
   ExpoSpeech: 9b3bdf552e69c8015c246dc52b5ad5fcdbec878e
   ExpoSpeechRecognition: ba4748362e203efcfbe428ad13007ed3cd6bce3a
   ExpoSplashScreen: 0ad5acac1b5d2953c6e00d4319f16d616f70d4dd
+  ExpoVideo: ecded6b0b802be921fcf85c8d831cc086c362fb4
+  ExpoVideoThumbnails: ef1a4c7bff9ab3b4e006ce17576c3f09320b4cf4
   EXTaskManager: 280143f6d8e596f28739d74bf34910300dcbd4ea
   EXUpdatesInterface: 7ff005b7af94ee63fa452ea7bb95d7a8ff40277a
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking, AppState } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, useAudioRecorder, AudioModule, setAudioModeAsync, AudioSource, AudioPlayer, AudioRecorder, RecordingPresets } from 'expo-audio';
 import { useMicrophonePermissions } from 'expo-camera';
-import { IOSOutputFormat, IOSAudioQuality, AndroidOutputFormat, AndroidAudioEncoder } from 'expo-av/build/Audio/RecordingConstants';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -173,10 +172,9 @@ const SoundboardSettings: React.FC<{
       // Probe duration
       let duration = 0;
       try {
-        const { sound } = await Audio.Sound.createAsync({ uri: newPath });
-        const status = await sound.getStatusAsync();
-        duration = (status as any).durationMillis ? ((status as any).durationMillis / 1000) : 0;
-        await sound.unloadAsync();
+        const player = AudioModule.createAudioPlayer(newPath);
+        // Wait briefly for metadata to load if needed, or just use duration if available
+        duration = player.duration;
       } catch { }
 
       const newChip: SoundChip = {
@@ -366,7 +364,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [soundChips, setSoundChips] = useState<SoundChip[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [activePlayer, setActivePlayer] = useState<AudioPlayer | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const hasLoadedRef = useRef(false); // Double-lock guard to prevent overwriting with empty state
 
@@ -374,7 +372,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [recordingState, setRecordingState] = useState<RecordingState>('ready');
   const [countdown, setCountdown] = useState(3);
   const [recordingCountdown, setRecordingCountdown] = useState(10);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedDuration, setRecordedDuration] = useState<number>(0);
   const [newSoundName, setNewSoundName] = useState('');
@@ -384,8 +382,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const recordingRef = useRef<NodeJS.Timeout | null>(null);
-  const recordingObjectRef = useRef<Audio.Recording | null>(null);
-  const preloadedSoundsRef = useRef<Record<string, Audio.Sound>>({});
+  const preloadedPlayersRef = useRef<Record<string, AudioPlayer>>({});
 
   // Cleanup on unmount
   useEffect(() => {
@@ -394,8 +391,8 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (recordingRef.current) clearInterval(recordingRef.current);
 
-      if (recordingObjectRef.current) {
-        recordingObjectRef.current.stopAndUnloadAsync().catch(err =>
+      if (recorder.isRecording) {
+        recorder.stop().catch(err =>
           console.log('ℹ️ SoundboardSpark: No active recording to cleanup on unmount')
         );
       }
@@ -435,17 +432,12 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       }
 
       // Stop and cleanup current recording
-      if (recording || recordingObjectRef.current) {
+      if (recorder.isRecording) {
         try {
-          const currentRecording = recordingObjectRef.current || recording;
-          if (currentRecording) {
-            await currentRecording.stopAndUnloadAsync();
-          }
+          await recorder.stop();
         } catch (error) {
           console.warn('Failed to stop existing recording:', error);
         }
-        setRecording(null);
-        recordingObjectRef.current = null;
       }
 
       // Reset all recording state
@@ -467,14 +459,9 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       const granted = await PermissionService.requestMicrophonePermission(true);
       if (!granted) return false;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: forRecording,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        interruptionModeAndroid: 1, // DoNotMix
-        interruptionModeIOS: 1, // DoNotMix
+      await setAudioModeAsync({
+        allowsRecording: forRecording,
+        playsInSilentMode: true,
       });
 
       return true;
@@ -537,13 +524,12 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       console.log('Starting beginRecording...');
 
       // Ensure we're starting from a clean state
-      if (recording) {
+      if (recorder.isRecording) {
         try {
-          await recording.stopAndUnloadAsync();
+          await recorder.stop();
         } catch (error) {
           console.warn('Failed to cleanup existing recording:', error);
         }
-        setRecording(null);
       }
 
       // Add a delay to ensure cleanup is complete
@@ -559,63 +545,18 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       }
 
       // Add a small delay to ensure audio session is fully ready
-      // This helps prevent kAudioFormatUnsupportedDataFormatError on iOS
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Use Expo's preset for high quality recording (ensures format compatibility)
-      // The key fix: Remove Linear PCM settings when using AAC format
-      // Error 1718449215 (kAudioFormatUnsupportedDataFormatError) is caused by
-      // including Linear PCM settings with AAC format
-      const recordingOptions: Audio.RecordingOptions = {
-        android: {
-          extension: '.m4a',
-          outputFormat: AndroidOutputFormat.MPEG_4,
-          audioEncoder: AndroidAudioEncoder.AAC,
-          sampleRate: 44100,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.m4a',
-          outputFormat: IOSOutputFormat.MPEG4AAC,
-          audioQuality: IOSAudioQuality.MAX,
-          sampleRate: 44100,
-          numberOfChannels: 1,
-          bitRate: 128000,
-          // CRITICAL: Do NOT include Linear PCM settings (linearPCMBitDepth, etc.) 
-          // when using AAC format - they cause kAudioFormatUnsupportedDataFormatError (1718449215)
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        },
-      };
+      console.log('Attempting to start recording...');
+      await recorder.record();
+      console.log('Recording started successfully');
 
-      console.log('Attempting to create recording...');
-      let newRecording: Audio.Recording;
-      try {
-        const result = await Audio.Recording.createAsync(recordingOptions);
-        newRecording = result.recording;
-        console.log('Recording created successfully');
-      } catch (createError: any) {
-        console.error('❌ Failed to create recording:', createError);
-        const errorMessage = createError?.message || String(createError);
-        throw new Error(`Failed to create recording: ${errorMessage}`);
-      }
-
-      if (!newRecording) {
-        throw new Error('Recording object was not created');
-      }
-
-      setRecording(newRecording);
-      recordingObjectRef.current = newRecording;
       setRecordingState('recording');
       setRecordingCountdown(10);
 
       console.log('Setting up recording countdown timer...');
       recordingRef.current = setInterval(() => {
         setRecordingCountdown((prev) => {
-          console.log(`Recording countdown: ${prev}`);
           if (prev <= 1) {
             console.log('Auto-stopping recording after countdown');
             if (recordingRef.current) {
@@ -632,12 +573,6 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     } catch (error) {
       console.error('❌ Failed to begin recording:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('❌ Error details:', {
-        message: errorMessage,
-        error,
-        recordingState,
-        hasRecording: !!recording,
-      });
       Alert.alert(
         'Recording Failed',
         `Failed to start recording: ${errorMessage}\n\nPlease check:\n- Microphone permissions are granted\n- No other app is using the microphone\n- Try restarting the app`
@@ -661,16 +596,12 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         recordingRef.current = null;
       }
 
-      const currentRecording = recordingObjectRef.current || recording;
-      if (currentRecording) {
-        console.log('📊 Getting recording status...');
-        const status = await currentRecording.getStatusAsync();
-        const actualDuration = status.durationMillis ? status.durationMillis / 1000 : 0;
+      if (recorder.isRecording) {
+        const actualDuration = recorder.currentTime;
         console.log(`⏱️ Recording duration: ${actualDuration}s`);
 
-        console.log('📥 Stopping and unloading recording...');
-        await currentRecording.stopAndUnloadAsync();
-        const uri = currentRecording.getURI();
+        await recorder.stop();
+        const uri = recorder.uri;
 
         setRecordedUri(uri);
         setRecordedDuration(actualDuration);
@@ -678,8 +609,6 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         setTrimEnd(Math.floor(actualDuration * 1000));
         console.log('✅ Setting recording state to recorded. URI:', uri);
         setRecordingState('recorded');
-        setRecording(null);
-        recordingObjectRef.current = null;
       } else {
         console.warn('⚠️ No recording object found to stop');
         setRecordingState('ready');
@@ -696,39 +625,31 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       if (recordedUri) {
         await setupAudioMode(false);
 
-        if (sound) {
-          const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
-          if (isPreloaded) {
-            await sound.stopAsync();
-          } else {
-            try { await sound.unloadAsync(); } catch (e) { }
-          }
-          setSound(null);
+        // Stop any currently playing sound
+        if (activePlayer) {
+          activePlayer.pause();
+          setActivePlayer(null);
         }
 
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: recordedUri },
-          {
-            positionMillis: trimStart,
-            shouldPlay: true,
-            progressUpdateIntervalMillis: 50, // Update every 50ms (20fps) instead of the default 500ms
-          }
-        );
-        setSound(newSound);
+        const previewPlayer = AudioModule.createAudioPlayer(recordedUri);
+        setActivePlayer(previewPlayer);
 
-        newSound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded) {
-            setPreviewPosition(status.positionMillis);
-            if (status.positionMillis >= trimEnd) {
-              newSound.stopAsync();
-            }
-            if (status.didJustFinish) {
-              // Reset for next play
-              newSound.setPositionAsync(trimStart);
-              setPreviewPosition(trimStart);
-            }
+        previewPlayer.addListener('timeUpdate', (event) => {
+          setPreviewPosition(event.currentTime * 1000);
+          if (trimEnd && event.currentTime * 1000 >= trimEnd) {
+            previewPlayer.pause();
           }
         });
+
+        previewPlayer.addListener('playbackStateChange', (event) => {
+          if (event.playbackState === 'finished') {
+            previewPlayer.seek(trimStart / 1000);
+            setPreviewPosition(trimStart);
+          }
+        });
+
+        previewPlayer.seek(trimStart / 1000);
+        previewPlayer.play();
 
         HapticFeedback.light();
       }
@@ -901,24 +822,21 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       // Cleanup sounds that are no longer in soundChips
       const currentIds = new Set(soundChips.map(c => c.id));
-      for (const id in preloadedSoundsRef.current) {
+      for (const id in preloadedPlayersRef.current) {
         if (!currentIds.has(id)) {
           console.log(`🧹 Unloading removed sound: ${id}`);
-          preloadedSoundsRef.current[id].unloadAsync().catch(() => { });
-          delete preloadedSoundsRef.current[id];
+          preloadedPlayersRef.current[id].pause();
+          delete preloadedPlayersRef.current[id];
         }
       }
 
       // Load new sounds
       for (const chip of soundChips) {
-        if (!preloadedSoundsRef.current[chip.id]) {
+        if (!preloadedPlayersRef.current[chip.id]) {
           try {
             const absoluteUri = toAbsoluteUri(chip.filePath);
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: absoluteUri },
-              { shouldPlay: false }
-            );
-            preloadedSoundsRef.current[chip.id] = newSound;
+            const newPlayer = AudioModule.createAudioPlayer(absoluteUri);
+            preloadedPlayersRef.current[chip.id] = newPlayer;
             console.log(`✅ Pre-loaded sound: ${chip.displayName}`);
           } catch (error) {
             console.warn(`❌ Failed to pre-load sound ${chip.id}:`, error);
@@ -939,31 +857,28 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   useEffect(() => {
     return () => {
       console.log('🧹 Cleaning up all pre-loaded sounds...');
-      Object.values(preloadedSoundsRef.current).forEach(s => s.unloadAsync().catch(() => { }));
-      preloadedSoundsRef.current = {};
+      Object.values(preloadedPlayersRef.current).forEach(p => p.pause());
+      preloadedPlayersRef.current = {};
     };
   }, []);
 
   // Cleanup temporary audio (like recorded previews) on unmount or change
   useEffect(() => {
     return () => {
-      if (sound) {
-        const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
+      if (activePlayer) {
+        const isPreloaded = Object.values(preloadedPlayersRef.current).some(p => p === activePlayer);
         if (!isPreloaded) {
-          sound.unloadAsync().catch(() => { });
+          activePlayer.pause();
         }
       }
     };
-  }, [sound]);
+  }, [activePlayer]);
 
   const setupPlaybackAudioMode = async () => {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false, // Critical for proper playback volume
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: false, // Critical for proper playback volume
+        playsInSilentMode: true,
       });
     } catch (error) {
       console.error('Failed to setup playback audio mode:', error);
@@ -976,14 +891,9 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       await setupPlaybackAudioMode();
 
       // Stop any currently playing sound
-      if (sound) {
-        const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
-        if (isPreloaded) {
-          await sound.stopAsync();
-        } else {
-          await sound.unloadAsync().catch(() => { });
-        }
-        setSound(null);
+      if (activePlayer) {
+        activePlayer.pause();
+        setActivePlayer(null);
       }
 
       // Check if file exists
@@ -995,35 +905,32 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       setCurrentlyPlaying(chip.id);
 
-      let playbackSound = preloadedSoundsRef.current[chip.id];
+      let playbackPlayer = preloadedPlayersRef.current[chip.id];
 
-      if (!playbackSound) {
+      if (!playbackPlayer) {
         console.log(`⚠️ Sound ${chip.id} not pre-loaded, loading now...`);
-        const { sound: newSound } = await Audio.Sound.createAsync({ uri: toAbsoluteUri(chip.filePath) });
-        playbackSound = newSound;
+        playbackPlayer = AudioModule.createAudioPlayer(toAbsoluteUri(chip.filePath));
       } else {
         // Reset to start/trim position
-        await playbackSound.setPositionAsync(chip.trimStart || 0);
+        playbackPlayer.seek((chip.trimStart || 0) / 1000);
       }
 
-      setSound(playbackSound);
+      setActivePlayer(playbackPlayer);
 
-      playbackSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          if (chip.trimEnd && status.positionMillis >= chip.trimEnd) {
-            playbackSound?.stopAsync();
-            setCurrentlyPlaying(null);
-          }
-          if (status.didJustFinish) {
-            setCurrentlyPlaying(null);
-          }
-        } else if (status.error) {
-          console.warn(`Playback error for ${chip.id}:`, status.error);
+      const timeUpdateSubscription = playbackPlayer.addListener('timeUpdate', (event) => {
+        if (chip.trimEnd && event.currentTime * 1000 >= chip.trimEnd) {
+          playbackPlayer.pause();
           setCurrentlyPlaying(null);
         }
       });
 
-      await playbackSound.playAsync();
+      const playbackStateSubscription = playbackPlayer.addListener('playbackStateChange', (event) => {
+        if (event.playbackState === 'finished') {
+          setCurrentlyPlaying(null);
+        }
+      });
+
+      playbackPlayer.play();
 
       // Update play count
       setSoundChips(prev => prev.map(c =>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
-import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -240,7 +240,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Timer logic
   useEffect(() => {
     if (timerState.isActive) {
-      activateKeepAwake(); // Keep screen awake when timer is active
+      activateKeepAwakeAsync(); // Keep screen awake when timer is active
       intervalRef.current = setInterval(() => {
         setCurrentTime(new Date());
       }, 1000);

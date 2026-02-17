@@ -2,7 +2,6 @@ import { Alert, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Location from 'expo-location';
-import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
 
 export type PermissionType = 'camera' | 'microphone' | 'mediaLibrary' | 'location';

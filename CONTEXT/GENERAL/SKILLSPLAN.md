@@ -129,3 +129,30 @@ This document outlines the specialized capabilities (skills) an AI agent can uti
 *   **Enhanced Understanding of Agent Capabilities**: Explicitly defined skills provide a clearer picture of what the AI agent can and cannot do.
 
 This migration represents a significant step towards a more robust and intelligent agent framework for SparksApp.
+
+## 5. Execution Plan (February 15, 2026)
+
+This section outlines the concrete steps to execute the migration to a skill-based framework.
+
+1.  **Establish New Structure**:
+    *   Create the central skills registry file: `CONTEXT/GENERAL/SKILLS.md`.
+    *   Create a new directory for individual skill documents: `CONTEXT/GENERAL/skills/`.
+
+2.  **Create Core Skills & Migrate Content**:
+    *   **Shared Components Skill**: Create `CONTEXT/GENERAL/skills/shared_components.md`. Migrate content from `CONTEXT/GENERAL/AGENT.md`, and add guidelines for creating, using, and listing existing shared components from `src/components/`.
+    *   **Shared Services Skill**: Create `CONTEXT/GENERAL/skills/shared_services.md`. Create a guide for reusing services from `src/services/` (e.g., `GeminiService`, `FeedbackNotificationService`) to build new features.
+    *   **Other Skills**: Decompose `CONTEXT/GENERAL/AGENT.md` into granular skill files within the `CONTEXT/GENERAL/skills/` directory, covering:
+        *   `spark_development.md`
+        *   `settings_design.md`
+        *   `environment_awareness.md`
+        *   `version_control.md`
+        *   `data_persistence.md`
+        *   `notifications.md`
+        *   `ai_integration.md`
+
+3.  **Update Central Registry**:
+    *   Populate `CONTEXT/GENERAL/SKILLS.md` with a high-level summary of each skill and a direct link to its corresponding `.md` file in the `skills/` directory.
+
+4.  **Deprecate Old Documentation**:
+    *   Update `AGENT.md` and `AGENTS.md` in the root directory to point directly to the new `CONTEXT/GENERAL/SKILLS.md`.
+    *   Replace the content of `CONTEXT/GENERAL/AGENT.md` with a deprecation notice that redirects to `CONTEXT/GENERAL/SKILLS.md`.
