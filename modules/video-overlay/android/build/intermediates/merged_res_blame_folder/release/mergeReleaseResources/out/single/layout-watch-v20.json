@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "modules.videooverlay.video-overlay-release-28:/layout-watch-v20/abc_alert_dialog_button_bar_material.xml",
+        "source": "modules.videooverlay.video-overlay-appcompat-1.7.0-2:/layout-watch-v20/abc_alert_dialog_button_bar_material.xml"
+    },
+    {
+        "merged": "modules.videooverlay.video-overlay-release-28:/layout-watch-v20/abc_alert_dialog_title_material.xml",
+        "source": "modules.videooverlay.video-overlay-appcompat-1.7.0-2:/layout-watch-v20/abc_alert_dialog_title_material.xml"
+    }
+]

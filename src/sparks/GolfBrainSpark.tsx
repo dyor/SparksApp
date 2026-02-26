@@ -1769,7 +1769,12 @@ const HighlightReelModal: React.FC<{
 }> = ({ visible, onClose, videos, colors }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
+  const [processingVideo, setProcessingVideo] = useState<{ hole: number; shot: Shot; shotNumber: number } | null>(null);
+  const [exportProgress, setExportProgress] = useState(0);
   const videoRef = useRef<Video>(null);
+  const overlayRef = useRef<View>(null);
 
   // Reset index when modal opens
   useEffect(() => {

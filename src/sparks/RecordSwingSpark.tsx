@@ -11,15 +11,25 @@ import {
     TextInput,
     Dimensions,
     Image,
+    ScrollView,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { RecordSwing, RecordedSwing } from '../components/RecordSwing';
-import { RecordSwingStorageService, RecordSwingSettings } from '../services/RecordSwingStorageService';
 import { VoiceCommandService } from '../services/VoiceCommandService';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { isExpoGo } from '../utils/expoGoDetection';
 import { HapticFeedback } from '../utils/haptics';
 import { BaseSpark } from '../components/BaseSpark';
+import { useSparkStore } from '../store';
+
+export interface RecordSwingSettings {
+    countdownSeconds: number;
+    durationSeconds: number;
+    voiceAssistantDurationSeconds: number; // Moved up
+    autoPlay: boolean;
+    voiceControlDuringRecording: boolean;
+    isListeningMode: boolean;
+}
 import {
     SettingsContainer,
     SettingsScrollView,
@@ -28,8 +38,206 @@ import {
     SaveCancelButtons,
     SettingsFeedbackSection,
 } from '../components/SettingsComponents';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { VoiceTranscript } from '../components/shared';
+import ConfettiCannon from 'react-native-confetti-cannon';
+
+// Dropdown Component
+const Dropdown = React.forwardRef<
+    { open: () => void },
+    {
+        options: readonly string[];
+        selectedValue: string;
+        onSelect: (value: string) => void;
+        placeholder?: string;
+        style?: any;
+        textStyle?: any;
+    }
+>(
+    (
+        { options, selectedValue, onSelect, placeholder, style, textStyle },
+        ref
+    ) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const { colors } = useTheme();
+
+        React.useImperativeHandle(ref, () => ({
+            open: () => setIsOpen(true),
+        }));
+
+        const shouldUseModal = options.length >= 5;
+
+        return (
+            <View style={{ position: "relative" }}>
+                <TouchableOpacity
+                    onPress={() => setIsOpen(!isOpen)}
+                    style={[
+                        style,
+                        {
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderRadius: 8,
+                            padding: 12,
+                            borderColor: colors.border
+                        },
+                    ]}
+                    activeOpacity={0.7}
+                >
+                    <Text style={[textStyle, { color: selectedValue ? colors.text : colors.textSecondary }]}>
+                        {selectedValue || placeholder}
+                    </Text>
+                    <Text style={[textStyle, { fontSize: 12, color: colors.textSecondary }]}>
+                        {isOpen ? "▲" : "▼"}
+                    </Text>
+                </TouchableOpacity>
+
+                {isOpen && shouldUseModal ? (
+                    <Modal
+                        visible={isOpen}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setIsOpen(false)}
+                    >
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                backgroundColor: "rgba(0,0,0,0.5)",
+                                justifyContent: "center",
+                                alignItems: "center",
+                            }}
+                            activeOpacity={1}
+                            onPress={() => setIsOpen(false)}
+                        >
+                            <View
+                                style={{
+                                    backgroundColor: colors.surface,
+                                    borderRadius: 12,
+                                    margin: 20,
+                                    maxHeight: "70%",
+                                    minWidth: "80%",
+                                    elevation: 5,
+                                    shadowColor: "#000",
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.25,
+                                    shadowRadius: 3.84,
+                                }}
+                                onStartShouldSetResponder={() => true}
+                            >
+                                <View
+                                    style={{
+                                        padding: 16,
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: colors.border,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 18,
+                                            fontWeight: "600",
+                                            textAlign: "center",
+                                            color: colors.text
+                                        }}
+                                    >
+                                        {placeholder || "Select Option"}
+                                    </Text>
+                                </View>
+                                <ScrollView
+                                    style={{ maxHeight: 300 }}
+                                    showsVerticalScrollIndicator={true}
+                                    bounces={false}
+                                    keyboardShouldPersistTaps="handled"
+                                >
+                                    {options?.map((option) => (
+                                        <TouchableOpacity
+                                            key={option}
+                                            onPress={() => {
+                                                onSelect(option);
+                                                setIsOpen(false);
+                                            }}
+                                            style={{
+                                                padding: 16,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: colors.border,
+                                                backgroundColor:
+                                                    selectedValue === option ? colors.primary + '20' : "transparent",
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text
+                                                style={[
+                                                    textStyle,
+                                                    {
+                                                        color:
+                                                            selectedValue === option ? colors.primary : colors.text,
+                                                        fontWeight:
+                                                            selectedValue === option ? "600" : "400",
+                                                    },
+                                                ]}
+                                            >
+                                                {option}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
+                ) : isOpen ? (
+                    <View
+                        style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            backgroundColor: colors.surface,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 6,
+                            zIndex: 1000,
+                            elevation: 5,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 3.84,
+                            maxHeight: 200,
+                            marginTop: 2,
+                        }}
+                    >
+                        <ScrollView
+                            style={{ maxHeight: 200 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                            bounces={false}
+                            keyboardShouldPersistTaps="handled"
+                            scrollEventThrottle={16}
+                        >
+                            {options?.map((option) => (
+                                <TouchableOpacity
+                                    key={option}
+                                    onPress={() => {
+                                        onSelect(option);
+                                        setIsOpen(false);
+                                    }}
+                                    style={{
+                                        padding: 12,
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: colors.border,
+                                        minHeight: 44,
+                                    }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[textStyle, { color: colors.text }]}>{option}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                ) : null}
+            </View>
+        );
+    }
+);
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,11 +280,11 @@ const RecordSwingSettingsView: React.FC<{
                 <SettingsSection title="Recording Configuration">
                     <View style={settingStyles.item}>
                         <Text style={[settingStyles.label, { color: colors.text }]}>Start Delay (seconds)</Text>
-                        <TextInput
-                            style={[settingStyles.input, { color: colors.text, borderColor: colors.border }]}
-                            keyboardType="numeric"
-                            value={tempSettings.countdownSeconds.toString()}
-                            onChangeText={(val) => setTempSettings(prev => ({ ...prev, countdownSeconds: parseInt(val) || 0 }))}
+                        <Dropdown
+                            options={Array.from({ length: 31 }, (_, i) => i.toString())}
+                            selectedValue={tempSettings.countdownSeconds.toString()}
+                            onSelect={(val) => setTempSettings(prev => ({ ...prev, countdownSeconds: parseInt(val) || 0 }))}
+                            placeholder="Select delay"
                         />
                         <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
                             Time to get into position before recording starts
@@ -85,16 +293,30 @@ const RecordSwingSettingsView: React.FC<{
 
                     <View style={settingStyles.item}>
                         <Text style={[settingStyles.label, { color: colors.text }]}>Recording Duration (seconds)</Text>
-                        <TextInput
-                            style={[settingStyles.input, { color: colors.text, borderColor: colors.border }]}
-                            keyboardType="numeric"
-                            value={tempSettings.durationSeconds.toString()}
-                            onChangeText={(val) => setTempSettings(prev => ({ ...prev, durationSeconds: parseInt(val) || 1 }))}
+                        <Dropdown
+                            options={Array.from({ length: 31 }, (_, i) => i.toString())}
+                            selectedValue={tempSettings.durationSeconds.toString()}
+                            onSelect={(val) => setTempSettings(prev => ({ ...prev, durationSeconds: parseInt(val) || 5 }))}
+                            placeholder="Select duration"
                         />
                         <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
                             How long to record for each swing
                         </Text>
                     </View>
+
+                    <View style={settingStyles.item}>
+                        <Text style={[settingStyles.label, { color: colors.text }]}>Voice Assistant Duration (seconds)</Text>
+                        <Dropdown
+                            options={Array.from({ length: 30 }, (_, i) => (i + 1).toString())}
+                            selectedValue={(tempSettings.voiceAssistantDurationSeconds ?? 20).toString()}
+                            onSelect={(val) => setTempSettings(prev => ({ ...prev, voiceAssistantDurationSeconds: parseInt(val) || 20 }))}
+                            placeholder="Select timeout"
+                        />
+                        <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
+                            How long the voice session stays active after tapping
+                        </Text>
+                    </View>
+
                     <View style={settingStyles.item}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flex: 1 }}>
@@ -109,22 +331,6 @@ const RecordSwingSettingsView: React.FC<{
                                 trackColor={{ false: '#767577', true: colors.primary }}
                             />
                         </View>
-                    </View>
-
-                    <View style={settingStyles.item}>
-                        <Text style={[settingStyles.label, { color: colors.text }]}>Voice Assistant Duration (seconds)</Text>
-                        <TextInput
-                            style={[settingStyles.input, { color: colors.text, borderColor: colors.border }]}
-                            keyboardType="numeric"
-                            value={(tempSettings.voiceAssistantDurationSeconds ?? 20).toString()}
-                            onChangeText={(val) => {
-                                const parsed = parseInt(val);
-                                setTempSettings(prev => ({ ...prev, voiceAssistantDurationSeconds: isNaN(parsed) ? 1 : Math.max(1, parsed) }));
-                            }}
-                        />
-                        <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
-                            How long the voice session stays active after tapping
-                        </Text>
                     </View>
                     <View style={settingStyles.item}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -174,14 +380,17 @@ const settingStyles = StyleSheet.create({
 
 const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: propsShowSettings = false, onCloseSettings }) => {
     const { colors } = useTheme();
+    const { getSparkData, setSparkData, isHydrated } = useSparkStore();
     const [recordings, setRecordings] = useState<RecordedSwing[]>([]);
     const [settings, setSettings] = useState<RecordSwingSettings>({
         countdownSeconds: 5,
-        durationSeconds: 15,
+        durationSeconds: 5,
         autoPlay: false,
         voiceAssistantDurationSeconds: 20,
         voiceControlDuringRecording: false,
+        isListeningMode: false,
     });
+    const [dataLoaded, setDataLoaded] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [currentTranscript, setCurrentTranscript] = useState('');
     const [loading, setLoading] = useState(true);
@@ -191,6 +400,11 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
     const [isPlaying, setIsPlaying] = useState(false);
     const [voiceContext, setVoiceContext] = useState<'idle' | 'recording' | 'reviewing'>('idle');
     const [lastRecording, setLastRecording] = useState<RecordedSwing | null>(null);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const confettiRef = useRef<any>(null);
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const isProcessingCommandRef = useRef(false);
 
     // -- Voice Logic --
     const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -208,10 +422,8 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 return;
             }
 
-            if (voiceTimeoutRef.current) {
-                clearTimeout(voiceTimeoutRef.current);
-                voiceTimeoutRef.current = null;
-            }
+            // Clear any existing timers before starting a new session
+            clearVoiceTimers();
 
             setCurrentTranscript('');
             const hasPermissions = await VoiceCommandService.requestPermissions();
@@ -220,11 +432,14 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 return;
             }
 
+            // Always stop first to ensure a fresh session and clear the native transcript buffer
+            try { await ExpoSpeechRecognitionModule.stop(); } catch (e) { }
+
             await ExpoSpeechRecognitionModule.start({
                 lang: 'en-US',
                 interimResults: true,
                 maxAlternatives: 1,
-                continuous: true, // Use continuous to prevent premature ending
+                continuous: true,
                 requiresOnDeviceRecognition: false,
                 addsPunctuation: true,
             });
@@ -232,6 +447,15 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             // Set timeout to stop listening
             const duration = settings.voiceAssistantDurationSeconds || 20;
             console.log(`🎙️ Voice session starting with ${duration}s timeout`);
+            setTimeLeft(duration);
+
+            countdownIntervalRef.current = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev !== null && prev > 1) return prev - 1;
+                    return 0;
+                });
+            }, 1000);
+
             voiceTimeoutRef.current = setTimeout(() => {
                 console.log('🎙️ Voice session timeout reached');
                 toggleListening(false);
@@ -245,12 +469,20 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         }
     }, [voiceContext, lastRecording, settings.voiceAssistantDurationSeconds]);
 
-    const handleUpdateRecording = async (timestamp: number, updates: Partial<RecordedSwing>) => {
+    const clearVoiceTimers = useCallback(() => {
+        if (voiceTimeoutRef.current) {
+            clearTimeout(voiceTimeoutRef.current);
+            voiceTimeoutRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setTimeLeft(null);
+    }, []);
+
+    const handleUpdateRecording = (timestamp: number, updates: Partial<RecordedSwing>) => {
         setRecordings(prev => prev.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r));
-        // Also update in storage
-        const data = await RecordSwingStorageService.getData();
-        const updatedRecordings = data.recordings.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r);
-        await RecordSwingStorageService.saveData({ ...data, recordings: updatedRecordings });
     };
 
     const handleTriggerRecording = () => {
@@ -260,14 +492,15 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
     const toggleListening = (value: boolean) => {
         console.log('🎙️ RecordSwingSpark: toggleListening called with:', value);
+
+        // Update local settings (Save useEffect will sync to store)
+        setSettings(prev => ({ ...prev, isListeningMode: value }));
+
         if (value) {
             startVoiceListening();
         } else {
             console.log('🎙️ RecordSwingSpark: stopping voice session');
-            if (voiceTimeoutRef.current) {
-                clearTimeout(voiceTimeoutRef.current);
-                voiceTimeoutRef.current = null;
-            }
+            clearVoiceTimers();
             ExpoSpeechRecognitionModule.stop();
             setVoiceContext('idle');
         }
@@ -284,25 +517,47 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         setCurrentTranscript("");
     });
     useSpeechRecognitionEvent("result", (event) => {
-        const text = event.results[0]?.transcript || "";
-        console.log('🎙️ Voice Event: result', text);
-        setCurrentTranscript(text);
+        if (!isListening || isProcessingCommandRef.current) return;
+
+        const text = event.results[event.results.length - 1]?.transcript || "";
+        const fullTranscriptText = (event.results[0]?.transcript || "");
+
+        setCurrentTranscript(fullTranscriptText);
 
         const lowerText = text.toLowerCase();
+        const lowerFull = fullTranscriptText.toLowerCase();
 
-        // 1. Record Swing (Idle)
-        if (voiceContext === 'idle' && lowerText.includes('record swing')) {
+        // Check both latest chunk and full transcript for the command
+        const hasStartCommand = lowerText.includes('record swing') || lowerText.includes('start recording') ||
+            lowerFull.includes('record swing') || lowerFull.includes('start recording');
+
+        // 1. Record Swing (Idle or Reviewing)
+        if ((voiceContext === 'idle' || voiceContext === 'reviewing') && hasStartCommand) {
+            console.log('🎙️ Command Detected: Record Swing');
+            isProcessingCommandRef.current = true;
+            setIsListening(false);
             setVoiceContext('recording');
             handleTriggerRecording();
             setCurrentTranscript('');
+            clearVoiceTimers(); // Clear timers while recording
+            ExpoSpeechRecognitionModule.stop();
+
+            setTimeout(() => { isProcessingCommandRef.current = false; }, 2000);
             return;
         }
 
         // 2. Stop Recording (Recording)
-        if (voiceContext === 'recording' && lowerText.includes('stop recording')) {
+        if (voiceContext === 'recording' && (lowerText.includes('stop recording') || lowerFull.includes('stop recording'))) {
+            console.log('🎙️ Command Detected: Stop Recording');
+            isProcessingCommandRef.current = true;
+            setIsListening(false);
             setTriggerCount(prev => prev > 0 ? -Math.abs(prev) - 1 : prev - 1);
             setVoiceContext('reviewing');
             setCurrentTranscript('');
+            clearVoiceTimers(); // Clear timers while reviewing
+            ExpoSpeechRecognitionModule.stop();
+
+            setTimeout(() => { isProcessingCommandRef.current = false; }, 2000);
             return;
         }
 
@@ -311,15 +566,16 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             let updated = false;
             const updates: Partial<RecordedSwing> = {};
 
-            if (lowerText.includes('good shot')) {
+            if (lowerText.includes('good shot') || lowerFull.includes('good shot')) {
                 updates.quality = 'good';
                 updated = true;
-            } else if (lowerText.includes('bad shot')) {
+                setShowConfetti(true);
+            } else if (lowerText.includes('bad shot') || lowerFull.includes('bad shot')) {
                 updates.quality = 'bad';
                 updated = true;
             }
 
-            const yardMatch = lowerText.match(/(\d+)\s*yards?/);
+            const yardMatch = lowerFull.match(/(\d+)\s*yards?/);
             if (yardMatch) {
                 updates.distance = yardMatch[1] + ' yards';
                 updated = true;
@@ -327,8 +583,11 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
             if (updated && lastRecording) {
                 handleUpdateRecording(lastRecording.timestamp, updates);
-                setCurrentTranscript('');
-                HapticFeedback.success();
+                // Don't stop mic here, usually user says "Good shot, 150 yards" in one go or two
+                // But we clear the transcript to show we heard it
+                if (lowerText.includes('shot') || yardMatch) {
+                    // We don't necessarily want to stop the whole session yet
+                }
             }
         }
     });
@@ -344,10 +603,10 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
     // -- Effects & Video --
 
-    // Video Player
-    const player = useVideoPlayer(selectedVideo?.uri || '', (player) => {
-        player.loop = true;
-        player.play();
+    // Video Player - only load source if we have a video selected to prevent "shadow" background audio
+    const player = useVideoPlayer(selectedVideo ? selectedVideo.uri : '', (player) => {
+        player.loop = false;
+        // player.play() is handled in useEffect to ensure it only starts when we want it to
     });
 
     useEffect(() => {
@@ -364,27 +623,74 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
     useEffect(() => {
         // Subscribe to player status
-        const subscription = player.addListener('playingChange', (event) => {
+        const sub1 = player.addListener('playingChange', (event) => {
             setIsPlaying(event.isPlaying);
+            // Detect end of playback: Not playing and (currentTime approx duration)
+            if (!event.isPlaying && player.currentTime > 0 && Math.abs(player.currentTime - player.duration) < 0.5) {
+                console.log('🎥 RecordSwingSpark: Playback finished detected via position, returning to listening state');
+                player.pause(); // Ensure it stops
+                setSelectedVideo(null);
+                setVoiceContext('idle');
+                // Auto-resume listening if it was active
+                if (settings.isListeningMode) {
+                    startVoiceListening();
+                }
+            }
         });
-        return () => subscription.remove();
-    }, [player]);
+        return () => {
+            sub1.remove();
+        };
+    }, [player, settings.isListeningMode, startVoiceListening, voiceContext]);
+
+    // Ensure player pauses when modal closes to prevent shadow audio
+    useEffect(() => {
+        if (!selectedVideo) { // Using selectedVideo as a proxy for modal visibility
+            player.pause();
+        }
+    }, [selectedVideo, player]);
 
     // Load data on mount
     useEffect(() => {
-        const loadData = async () => {
-            const data = await RecordSwingStorageService.getData();
-            setRecordings(data.recordings);
-            setSettings(data.settings);
+        if (!isHydrated) return;
+        if (dataLoaded) return;
+
+        const loadData = () => {
+            console.log('🔄 RecordSwingSpark: Loading data from sparkStore');
+            const data = getSparkData('record-swing');
+            if (data.recordings) setRecordings(data.recordings);
+            if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+
             setLoading(false);
+            setDataLoaded(true);
+
+            // Auto-start listening if was active in database
+            if (data.settings?.isListeningMode) {
+                setTimeout(() => {
+                    startVoiceListening();
+                }, 500);
+            }
         };
         loadData();
-    }, []);
+
+        return () => {
+            clearVoiceTimers();
+        };
+    }, [isHydrated, dataLoaded, getSparkData, startVoiceListening, clearVoiceTimers]);
+
+    // Save data whenever recordings or settings change
+    useEffect(() => {
+        if (!dataLoaded) return;
+
+        console.log('💾 RecordSwingSpark: Saving data to sparkStore');
+        setSparkData('record-swing', {
+            recordings,
+            settings
+        });
+    }, [recordings, settings, setSparkData, dataLoaded]);
 
     // Handle new recording
-    const handleRecordingComplete = useCallback(async (recording: RecordedSwing) => {
-        const updatedData = await RecordSwingStorageService.addRecording(recording);
-        setRecordings(updatedData.recordings);
+    const handleRecordingComplete = useCallback((recording: RecordedSwing) => {
+        setRecordings(prev => [recording, ...prev]);
         setLastRecording(recording);
         HapticFeedback.success();
 
@@ -396,17 +702,17 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             setVoiceContext('reviewing'); // Still allow quality tagging even if not auto-played
         }
 
-        // 2. Resume listening if it was on
-        if (isListening) {
+        // 2. Resume listening if it was on AND we aren't auto-playing (otherwise wait for playback finish)
+        if (settings.isListeningMode && !settings.autoPlay) {
             setTimeout(() => {
                 startVoiceListening();
             }, 500);
         }
-    }, [isListening, settings.autoPlay, startVoiceListening]);
+    }, [settings.isListeningMode, settings.autoPlay, startVoiceListening]);
 
 
 
-    const deleteRecording = async (timestamp: number) => {
+    const deleteRecording = (timestamp: number) => {
         Alert.alert(
             'Delete Recording',
             'Are you sure you want to delete this swing?',
@@ -415,20 +721,13 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: async () => {
-                        const updatedData = await RecordSwingStorageService.deleteRecording(timestamp);
-                        setRecordings(updatedData.recordings);
+                    onPress: () => {
+                        setRecordings(prev => prev.filter(r => r.timestamp !== timestamp));
                         HapticFeedback.light();
                     },
                 },
             ]
         );
-    };
-
-    const updateSettings = async (newSettings: Partial<RecordSwingSettings>) => {
-        const updated = { ...settings, ...newSettings };
-        setSettings(updated);
-        await RecordSwingStorageService.updateSettings(updated);
     };
 
     const renderItem = ({ item }: { item: RecordedSwing }) => (
@@ -452,7 +751,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             <View style={styles.cardContent}>
                 <View style={styles.cardHeader}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>
-                        Swing {item.quality ? (item.quality === 'good' ? '✅' : '❌') : ''}
+                        Swing {item.quality === 'good' ? '🔥' : item.quality === 'bad' ? '💩' : ''}
                     </Text>
                     <TouchableOpacity onPress={() => deleteRecording(item.timestamp)}>
                         <Text style={{ color: colors.error, padding: 4 }}>Delete</Text>
@@ -475,8 +774,8 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         return (
             <RecordSwingSettingsView
                 settings={settings}
-                onSave={async (newSettings) => {
-                    await updateSettings(newSettings);
+                onSave={(newSettings) => {
+                    setSettings(newSettings);
                     onCloseSettings?.();
                 }}
                 onCancel={() => onCloseSettings?.()}
@@ -511,14 +810,16 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     </TouchableOpacity>
                     <Text style={[styles.listenLabel, { color: colors.text }]}>
                         {isListening ? (
-                            voiceContext === 'idle' ? 'Listening for "Record Swing"...' :
-                                voiceContext === 'recording' ? 'Listening for "Stop Recording"...' :
-                                    'Listening for "Good Shot" / Distance...'
+                            voiceContext === 'idle' ? `Listening for "Record Swing"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
+                                voiceContext === 'recording' ? `Listening for "Stop Recording"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
+                                    `Listening for "Good Shot" / Distance... ${timeLeft !== null ? `[${timeLeft}s]` : ''}`
                         ) : 'Tap for Voice Activation'}
                     </Text>
-                    <Text style={[styles.listenSubtext, { color: colors.textSecondary }]}>
-                        Say "Record Swing" to start hands-free
-                    </Text>
+                    {voiceContext === 'idle' && (
+                        <Text style={[styles.listenSubtext, { color: colors.textSecondary }]}>
+                            Say "Record Swing" to start hands-free
+                        </Text>
+                    )}
 
                     <View style={{ width: '100%', marginTop: 8 }}>
                         <VoiceTranscript
@@ -531,6 +832,17 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 <View style={styles.recordSection}>
                     <RecordSwing
                         onRecordingComplete={handleRecordingComplete}
+                        onCountdownStart={() => {
+                            console.log('🎥 RecordSwingSpark: Countdown started, clearing timers');
+                            clearVoiceTimers();
+
+                            // If we don't want voice control during recording, stop the engine to prevent interference
+                            if (!settings.voiceControlDuringRecording) {
+                                console.log('🎥 RecordSwingSpark: Stopping voice engine for recording duration');
+                                setIsListening(false);
+                                ExpoSpeechRecognitionModule.stop();
+                            }
+                        }}
                         countdownSeconds={settings.countdownSeconds}
                         durationSeconds={settings.durationSeconds}
                         triggerCount={triggerCount}
@@ -597,9 +909,14 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                                     <TouchableOpacity
                                         style={[styles.modalCloseButton, { backgroundColor: colors.surface }]}
                                         onPress={() => {
+                                            player.pause(); // Ensure audio stops
                                             setSelectedVideo(null);
                                             setPlaybackRate(1.0);
                                             setVoiceContext('idle');
+                                            // Resume listening when returning to main screen
+                                            if (settings.isListeningMode) {
+                                                setTimeout(() => startVoiceListening(), 500);
+                                            }
                                         }}
                                     >
                                         <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>Close</Text>
@@ -610,6 +927,16 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     </View>
                 </Modal>
             </View>
+
+            {showConfetti && (
+                <ConfettiCannon
+                    count={200}
+                    origin={{ x: width / 2, y: 0 }}
+                    fadeOut={true}
+                    fallSpeed={3000}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </BaseSpark>
     );
 };

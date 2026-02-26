@@ -38,6 +38,7 @@ export interface RecordSwingProps {
   countdownSeconds?: number;
   durationSeconds?: number;
   onRecordingComplete?: (swing: RecordedSwing) => void;
+  onCountdownStart?: () => void;
   isWaitingForVoice?: boolean;
   colors: {
     primary: string;
@@ -57,6 +58,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   countdownSeconds = 5,
   durationSeconds = 30,
   onRecordingComplete,
+  onCountdownStart,
   triggerCount = 0,
   isWaitingForVoice = false,
   colors,
@@ -79,10 +81,9 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Video Player
-  const player = useVideoPlayer(recordedSwing?.uri || "", (player) => {
-    player.loop = true;
-    player.play();
+  // Video Player - only load source if we are actually showing the player to prevent shadow audio
+  const player = useVideoPlayer(showVideoPlayer ? (recordedSwing?.uri || "") : "", (player) => {
+    player.loop = false;
   });
 
   useEffect(() => {
@@ -95,6 +96,13 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
     });
     return () => subscription.remove();
   }, [player]);
+
+  // Ensure player pauses when modal closes to prevent shadow audio
+  useEffect(() => {
+    if (!showVideoPlayer) {
+      player.pause();
+    }
+  }, [showVideoPlayer, player]);
 
   const handleRecordSwing = async () => {
     console.log("⛳️ handleRecordSwing: triggered");
@@ -176,6 +184,10 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
   const startCountdown = () => {
     if (countdownTimerRef.current) return;
+
+    if (onCountdownStart) {
+      onCountdownStart();
+    }
 
     setCountdown(countdownSeconds);
     let count = countdownSeconds;
