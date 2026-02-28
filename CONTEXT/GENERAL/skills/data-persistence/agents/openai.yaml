@@ -1,0 +1,4 @@
+interface:
+  display_name: "Data Persistence"
+  short_description: "Persist Spark data safely with useSparkStore"
+  default_prompt: "Use $data-persistence to implement hydration-safe Spark data persistence with useSparkStore."

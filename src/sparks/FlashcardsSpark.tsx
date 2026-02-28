@@ -626,17 +626,15 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
   const triggerCelebration = () => {
     HapticFeedback.success();
+    // Animate in, hold at full visibility for several seconds (no fade-out; user dismisses with button)
+    const CELEBRATION_HOLD_MS = 5000;
     Animated.sequence([
       Animated.timing(celebrationAnimation, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }),
-      Animated.timing(celebrationAnimation, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.delay(CELEBRATION_HOLD_MS),
     ]).start();
   };
 

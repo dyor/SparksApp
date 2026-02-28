@@ -810,9 +810,9 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     </TouchableOpacity>
                     <Text style={[styles.listenLabel, { color: colors.text }]}>
                         {isListening ? (
-                            voiceContext === 'idle' ? `Listening for "Record Swing"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
-                                voiceContext === 'recording' ? `Listening for "Stop Recording"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
-                                    `Listening for "Good Shot" / Distance... ${timeLeft !== null ? `[${timeLeft}s]` : ''}`
+                            voiceContext === 'idle' ? `Say "Record Swing"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
+                                voiceContext === 'recording' ? `Say "Stop Recording"... ${timeLeft !== null ? `[${timeLeft}s]` : ''}` :
+                                    `Say "Good Shot" "Bad Shot" "200 Yards" ... ${timeLeft !== null ? `[${timeLeft}s]` : ''}`
                         ) : 'Tap for Voice Activation'}
                     </Text>
                     {voiceContext === 'idle' && (

@@ -13,6 +13,8 @@ import {
   SettingsHeader,
   SettingsSection,
   SettingsButton,
+  SettingsInput,
+  SettingsText,
   SaveCancelButtons,
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
@@ -24,12 +26,20 @@ interface Activity {
   order: number;
 }
 
+type HoleTimingMode = 'none' | '9' | '18';
+
+const DEFAULT_HOLE_MINUTES = 13;
+const defaultHoleDurations = (n: number): number[] => Array(n).fill(DEFAULT_HOLE_MINUTES);
+
 interface TimerState {
   teeTime: Date | null;
   startTime: Date | null;
   isActive: boolean;
   currentActivityIndex: number;
   completedActivities: Set<string>;
+  /** Hole phase: current hole (0-based) and when it started. Only used after tee time when hole timing is on. */
+  currentHoleIndex: number;
+  holeStartTime: Date | null;
 }
 
 const defaultActivities: Activity[] = [
@@ -434,12 +444,28 @@ const DraggableActivityItem: React.FC<{
 // Settings Component
 const TeeTimeTimerSettings: React.FC<{
   activities: Activity[];
-  onSave: (activities: Activity[]) => void;
+  holeTimingMode: HoleTimingMode;
+  holeDurations: number[];
+  onSave: (activities: Activity[], holeTimingMode: HoleTimingMode, holeDurations: number[]) => void;
   onClose: () => void;
-}> = ({ activities, onSave, onClose }) => {
+}> = ({ activities, holeTimingMode: initialHoleMode, holeDurations: initialHoleDurations, onSave, onClose }) => {
   const { colors } = useTheme();
   const [editingActivities, setEditingActivities] = useState<Activity[]>([...activities]);
   const [isAnyItemDragging, setIsAnyItemDragging] = useState(false);
+  const [holeTimingMode, setHoleTimingMode] = useState<HoleTimingMode>(initialHoleMode);
+  const [holeDurations, setHoleDurations] = useState<number[]>(() => {
+    // Only initialize a fixed-length hole duration array when timing 9 or 18 holes.
+    if (initialHoleMode === '9' || initialHoleMode === '18') {
+      const n = initialHoleMode === '9' ? 9 : 18;
+      if (initialHoleDurations.length >= n) return initialHoleDurations.slice(0, n);
+      return [
+        ...initialHoleDurations,
+        ...Array(n - initialHoleDurations.length).fill(DEFAULT_HOLE_MINUTES),
+      ];
+    }
+    // Hole timing disabled: preserve any stored durations, or start empty.
+    return initialHoleDurations.length ? [...initialHoleDurations] : [];
+  });
 
   const addActivity = () => {
     const newActivity: Activity = {
@@ -501,13 +527,24 @@ const TeeTimeTimerSettings: React.FC<{
     );
   };
 
+  const setHoleMode = (mode: HoleTimingMode) => {
+    setHoleTimingMode(mode);
+    const n = mode === '9' ? 9 : mode === '18' ? 18 : 0;
+    if (n === 0) return;
+    setHoleDurations(prev => {
+      if (prev.length === n) return prev;
+      if (prev.length < n) return [...prev, ...Array(n - prev.length).fill(DEFAULT_HOLE_MINUTES)];
+      return prev.slice(0, n);
+    });
+  };
+
   const handleSave = () => {
     const reorderedActivities = editingActivities.map((activity, index) => ({
       ...activity,
       order: index + 1
     }));
     console.log('💾 TeeTimeTimerSettings: Saving activities', reorderedActivities.length);
-    onSave(reorderedActivities);
+    onSave(reorderedActivities, holeTimingMode, holeDurations);
     onClose();
   };
 
@@ -641,6 +678,47 @@ const TeeTimeTimerSettings: React.FC<{
     activitiesContainer: {
       backgroundColor: 'transparent',
     },
+    radioRow: {
+      flexDirection: 'column',
+      gap: 10,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    radioOption: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    radioOptionSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '18',
+    },
+    radioLabel: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '500',
+    },
+    radioLabelSelected: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    holeInputsContainer: {
+      marginTop: 12,
+    },
+    holeInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 12,
+    },
+    holeInputLabel: {
+      fontSize: 15,
+      color: colors.text,
+      minWidth: 56,
+    },
   });
 
   return (
@@ -690,6 +768,53 @@ const TeeTimeTimerSettings: React.FC<{
             />
           </SettingsSection>
 
+          <SettingsSection title="Hole timing">
+            <SettingsText>After your tee time, count down each hole.</SettingsText>
+            <View style={settingsSubStyles.radioRow}>
+              <TouchableOpacity
+                style={[settingsSubStyles.radioOption, holeTimingMode === 'none' && settingsSubStyles.radioOptionSelected]}
+                onPress={() => setHoleMode('none')}
+              >
+                <Text style={[settingsSubStyles.radioLabel, holeTimingMode === 'none' && settingsSubStyles.radioLabelSelected]}>Do Not Time Holes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[settingsSubStyles.radioOption, holeTimingMode === '9' && settingsSubStyles.radioOptionSelected]}
+                onPress={() => setHoleMode('9')}
+              >
+                <Text style={[settingsSubStyles.radioLabel, holeTimingMode === '9' && settingsSubStyles.radioLabelSelected]}>Time 9 Holes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[settingsSubStyles.radioOption, holeTimingMode === '18' && settingsSubStyles.radioOptionSelected]}
+                onPress={() => setHoleMode('18')}
+              >
+                <Text style={[settingsSubStyles.radioLabel, holeTimingMode === '18' && settingsSubStyles.radioLabelSelected]}>Time 18 Holes</Text>
+              </TouchableOpacity>
+            </View>
+            {(holeTimingMode === '9' || holeTimingMode === '18') && (
+              <View style={settingsSubStyles.holeInputsContainer}>
+                <SettingsText variant="caption">Minutes per hole (default 13)</SettingsText>
+                {holeDurations.slice(0, holeTimingMode === '9' ? 9 : 18).map((mins, i) => (
+                  <View key={i} style={settingsSubStyles.holeInputRow}>
+                    <Text style={settingsSubStyles.holeInputLabel}>Hole {i + 1}</Text>
+                    <SettingsInput
+                      placeholder="13"
+                      value={String(mins)}
+                      onChangeText={(t) => {
+                        const v = parseInt(t, 10);
+                        setHoleDurations(prev => {
+                          const next = [...prev];
+                          next[i] = (t === '' || isNaN(v)) ? DEFAULT_HOLE_MINUTES : Math.min(99, Math.max(1, v));
+                          return next;
+                        });
+                      }}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+          </SettingsSection>
+
           <SaveCancelButtons onSave={handleSave} onCancel={onClose} />
         </SettingsScrollView>
       </SettingsContainer>
@@ -724,7 +849,11 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     isActive: false,
     currentActivityIndex: 0,
     completedActivities: new Set(),
+    currentHoleIndex: 0,
+    holeStartTime: null,
   });
+  const [holeTimingMode, setHoleTimingMode] = useState<HoleTimingMode>('none');
+  const [holeDurations, setHoleDurations] = useState<number[]>(defaultHoleDurations(9));
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showTeeTimeCard, setShowTeeTimeCard] = useState(true);
   const [showNativePicker, setShowNativePicker] = useState(false);
@@ -763,8 +892,20 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
           teeTime: savedTimerState.teeTime ? new Date(savedTimerState.teeTime) : null,
           startTime: savedTimerState.startTime ? new Date(savedTimerState.startTime) : null,
           completedActivities: new Set(savedTimerState.completedActivities || []),
+          currentHoleIndex: savedTimerState.currentHoleIndex ?? 0,
+          holeStartTime: savedTimerState.holeStartTime ? new Date(savedTimerState.holeStartTime) : null,
         });
         console.log('📦 TeeTimeTimerSpark: Loaded timer state');
+      }
+
+      if (savedData?.holeTimingMode && (savedData.holeTimingMode === 'none' || savedData.holeTimingMode === '9' || savedData.holeTimingMode === '18')) {
+        setHoleTimingMode(savedData.holeTimingMode);
+      }
+      if (savedData?.holeDurations && Array.isArray(savedData.holeDurations)) {
+        const n = savedData.holeTimingMode === '18' ? 18 : 9;
+        const arr = savedData.holeDurations.slice(0, n);
+        while (arr.length < n) arr.push(DEFAULT_HOLE_MINUTES);
+        setHoleDurations(arr);
       }
 
       setDataLoaded(true);
@@ -799,11 +940,15 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
     const saveData = {
       activities,
+      holeTimingMode,
+      holeDurations,
       timerState: {
         ...timerState,
         teeTime: timerState.teeTime ? (timerState.teeTime instanceof Date ? timerState.teeTime.toISOString() : timerState.teeTime) : null,
         startTime: timerState.startTime ? (timerState.startTime instanceof Date ? timerState.startTime.toISOString() : timerState.startTime) : null,
         completedActivities: Array.from(timerState.completedActivities || []),
+        currentHoleIndex: timerState.currentHoleIndex ?? 0,
+        holeStartTime: timerState.holeStartTime ? (timerState.holeStartTime instanceof Date ? timerState.holeStartTime.toISOString() : timerState.holeStartTime) : null,
       },
       lastUsed: new Date().toISOString(),
     };
@@ -816,7 +961,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       isActive: timerState.isActive,
       hasTeeTime: timerState.teeTime !== null,
     });
-  }, [activities, timerState, dataLoaded, isHydrated]);
+  }, [activities, timerState, holeTimingMode, holeDurations, dataLoaded, isHydrated]);
 
   // Timer logic
   useEffect(() => {
@@ -840,6 +985,42 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     };
   }, [timerState.isActive]);
 
+  const holeCount = holeTimingMode === '9' ? 9 : holeTimingMode === '18' ? 18 : 0;
+  const teeTimeHasPassed = timerState.isActive && timerState.teeTime != null && currentTime.getTime() >= timerState.teeTime.getTime();
+  const inHolePhase = teeTimeHasPassed && holeCount > 0 && timerState.holeStartTime != null;
+
+  // Start hole phase when tee time passes (one-time init)
+  useEffect(() => {
+    if (!timerState.isActive || !timerState.teeTime || holeCount === 0) return;
+    if (currentTime.getTime() < timerState.teeTime.getTime()) return;
+    if (timerState.holeStartTime != null) return;
+
+    setTimerState(prev => ({
+      ...prev,
+      holeStartTime: prev.teeTime,
+      currentHoleIndex: 0,
+    }));
+  }, [timerState.isActive, timerState.teeTime, timerState.holeStartTime, holeCount, currentTime.getTime()]);
+
+  // Advance to next hole when current hole time expires
+  useEffect(() => {
+    if (!inHolePhase || holeCount === 0) return;
+    const idx = timerState.currentHoleIndex;
+    if (idx >= holeCount) return;
+
+    const durationMinutes = holeDurations[idx] ?? DEFAULT_HOLE_MINUTES;
+    const holeEndMs = timerState.holeStartTime!.getTime() + durationMinutes * 60 * 1000;
+    const now = currentTime.getTime();
+    if (now < holeEndMs) return;
+
+    setTimerState(prev => ({
+      ...prev,
+      currentHoleIndex: Math.min(prev.currentHoleIndex + 1, holeCount),
+      // Start the next hole exactly at the previous hole's scheduled end time
+      holeStartTime: new Date(holeEndMs),
+    }));
+    HapticFeedback.light();
+  }, [inHolePhase, holeCount, timerState.currentHoleIndex, timerState.holeStartTime, holeDurations, currentTime.getTime()]);
 
   // Calculate activity start times
   const getActivityStartTime = (activityIndex: number): Date => {
@@ -962,6 +1143,35 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     return Math.max(0, Math.floor((lastActivityStartTime.getTime() - currentTime.getTime()) / 1000));
   };
 
+  // Hole phase: seconds remaining for current hole (0 when round complete or not in hole phase)
+  const getCurrentHoleRemainingSeconds = (): number => {
+    if (!inHolePhase || holeCount === 0 || !timerState.holeStartTime) return 0;
+    const idx = timerState.currentHoleIndex;
+    if (idx >= holeCount) return 0;
+    const durationMinutes = holeDurations[idx] ?? DEFAULT_HOLE_MINUTES;
+    const endMs = timerState.holeStartTime.getTime() + durationMinutes * 60 * 1000;
+    return Math.max(0, Math.floor((endMs - currentTime.getTime()) / 1000));
+  };
+
+  const holeRoundComplete = inHolePhase && timerState.currentHoleIndex >= holeCount;
+
+  // Time remaining until end of measured round (when tee time is in the past and 9/18 holes selected)
+  const getSecondsRemainingInRound = (): number => {
+    if (!timerState.isActive || !timerState.teeTime || holeCount === 0) return 0;
+    const totalMinutes = holeDurations.slice(0, holeCount).reduce((s, m) => s + (m || DEFAULT_HOLE_MINUTES), 0);
+    const roundEndMs = timerState.teeTime.getTime() + totalMinutes * 60 * 1000;
+    return Math.max(0, Math.floor((roundEndMs - currentTime.getTime()) / 1000));
+  };
+
+  const formatRoundTimeRemaining = (): string => {
+    const secs = getSecondsRemainingInRound();
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   const handleTimePickerChange = (event: any, time?: Date) => {
     if (time) {
       setSelectedTime(time);
@@ -971,22 +1181,49 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   const handleConfirmTeeTime = () => {
     setShowNativePicker(false);
 
-    const today = new Date();
-    const teeTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(),
-      selectedTime.getHours(), selectedTime.getMinutes());
+    const now = new Date();
+    const baseTeeTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      selectedTime.getHours(),
+      selectedTime.getMinutes()
+    );
 
-    // If tee time is in the past, assume tomorrow
-    if (teeTime < today) {
-      teeTime.setDate(teeTime.getDate() + 1);
+    // Decide whether this tee time should be treated as today or tomorrow
+    let teeTime = new Date(baseTeeTime.getTime());
+    if (holeTimingMode === 'none') {
+      // No hole timing: if tee time is already in the past, treat it as tomorrow
+      if (teeTime < now) {
+        teeTime.setDate(teeTime.getDate() + 1);
+      }
+    } else {
+      // With hole timing, allow some time after tee time before rolling to tomorrow
+      const extraHours = holeTimingMode === '9' ? 2 : 4;
+      const sameDayThreshold = new Date(
+        baseTeeTime.getTime() + extraHours * 60 * 60 * 1000
+      );
+      if (sameDayThreshold < now) {
+        teeTime.setDate(teeTime.getDate() + 1);
+      }
     }
 
     const startTime = new Date(teeTime.getTime() - totalDuration * 60 * 1000);
 
-    // Check if we're starting late
-    const now = new Date();
+    // Check if we're starting late relative to the prep window
     const isLate = now > startTime;
-    const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000);
-    const isTooLate = now > endTime;
+
+    // Define how late is "too late" based on hole timing mode
+    let allowedEnd: Date;
+    if (holeTimingMode === '9') {
+      allowedEnd = new Date(teeTime.getTime() + 2 * 60 * 60 * 1000);
+    } else if (holeTimingMode === '18') {
+      allowedEnd = new Date(teeTime.getTime() + 4 * 60 * 60 * 1000);
+    } else {
+      // Without hole timing, consider it too late once we've passed tee time
+      allowedEnd = new Date(teeTime.getTime());
+    }
+    const isTooLate = now > allowedEnd;
 
     if (isTooLate) {
       // Started after all activities should be complete
@@ -1044,7 +1281,34 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     // Schedule notifications for all activities
     await scheduleActivityNotifications(teeTime, startTime);
 
+    // Schedule notifications at the end of each hole (when 9 or 18 holes selected)
+    await scheduleHoleEndNotifications(teeTime);
+
     HapticFeedback.success();
+  };
+
+  const scheduleHoleEndNotifications = async (teeTime: Date) => {
+    const n = holeTimingMode === '9' ? 9 : holeTimingMode === '18' ? 18 : 0;
+    if (n === 0) return;
+
+    const now = new Date();
+    let cumulativeMs = teeTime.getTime();
+
+    for (let h = 0; h < n; h++) {
+      const mins = holeDurations[h] ?? DEFAULT_HOLE_MINUTES;
+      cumulativeMs += mins * 60 * 1000;
+      const holeEndTime = new Date(cumulativeMs);
+      if (holeEndTime.getTime() <= now.getTime()) continue;
+
+      await NotificationService.scheduleActivityNotification(
+        `Hole ${h + 1} complete`,
+        holeEndTime,
+        `hole-${h + 1}-end`,
+        'Tee Time Timer',
+        'tee-time-timer',
+        '⛳'
+      );
+    }
   };
 
   const scheduleActivityNotifications = async (teeTime: Date, startTime: Date) => {
@@ -1134,32 +1398,40 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       isActive: false,
       currentActivityIndex: 0,
       completedActivities: new Set(),
+      currentHoleIndex: 0,
+      holeStartTime: null,
     });
     setShowTeeTimeCard(true);
     HapticFeedback.medium();
   };
 
-  const saveActivities = useCallback((newActivities: Activity[]) => {
-    console.log('💾 TeeTimeTimerSpark: saveActivities called with', newActivities.length, 'activities');
+  const saveActivitiesWithHoleSettings = useCallback((
+    newActivities: Activity[],
+    newHoleTimingMode: HoleTimingMode,
+    newHoleDurations: number[],
+  ) => {
+    console.log('💾 TeeTimeTimerSpark: saveActivitiesWithHoleSettings called with', newActivities.length, 'activities');
 
-    // 1. Update local state immediately
     setActivities([...newActivities]);
+    setHoleTimingMode(newHoleTimingMode);
+    setHoleDurations(newHoleDurations);
 
-    // 2. Explicitly save to store to prevent race conditions with re-mounts/renders
-    // This ensures that even if the component re-mounts immediately after this call,
-    // the store already has the latest 7 activities.
     const saveData = {
       activities: newActivities,
+      holeTimingMode: newHoleTimingMode,
+      holeDurations: newHoleDurations,
       timerState: {
         ...timerState,
         teeTime: timerState.teeTime ? (timerState.teeTime instanceof Date ? timerState.teeTime.toISOString() : timerState.teeTime) : null,
         startTime: timerState.startTime ? (timerState.startTime instanceof Date ? timerState.startTime.toISOString() : timerState.startTime) : null,
         completedActivities: Array.from(timerState.completedActivities || []),
+        currentHoleIndex: timerState.currentHoleIndex ?? 0,
+        holeStartTime: timerState.holeStartTime ? (timerState.holeStartTime instanceof Date ? timerState.holeStartTime.toISOString() : timerState.holeStartTime) : null,
       },
       lastUsed: new Date().toISOString(),
     };
 
-    console.log(`💾 TeeTimeTimerSpark: Explicitly saving ${newActivities.length} activities to store...`);
+    console.log(`💾 TeeTimeTimerSpark: Explicitly saving ${newActivities.length} activities and hole settings...`);
     setSparkData('tee-time-timer', saveData);
 
     HapticFeedback.success();
@@ -1468,13 +1740,45 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       minWidth: 80,
       textAlign: 'right',
     },
+    holePhaseCard: {
+      backgroundColor: colors.surface,
+      padding: 28,
+      borderRadius: 16,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.primary,
+      minWidth: 260,
+    },
+    holePhaseTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 12,
+    },
+    holePhaseLabel: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    holePhaseTime: {
+      fontSize: 42,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    holePhaseRoundRemaining: {
+      fontSize: 22,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
   });
 
   if (showSettings) {
     return (
       <TeeTimeTimerSettings
         activities={activities}
-        onSave={saveActivities}
+        holeTimingMode={holeTimingMode}
+        holeDurations={holeDurations}
+        onSave={saveActivitiesWithHoleSettings}
         onClose={onCloseSettings || (() => { })}
       />
     );
@@ -1584,31 +1888,59 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
             </View>
           )}
 
-
-          <View style={styles.timerSection}>
-            <View style={styles.progressContainer}>
-              <TeeTimeCircularProgress
-                progress={getOverallProgress()}
-                size={200}
-                strokeWidth={12}
-              >
-                <View style={styles.circleContent}>
-                  <Text style={styles.teeTimeLabel}>Tee Time</Text>
-                  <Text style={styles.teeTimeValue}>
-                    {timerState.teeTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                  <Text style={styles.timeUntilTeeTime}>
-                    {formatTimeRemaining()} to go
-                  </Text>
-                  <Text style={styles.progressText}>
-                    {Math.round(getOverallProgress() * 100)}% done
-                  </Text>
-                </View>
-              </TeeTimeCircularProgress>
+          {(inHolePhase || (teeTimeHasPassed && holeCount > 0)) ? (
+            <View style={styles.timerSection}>
+              <View style={styles.holePhaseCard}>
+                <Text style={styles.holePhaseTitle}>
+                  {holeRoundComplete ? '✅ Round complete' : inHolePhase ? `Hole ${timerState.currentHoleIndex + 1} of ${holeCount}` : `Hole 1 of ${holeCount}`}
+                </Text>
+                {!holeRoundComplete && inHolePhase && (
+                  <>
+                    <Text style={styles.holePhaseLabel}>Time remaining</Text>
+                    <Text style={styles.holePhaseTime}>
+                      {(() => {
+                        const secs = getCurrentHoleRemainingSeconds();
+                        const m = Math.floor(secs / 60);
+                        const s = secs % 60;
+                        return `${m}:${s.toString().padStart(2, '0')}`;
+                      })()}
+                    </Text>
+                  </>
+                )}
+                {holeCount > 0 && (
+                  <>
+                    <Text style={[styles.holePhaseLabel, { marginTop: 16 }]}>Time left in round</Text>
+                    <Text style={styles.holePhaseRoundRemaining}>{formatRoundTimeRemaining()}</Text>
+                  </>
+                )}
+              </View>
             </View>
-          </View>
+          ) : (
+            <>
+              <View style={styles.timerSection}>
+                <View style={styles.progressContainer}>
+                  <TeeTimeCircularProgress
+                    progress={getOverallProgress()}
+                    size={200}
+                    strokeWidth={12}
+                  >
+                    <View style={styles.circleContent}>
+                      <Text style={styles.teeTimeLabel}>Tee Time</Text>
+                      <Text style={styles.teeTimeValue}>
+                        {timerState.teeTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text style={styles.timeUntilTeeTime}>
+                        {formatTimeRemaining()} to go
+                      </Text>
+                      <Text style={styles.progressText}>
+                        {Math.round(getOverallProgress() * 100)}% done
+                      </Text>
+                    </View>
+                  </TeeTimeCircularProgress>
+                </View>
+              </View>
 
-          <View style={styles.activitiesContainer}>
+              <View style={styles.activitiesContainer}>
             {activities.map((activity, index) => (
               <ActivityCard
                 key={activity.id}
@@ -1636,7 +1968,9 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
                 </Text>
               </View>
             )}
-          </View>
+              </View>
+            </>
+          )}
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity

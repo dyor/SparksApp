@@ -384,17 +384,22 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const recordingRef = useRef<NodeJS.Timeout | null>(null);
   const preloadedPlayersRef = useRef<Record<string, AudioPlayer>>({});
 
-  // Cleanup on unmount
+  // Cleanup on unmount (native recorder may already be disposed — avoid touching it if so)
   useEffect(() => {
     return () => {
       console.log('🧹 SoundboardSpark: Unmounting, cleaning up resources...');
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (recordingRef.current) clearInterval(recordingRef.current);
 
-      if (recorder.isRecording) {
-        recorder.stop().catch(err =>
-          console.log('ℹ️ SoundboardSpark: No active recording to cleanup on unmount')
-        );
+      try {
+        if (recorder.isRecording) {
+          recorder.stop().catch(() =>
+            console.log('ℹ️ SoundboardSpark: No active recording to cleanup on unmount')
+          );
+        }
+      } catch {
+        // Native shared object may already be disposed (e.g. app backgrounded or unmount)
+        console.log('ℹ️ SoundboardSpark: Recorder already disposed during cleanup');
       }
     };
   }, []);
@@ -431,13 +436,17 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         recordingRef.current = null;
       }
 
-      // Stop and cleanup current recording
-      if (recorder.isRecording) {
-        try {
-          await recorder.stop();
-        } catch (error) {
-          console.warn('Failed to stop existing recording:', error);
+      // Stop and cleanup current recording (recorder native object may be disposed)
+      try {
+        if (recorder.isRecording) {
+          try {
+            await recorder.stop();
+          } catch (error) {
+            console.warn('Failed to stop existing recording:', error);
+          }
         }
+      } catch {
+        // Native shared object already disposed
       }
 
       // Reset all recording state
@@ -523,13 +532,17 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       console.log('Starting beginRecording...');
 
-      // Ensure we're starting from a clean state
-      if (recorder.isRecording) {
-        try {
-          await recorder.stop();
-        } catch (error) {
-          console.warn('Failed to cleanup existing recording:', error);
+      // Ensure we're starting from a clean state (recorder native object may be disposed)
+      try {
+        if (recorder.isRecording) {
+          try {
+            await recorder.stop();
+          } catch (error) {
+            console.warn('Failed to cleanup existing recording:', error);
+          }
         }
+      } catch {
+        // Native shared object already disposed
       }
 
       // Add a delay to ensure cleanup is complete
@@ -596,21 +609,27 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         recordingRef.current = null;
       }
 
-      if (recorder.isRecording) {
-        const actualDuration = recorder.currentTime;
-        console.log(`⏱️ Recording duration: ${actualDuration}s`);
+      try {
+        if (recorder.isRecording) {
+          const actualDuration = recorder.currentTime;
+          console.log(`⏱️ Recording duration: ${actualDuration}s`);
 
-        await recorder.stop();
-        const uri = recorder.uri;
+          await recorder.stop();
+          const uri = recorder.uri;
 
-        setRecordedUri(uri);
-        setRecordedDuration(actualDuration);
-        setTrimStart(0);
-        setTrimEnd(Math.floor(actualDuration * 1000));
-        console.log('✅ Setting recording state to recorded. URI:', uri);
-        setRecordingState('recorded');
-      } else {
-        console.warn('⚠️ No recording object found to stop');
+          setRecordedUri(uri);
+          setRecordedDuration(actualDuration);
+          setTrimStart(0);
+          setTrimEnd(Math.floor(actualDuration * 1000));
+          console.log('✅ Setting recording state to recorded. URI:', uri);
+          setRecordingState('recorded');
+        } else {
+          console.warn('⚠️ No recording object found to stop');
+          setRecordingState('ready');
+        }
+      } catch (nativeErr) {
+        // Native shared object may be disposed (e.g. app was backgrounded)
+        console.warn('Recorder native object unavailable:', nativeErr);
         setRecordingState('ready');
       }
     } catch (error) {
@@ -787,9 +806,9 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     checkFileSystemStatus();
 
     // Pre-warm permissions
-    Audio.getPermissionsAsync().then(({ status, canAskAgain }) => {
+    AudioModule.getPermissionsAsync().then(({ status, canAskAgain }) => {
       if (status !== 'granted' && canAskAgain) {
-        Audio.requestPermissionsAsync();
+        AudioModule.requestPermissionsAsync();
       }
     });
   }, [getSparkData, isHydrated]);
