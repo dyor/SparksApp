@@ -42,9 +42,10 @@ export interface VideoAI {
 
 const VideoSpark: React.FC = () => {
     const { colors } = useTheme();
-    const { getSparkData, setSparkData, isHydrated, videoCapture, setVideoCaptureData } = useSparkStore();
-    const [videos, setVideos] = useState<VideoAI[]>([]);
-    const [dataLoaded, setDataLoaded] = useState(false);
+    const { setSparkData, isHydrated, videoCapture, setVideoCaptureData } = useSparkStore();
+
+    // Reactive access to videos from the store
+    const videos = useSparkStore(state => state.sparkData['video']?.videos || []) as VideoAI[];
 
     // Recorder State
     const [showRecorder, setShowRecorder] = useState(false);
@@ -55,25 +56,7 @@ const VideoSpark: React.FC = () => {
     const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<VideoAI | null>(null);
     const [isImprovingScript, setIsImprovingScript] = useState(false);
     const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
-    const [pendingScreenMetadata, setPendingScreenMetadata] = useState<{ script?: string, countdown: number, duration: number, isOverlayProcess?: boolean } | null>(null);
 
-    // Initial Load
-    useEffect(() => {
-        if (!isHydrated) return;
-        if (dataLoaded) return;
-
-        const data = getSparkData('video');
-        if (data?.videos) {
-            setVideos(data.videos);
-        }
-        setDataLoaded(true);
-    }, [isHydrated, dataLoaded, getSparkData]);
-
-    // Save on Change
-    useEffect(() => {
-        if (!dataLoaded) return;
-        setSparkData('video', { videos });
-    }, [videos, dataLoaded, setSparkData]);
 
     // Handle Screen Recording Auto-Finish & Script Timer
     useEffect(() => {
@@ -168,12 +151,13 @@ const VideoSpark: React.FC = () => {
             timestamp: Date.now(),
         };
 
-        setVideos(prev => [newVideo, ...prev]);
+        setSparkData('video', { videos: [newVideo, ...videos] });
         HapticFeedback.success();
     };
 
     const handleSaveVideo = (updatedVideo: VideoAI) => {
-        setVideos(prev => prev.map(v => v.id === updatedVideo.id ? updatedVideo : v));
+        const updatedVideos = videos.map(v => v.id === updatedVideo.id ? updatedVideo : v);
+        setSparkData('video', { videos: updatedVideos });
         setSelectedVideoForEdit(null);
     };
 
@@ -187,7 +171,8 @@ const VideoSpark: React.FC = () => {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: () => {
-                        setVideos(prev => prev.filter(v => v.id !== id));
+                        const updatedVideos = videos.filter(v => v.id !== id);
+                        setSparkData('video', { videos: updatedVideos });
                         HapticFeedback.success();
                     },
                 },
@@ -431,7 +416,7 @@ const VideoSpark: React.FC = () => {
                 video={selectedVideoForEdit}
                 onClose={() => setSelectedVideoForEdit(null)}
                 onSave={handleSaveVideo}
-                onStartExport={setPendingScreenMetadata}
+                onStartExport={(metadata) => setVideoCaptureData(metadata)}
                 colors={colors}
             />
         </BaseSpark>
