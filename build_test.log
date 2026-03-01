@@ -1,0 +1,217 @@
+Cleaning old builds...
+Installing CocoaPods...
+Using Expo modules
+[Expo] Enabling modular headers for pod ExpoModulesCore
+[Expo] Enabling modular headers for pod React-Core
+[Expo] Enabling modular headers for pod GoogleSignIn
+[Expo] Enabling modular headers for pod React-RCTAppDelegate
+[Expo] Enabling modular headers for pod React-RCTFabric
+[Expo] Enabling modular headers for pod ReactAppDependencyProvider
+[Expo] Enabling modular headers for pod RCT-Folly
+[Expo] Enabling modular headers for pod glog
+[Expo] Enabling modular headers for pod ReactCodegen
+[Expo] Enabling modular headers for pod RCTRequired
+[Expo] Enabling modular headers for pod RCTTypeSafety
+[Expo] Enabling modular headers for pod ReactCommon
+[Expo] Enabling modular headers for pod React-NativeModulesApple
+[Expo] Enabling modular headers for pod Yoga
+[Expo] Enabling modular headers for pod React-Fabric
+[Expo] Enabling modular headers for pod React-graphics
+[Expo] Enabling modular headers for pod React-utils
+[Expo] Enabling modular headers for pod React-featureflags
+[Expo] Enabling modular headers for pod React-debug
+[Expo] Enabling modular headers for pod React-ImageManager
+[Expo] Enabling modular headers for pod React-rendererdebug
+[Expo] Enabling modular headers for pod DoubleConversion
+[Expo] Enabling modular headers for pod React-jsi
+[Expo] Enabling modular headers for pod React-renderercss
+[Expo] Enabling modular headers for pod hermes-engine
+[Expo] Enabling modular headers for pod React-hermes
+[Expo] Enabling modular headers for pod ZXingObjC
+[Expo] Enabling modular headers for pod expo-dev-menu-interface
+[Expo] Enabling modular headers for pod EXManifests
+[Expo] Enabling modular headers for pod EXUpdatesInterface
+[Expo] Enabling modular headers for pod expo-dev-menu
+[Expo] Enabling modular headers for pod React-jsinspector
+[Expo] Enabling modular headers for pod expo-dev-launcher
+[Expo] Enabling modular headers for pod EXImageLoader
+[Expo] Enabling modular headers for pod SDWebImageWebPCoder
+[Expo] Enabling modular headers for pod EASClient
+Found 12 modules for target `Sparks`
+link_native_modules! {ios_packages: [{configurations: [], name: "@react-native-async-storage/async-storage", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-async-storage/async-storage", path: "../node_modules/@react-native-async-storage/async-storage", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-async-storage/async-storage/RNCAsyncStorage.podspec", script_phases: []}, {configurations: [], name: "@react-native-community/datetimepicker", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-community/datetimepicker", path: "../node_modules/@react-native-community/datetimepicker", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-community/datetimepicker/RNDateTimePicker.podspec", script_phases: []}, {configurations: [], name: "@react-native-firebase/app", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/app", path: "../node_modules/@react-native-firebase/app", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/app/RNFBApp.podspec", script_phases: [{"name" => "[RNFB] Core Configuration", "path" => "./ios_config.sh", "execution_position" => "after_compile", "input_files" => ["$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)"]}]}, {configurations: [], name: "@react-native-firebase/remote-config", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/remote-config", path: "../node_modules/@react-native-firebase/remote-config", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/remote-config/RNFBRemoteConfig.podspec", script_phases: []}, {configurations: [], name: "@react-native-google-signin/google-signin", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-google-signin/google-signin", path: "../node_modules/@react-native-google-signin/google-signin", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-google-signin/google-signin/RNGoogleSignin.podspec", script_phases: []}, {configurations: [], name: "expo", root: "/Users/mattdyor/SparksApp/node_modules/expo", path: "../node_modules/expo", podspec_path: "/Users/mattdyor/SparksApp/node_modules/expo/Expo.podspec", script_phases: []}, {configurations: [], name: "react-native-gesture-handler", root: "/Users/mattdyor/SparksApp/node_modules/react-native-gesture-handler", path: "../node_modules/react-native-gesture-handler", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-gesture-handler/RNGestureHandler.podspec", script_phases: []}, {configurations: [], name: "react-native-safe-area-context", root: "/Users/mattdyor/SparksApp/node_modules/react-native-safe-area-context", path: "../node_modules/react-native-safe-area-context", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", script_phases: []}, {configurations: [], name: "react-native-screens", root: "/Users/mattdyor/SparksApp/node_modules/react-native-screens", path: "../node_modules/react-native-screens", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-screens/RNScreens.podspec", script_phases: []}, {configurations: [], name: "react-native-svg", root: "/Users/mattdyor/SparksApp/node_modules/react-native-svg", path: "../node_modules/react-native-svg", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-svg/RNSVG.podspec", script_phases: []}, {configurations: [], name: "react-native-view-shot", root: "/Users/mattdyor/SparksApp/node_modules/react-native-view-shot", path: "../node_modules/react-native-view-shot", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-view-shot/react-native-view-shot.podspec", script_phases: []}, {configurations: [], name: "react-native-webview", root: "/Users/mattdyor/SparksApp/node_modules/react-native-webview", path: "../node_modules/react-native-webview", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-webview/react-native-webview.podspec", script_phases: []}], ios_project_root_path: "/Users/mattdyor/SparksApp/ios", react_native_path: "../node_modules/react-native"}
+Adding a custom script phase for Pod RNFBApp: [RNFB] Core Configuration
+Auto-linking React Native modules for target `Sparks`: RNCAsyncStorage, RNDateTimePicker, RNFBApp, RNFBRemoteConfig, RNGestureHandler, RNGoogleSignin, RNSVG, RNScreens, react-native-safe-area-context, react-native-view-shot, and react-native-webview
+Framework build type is static framework
+Configuring the target with the New Architecture
+[36m[1m[Codegen][0m Analyzing /Users/mattdyor/SparksApp/package.json[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+[36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the project dependencies.[0m
+[36m[1m[Codegen][0m Found @react-native-async-storage/async-storage[0m
+[36m[1m[Codegen][0m Found @react-native-community/datetimepicker[0m
+[36m[1m[Codegen][0m Found @react-native-google-signin/google-signin[0m
+[36m[1m[Codegen][0m Found expo-media-library[0m
+[36m[1m[Codegen][0m Found react-native[0m
+[36m[1m[Codegen][0m Found react-native-gesture-handler[0m
+[36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+[36m[1m[Codegen][0m Found react-native-screens[0m
+[36m[1m[Codegen][0m Found react-native-svg[0m
+[36m[1m[Codegen][0m Found react-native-view-shot[0m
+[36m[1m[Codegen][0m Found react-native-webview[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+[36m[1m[Codegen][0m Processing rnasyncstorage[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnasyncstorage[0m
+[36m[1m[Codegen][0m Processing RNDateTimePickerCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, visionos for RNDateTimePickerCGen[0m
+[36m[1m[Codegen][0m Processing RNGoogleSignInCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for RNGoogleSignInCGen[0m
+[36m[1m[Codegen][0m Processing expo-media-library[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing FBReactNativeSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rncore[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m Processing safeareacontext[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+[36m[1m[Codegen][0m Processing rnscreens[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, tvos, visionos for rnscreens[0m
+[36m[1m[Codegen][0m Processing rnsvg[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+[36m[1m[Codegen][0m Processing rnviewshot[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for rnviewshot[0m
+[36m[1m[Codegen][0m Processing RNCWebViewSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, visionos for RNCWebViewSpec[0m
+[36m[1m[Codegen][0m Generating Native Code for rnasyncstorage - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNDateTimePickerCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNGoogleSignInCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for expo-media-library - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m [33m[Codegen - FBReactNativeSpec] Skipping iOS code generation for FBReactNativeSpec as it has been generated already.[0m
+[36m[1m[Codegen][0m [33m[Codegen - rncore] Skipping iOS code generation for rncore as it has been generated already.[0m
+[36m[1m[Codegen][0m Generating Native Code for rngesturehandler_codegen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnscreens - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnviewshot - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNCWebViewSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Crawling @react-native-community/datetimepicker library for components[0m
+[36m[1m[Codegen][0m Match found RNDateTimePicker -> RNDateTimePickerComponentView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] @react-native-community/datetimepicker should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Crawling react-native-webview library for components[0m
+[36m[1m[Codegen][0m Match found RNCWebView -> RNCWebView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] react-native-webview should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTModuleProviders.h[0m
+[36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTAppDependencyProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTAppDependencyProvider.mm[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/mattdyor/SparksApp/ios/build/generated/ios/ReactAppDependencyProvider.podspec[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/mattdyor/SparksApp/ios/build/generated/ios/ReactCodegen.podspec[0m
+[36m[1m[Codegen][0m [33mDone.[0m
+No modules to process in combine-js-to-schema-cli. If this is unexpected, please check if you set up your NativeComponent correctly. See combine-js-to-schema.js for how codegen finds modules.
+Analyzing dependencies
+Downloading dependencies
+Generating Pods project
+Setting USE_HERMES build settings
+Setting REACT_NATIVE_PATH build settings
+Setting SWIFT_ACTIVE_COMPILATION_CONDITIONS build settings
+[Ccache]: Removing Ccache from CC, LD, CXX & LDPLUSPLUS build settings
+[SPM] Cleaning old SPM dependencies from Pods project
+[SPM] Adding SPM dependencies to Pods project
+[Privacy Manifest Aggregation] Appending aggregated reasons to existing PrivacyInfo.xcprivacy file.
+[Privacy Manifest Aggregation] Reading .xcprivacy files to aggregate all used Required Reason APIs.
+Setting CLANG_CXX_LANGUAGE_STANDARD to c++20 on /Users/mattdyor/SparksApp/ios/Sparks.xcodeproj
+
+==================== DEPRECATION NOTICE =====================
+Calling `pod install` directly is deprecated in React Native
+because we are moving away from Cocoapods toward alternative
+solutions to build the project.
+* If you are using Expo, please run:
+`npx expo run:ios`
+* If you are using the Community CLI, please run:
+`yarn ios`
+=============================================================
+
+Pod install took 36 [s] to run
+Integrating client project
+Pod installation complete! There are 127 dependencies from the Podfile and 145 total pods installed.
+
+[!] Can't merge pod_target_xcconfig for pod targets: ["expo-dev-menu", "Main", "ReactNativeCompatibles", "SafeAreaView", "Vendored"]. Singular build setting DEFINES_MODULE has different values.
+
+[!] Can't merge pod_target_xcconfig for pod targets: ["expo-dev-menu", "Main", "ReactNativeCompatibles", "SafeAreaView", "Vendored"]. Singular build setting DEFINES_MODULE has different values.
+Deploying to Matt's iPhone (2) in Release mode...
+env: load .env
+env: export EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID EXPO_PUBLIC_GEMINI_API_KEY EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+- Installing CocoaPods...
+✔ Installed CocoaPods
+› Skipping dev server
+Unexpected devicectl JSON version output from devicectl. Connecting to physical Apple devices may not work as expected.
+› Using --device 00008120-0001093E1490C01E
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS ./index.ts ▓▓▓▓░░░░░░░░░░░░ 28.2% (295/556)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.2% (782/979)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.2% ( 818/1033)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.5% (1230/1387)
+iOS Bundling failed 15974ms index.ts (1724 modules)
+Unable to resolve module react-native-record-screen from /Users/mattdyor/SparksApp/src/services/ScreenRecorderService.ts: react-native-record-screen could not be found within the project or in these directories:
+  node_modules
+[0m [90m 1 |[39m [36mimport[39m { [33mAlert[39m[33m,[39m [33mPlatform[39m } [36mfrom[39m [32m'react-native'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33mRecordScreen[39m [36mfrom[39m [32m'react-native-record-screen'[39m[33m;[39m
+ [90m   |[39m                           [31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { [33mHapticFeedback[39m } [36mfrom[39m [32m'../utils/haptics'[39m[33m;[39m
+ [90m 4 |[39m
+ [90m 5 |[39m [90m// REAL INTEGRATION:[39m[0m
+Error: Unable to resolve module react-native-record-screen from /Users/mattdyor/SparksApp/src/services/ScreenRecorderService.ts: react-native-record-screen could not be found within the project or in these directories:
+  node_modules
+[0m [90m 1 |[39m [36mimport[39m { [33mAlert[39m[33m,[39m [33mPlatform[39m } [36mfrom[39m [32m'react-native'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33mRecordScreen[39m [36mfrom[39m [32m'react-native-record-screen'[39m[33m;[39m
+ [90m   |[39m                           [31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { [33mHapticFeedback[39m } [36mfrom[39m [32m'../utils/haptics'[39m[33m;[39m
+ [90m 4 |[39m
+ [90m 5 |[39m [90m// REAL INTEGRATION:[39m[0m
+Error: Unable to resolve module react-native-record-screen from /Users/mattdyor/SparksApp/src/services/ScreenRecorderService.ts: react-native-record-screen could not be found within the project or in these directories:
+  node_modules
+[0m [90m 1 |[39m [36mimport[39m { [33mAlert[39m[33m,[39m [33mPlatform[39m } [36mfrom[39m [32m'react-native'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33mRecordScreen[39m [36mfrom[39m [32m'react-native-record-screen'[39m[33m;[39m
+ [90m   |[39m                           [31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { [33mHapticFeedback[39m } [36mfrom[39m [32m'../utils/haptics'[39m[33m;[39m
+ [90m 4 |[39m
+ [90m 5 |[39m [90m// REAL INTEGRATION:[39m[0m
+    at ModuleResolver.resolveDependency (/Users/mattdyor/SparksApp/node_modules/metro/src/node-haste/DependencyGraph/ModuleResolution.js:150:15)
+    at DependencyGraph.resolveDependency (/Users/mattdyor/SparksApp/node_modules/metro/src/node-haste/DependencyGraph.js:239:43)
+    at /Users/mattdyor/SparksApp/node_modules/metro/src/lib/transformHelpers.js:161:21
+    at resolveDependencies (/Users/mattdyor/SparksApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:43:25)
+    at visit (/Users/mattdyor/SparksApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:81:30)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 4)
+    at visit (/Users/mattdyor/SparksApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:90:5)
+    at async Promise.all (index 17)
+    at visit (/Users/mattdyor/SparksApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:90:5)

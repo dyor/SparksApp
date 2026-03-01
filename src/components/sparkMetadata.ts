@@ -370,6 +370,16 @@ export const sparkMetadata: Record<string, SparkMetadata> = {
         rating: 4.2,
         properties: ["Beta"],
     },
+    "video": {
+        id: "video",
+        title: "Video",
+        description: "Record and edit videos for social media shorts.",
+        icon: "🎬✨",
+        category: "media",
+        createdAt: "2026-02-28T00:00:00.000Z",
+        rating: 0.0,
+        properties: ["AI", "Beta"],
+    },
 };
 
 export const getSparkMetadataById = (id: string) => {

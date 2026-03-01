@@ -15,6 +15,11 @@ import { ServiceFactory } from "./src/services/ServiceFactory";
 import AuthService from "./src/services/AuthService";
 import { RemoteConfigService } from "./src/services/RemoteConfigService";
 import { navigationRef } from "./src/navigation/navigationRef";
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import { ScreenRecordingHUD } from "./src/components/ScreenRecordingHUD";
+import { ScreenRecorder } from "./src/services/ScreenRecorderService";
+import { HapticFeedback } from "./src/utils/haptics";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -273,9 +278,57 @@ function AppContent() {
     }
   }, []);
 
+  // Global Screen Recording Listener
+  useEffect(() => {
+    const handleGlobalRecordingStatus = async (status: any, rawUri?: string | null) => {
+      if (status === 'idle' && rawUri) {
+        console.log('🎬 Recording finished, raw path:', rawUri);
+
+        try {
+          // 1. Ensure MediaLibrary permissions
+          const { status: libStatus } = await MediaLibrary.requestPermissionsAsync();
+          if (libStatus !== 'granted') {
+            console.warn('⚠️ Media Library permission denied, keeping temporary URI.');
+          }
+
+          // 2. Persist to App Documents (so links don't break when cache clears)
+          const filename = `SparkVideo_${Date.now()}.mp4`;
+          const persistentUri = FileSystem.documentDirectory + filename;
+          await FileSystem.copyAsync({ from: rawUri, to: persistentUri });
+          console.log('✅ Video persisted to:', persistentUri);
+
+          // 3. Finalize entry in spark store
+          const { getSparkData, setSparkData, videoCapture } = useSparkStore.getState();
+          const currentData = getSparkData('video');
+          const videos = currentData?.videos || [];
+
+          const newVideo = {
+            id: Date.now().toString(),
+            uri: persistentUri,
+            source: videoCapture.isOverlayProcess ? 'overlay' : 'screen',
+            script: videoCapture.script,
+            status: 'editing',
+            countdownSeconds: videoCapture.countdownSeconds,
+            durationSeconds: videoCapture.durationSeconds,
+            timestamp: Date.now(),
+          };
+
+          setSparkData('video', { videos: [newVideo, ...videos] });
+          HapticFeedback.success();
+        } catch (e) {
+          console.error('❌ Failed to persist video:', e);
+        }
+      }
+    };
+
+    ScreenRecorder.addListener(handleGlobalRecordingStatus);
+    return () => ScreenRecorder.removeListener(handleGlobalRecordingStatus);
+  }, []);
+
   return (
     <>
       <AppNavigator />
+      <ScreenRecordingHUD />
       <SystemBars style={preferences.theme === "dark" ? "light" : "dark"} />
     </>
   );

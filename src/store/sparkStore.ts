@@ -45,6 +45,16 @@ interface SparkState {
   // Hydration
   isHydrated: boolean;
   setHydrated: (hydrated: boolean) => void;
+
+  // Video Recording Persistence (Volatile)
+  videoCapture: {
+    script?: string;
+    countdownSeconds: number;
+    durationSeconds: number;
+    source: 'screen' | 'front_camera' | 'rear_camera';
+    isOverlayProcess?: boolean;
+  };
+  setVideoCaptureData: (data: Partial<SparkState['videoCapture']>) => void;
 }
 
 export const useSparkStore = create<SparkState>()(
@@ -56,6 +66,12 @@ export const useSparkStore = create<SparkState>()(
       userSparkIds: [], // No default sparks - user starts with empty collection
       favoriteSparkIds: [],
       isHydrated: false,
+      videoCapture: {
+        script: '',
+        countdownSeconds: 5,
+        durationSeconds: 60,
+        source: 'screen'
+      },
 
       // Actions
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
@@ -162,6 +178,10 @@ export const useSparkStore = create<SparkState>()(
         })),
 
       isFavorite: (sparkId) => get().favoriteSparkIds.includes(sparkId),
+
+      setVideoCaptureData: (data) => set((state) => ({
+        videoCapture: { ...state.videoCapture, ...data }
+      })),
     }),
     {
       name: 'sparks-data-storage',

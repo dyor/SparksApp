@@ -43,6 +43,7 @@ import { IdeasSpark } from "../sparks/IdeasSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import { InfiniteSpark } from "../sparks/InfiniteSpark";
 import RecordSwingSpark from "../sparks/RecordSwingSpark";
+import VideoSpark from "../sparks/VideoSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -228,6 +229,10 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   "record-swing": {
     metadata: sparkMetadata["record-swing"],
     component: RecordSwingSpark,
+  },
+  video: {
+    metadata: sparkMetadata.video,
+    component: VideoSpark,
   },
 };
 

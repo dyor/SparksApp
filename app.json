@@ -49,7 +49,8 @@
       "expo-speech-recognition",
       "expo-apple-authentication",
       "@react-native-community/datetimepicker",
-      "expo-video"
+      "expo-video",
+      "react-native-nitro-screen-recorder"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [

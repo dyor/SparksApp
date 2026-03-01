@@ -1,0 +1,606 @@
+Cleaning old builds...
+Installing CocoaPods...
+Using Expo modules
+[Expo] Enabling modular headers for pod ExpoModulesCore
+[Expo] Enabling modular headers for pod React-Core
+[Expo] Enabling modular headers for pod GoogleSignIn
+[Expo] Enabling modular headers for pod React-RCTAppDelegate
+[Expo] Enabling modular headers for pod React-RCTFabric
+[Expo] Enabling modular headers for pod ReactAppDependencyProvider
+[Expo] Enabling modular headers for pod RCT-Folly
+[Expo] Enabling modular headers for pod glog
+[Expo] Enabling modular headers for pod ReactCodegen
+[Expo] Enabling modular headers for pod RCTRequired
+[Expo] Enabling modular headers for pod RCTTypeSafety
+[Expo] Enabling modular headers for pod ReactCommon
+[Expo] Enabling modular headers for pod React-NativeModulesApple
+[Expo] Enabling modular headers for pod Yoga
+[Expo] Enabling modular headers for pod React-Fabric
+[Expo] Enabling modular headers for pod React-graphics
+[Expo] Enabling modular headers for pod React-utils
+[Expo] Enabling modular headers for pod React-featureflags
+[Expo] Enabling modular headers for pod React-debug
+[Expo] Enabling modular headers for pod React-ImageManager
+[Expo] Enabling modular headers for pod React-rendererdebug
+[Expo] Enabling modular headers for pod DoubleConversion
+[Expo] Enabling modular headers for pod React-jsi
+[Expo] Enabling modular headers for pod React-renderercss
+[Expo] Enabling modular headers for pod hermes-engine
+[Expo] Enabling modular headers for pod React-hermes
+[Expo] Enabling modular headers for pod ZXingObjC
+[Expo] Enabling modular headers for pod expo-dev-menu-interface
+[Expo] Enabling modular headers for pod EXManifests
+[Expo] Enabling modular headers for pod EXUpdatesInterface
+[Expo] Enabling modular headers for pod expo-dev-menu
+[Expo] Enabling modular headers for pod React-jsinspector
+[Expo] Enabling modular headers for pod expo-dev-launcher
+[Expo] Enabling modular headers for pod EXImageLoader
+[Expo] Enabling modular headers for pod SDWebImageWebPCoder
+[Expo] Enabling modular headers for pod EASClient
+[NitroModules] 🔥 Your app is boosted by nitro modules!
+[NitroModules] Found react-native 0.79.6 (79) in /Users/mattdyor/SparksApp/node_modules/react-native!
+[NitroModules] 🔥 NitroScreenRecorder is boosted by nitro!
+Found 14 modules for target `Sparks`
+link_native_modules! {ios_packages: [{configurations: [], name: "@react-native-async-storage/async-storage", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-async-storage/async-storage", path: "../node_modules/@react-native-async-storage/async-storage", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-async-storage/async-storage/RNCAsyncStorage.podspec", script_phases: []}, {configurations: [], name: "@react-native-community/datetimepicker", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-community/datetimepicker", path: "../node_modules/@react-native-community/datetimepicker", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-community/datetimepicker/RNDateTimePicker.podspec", script_phases: []}, {configurations: [], name: "@react-native-firebase/app", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/app", path: "../node_modules/@react-native-firebase/app", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/app/RNFBApp.podspec", script_phases: [{"name" => "[RNFB] Core Configuration", "path" => "./ios_config.sh", "execution_position" => "after_compile", "input_files" => ["$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)"]}]}, {configurations: [], name: "@react-native-firebase/remote-config", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/remote-config", path: "../node_modules/@react-native-firebase/remote-config", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-firebase/remote-config/RNFBRemoteConfig.podspec", script_phases: []}, {configurations: [], name: "@react-native-google-signin/google-signin", root: "/Users/mattdyor/SparksApp/node_modules/@react-native-google-signin/google-signin", path: "../node_modules/@react-native-google-signin/google-signin", podspec_path: "/Users/mattdyor/SparksApp/node_modules/@react-native-google-signin/google-signin/RNGoogleSignin.podspec", script_phases: []}, {configurations: [], name: "expo", root: "/Users/mattdyor/SparksApp/node_modules/expo", path: "../node_modules/expo", podspec_path: "/Users/mattdyor/SparksApp/node_modules/expo/Expo.podspec", script_phases: []}, {configurations: [], name: "react-native-gesture-handler", root: "/Users/mattdyor/SparksApp/node_modules/react-native-gesture-handler", path: "../node_modules/react-native-gesture-handler", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-gesture-handler/RNGestureHandler.podspec", script_phases: []}, {configurations: [], name: "react-native-nitro-modules", root: "/Users/mattdyor/SparksApp/node_modules/react-native-nitro-modules", path: "../node_modules/react-native-nitro-modules", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-nitro-modules/NitroModules.podspec", script_phases: []}, {configurations: [], name: "react-native-nitro-screen-recorder", root: "/Users/mattdyor/SparksApp/node_modules/react-native-nitro-screen-recorder", path: "../node_modules/react-native-nitro-screen-recorder", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-nitro-screen-recorder/NitroScreenRecorder.podspec", script_phases: []}, {configurations: [], name: "react-native-safe-area-context", root: "/Users/mattdyor/SparksApp/node_modules/react-native-safe-area-context", path: "../node_modules/react-native-safe-area-context", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", script_phases: []}, {configurations: [], name: "react-native-screens", root: "/Users/mattdyor/SparksApp/node_modules/react-native-screens", path: "../node_modules/react-native-screens", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-screens/RNScreens.podspec", script_phases: []}, {configurations: [], name: "react-native-svg", root: "/Users/mattdyor/SparksApp/node_modules/react-native-svg", path: "../node_modules/react-native-svg", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-svg/RNSVG.podspec", script_phases: []}, {configurations: [], name: "react-native-view-shot", root: "/Users/mattdyor/SparksApp/node_modules/react-native-view-shot", path: "../node_modules/react-native-view-shot", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-view-shot/react-native-view-shot.podspec", script_phases: []}, {configurations: [], name: "react-native-webview", root: "/Users/mattdyor/SparksApp/node_modules/react-native-webview", path: "../node_modules/react-native-webview", podspec_path: "/Users/mattdyor/SparksApp/node_modules/react-native-webview/react-native-webview.podspec", script_phases: []}], ios_project_root_path: "/Users/mattdyor/SparksApp/ios", react_native_path: "../node_modules/react-native"}
+Adding a custom script phase for Pod RNFBApp: [RNFB] Core Configuration
+[NitroModules] 🔥 Your app is boosted by nitro modules!
+[NitroModules] Found react-native 0.79.6 (79) in /Users/mattdyor/SparksApp/node_modules/react-native!
+[NitroModules] 🔥 NitroScreenRecorder is boosted by nitro!
+Auto-linking React Native modules for target `Sparks`: NitroModules, NitroScreenRecorder, RNCAsyncStorage, RNDateTimePicker, RNFBApp, RNFBRemoteConfig, RNGestureHandler, RNGoogleSignin, RNSVG, RNScreens, react-native-safe-area-context, react-native-view-shot, and react-native-webview
+Framework build type is static framework
+Configuring the target with the New Architecture
+[36m[1m[Codegen][0m Analyzing /Users/mattdyor/SparksApp/package.json[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+[36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the project dependencies.[0m
+[36m[1m[Codegen][0m Found @react-native-async-storage/async-storage[0m
+[36m[1m[Codegen][0m Found @react-native-community/datetimepicker[0m
+[36m[1m[Codegen][0m Found @react-native-google-signin/google-signin[0m
+[36m[1m[Codegen][0m Found expo-media-library[0m
+[36m[1m[Codegen][0m Found react-native[0m
+[36m[1m[Codegen][0m Found react-native-gesture-handler[0m
+[36m[1m[Codegen][0m Found react-native-nitro-modules[0m
+[36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+[36m[1m[Codegen][0m Found react-native-screens[0m
+[36m[1m[Codegen][0m Found react-native-svg[0m
+[36m[1m[Codegen][0m Found react-native-view-shot[0m
+[36m[1m[Codegen][0m Found react-native-webview[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+[36m[1m[Codegen][0m Processing rnasyncstorage[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnasyncstorage[0m
+[36m[1m[Codegen][0m Processing RNDateTimePickerCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, visionos for RNDateTimePickerCGen[0m
+[36m[1m[Codegen][0m Processing RNGoogleSignInCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for RNGoogleSignInCGen[0m
+[36m[1m[Codegen][0m Processing expo-media-library[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing FBReactNativeSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rncore[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m Processing NitroModulesSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing safeareacontext[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+[36m[1m[Codegen][0m Processing rnscreens[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, tvos, visionos for rnscreens[0m
+[36m[1m[Codegen][0m Processing rnsvg[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+[36m[1m[Codegen][0m Processing rnviewshot[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for rnviewshot[0m
+[36m[1m[Codegen][0m Processing RNCWebViewSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, visionos for RNCWebViewSpec[0m
+[36m[1m[Codegen][0m Generating Native Code for rnasyncstorage - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNDateTimePickerCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNGoogleSignInCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for expo-media-library - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m [33m[Codegen - FBReactNativeSpec] Skipping iOS code generation for FBReactNativeSpec as it has been generated already.[0m
+[36m[1m[Codegen][0m [33m[Codegen - rncore] Skipping iOS code generation for rncore as it has been generated already.[0m
+[36m[1m[Codegen][0m Generating Native Code for rngesturehandler_codegen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for NitroModulesSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnscreens - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnviewshot - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNCWebViewSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/mattdyor/SparksApp/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Crawling @react-native-community/datetimepicker library for components[0m
+[36m[1m[Codegen][0m Match found RNDateTimePicker -> RNDateTimePickerComponentView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] @react-native-community/datetimepicker should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Crawling react-native-webview library for components[0m
+[36m[1m[Codegen][0m Match found RNCWebView -> RNCWebView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] react-native-webview should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTModuleProviders.h[0m
+[36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTAppDependencyProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/mattdyor/SparksApp/ios/build/generated/ios/RCTAppDependencyProvider.mm[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/mattdyor/SparksApp/ios/build/generated/ios/ReactAppDependencyProvider.podspec[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/mattdyor/SparksApp/ios/build/generated/ios/ReactCodegen.podspec[0m
+[36m[1m[Codegen][0m [33mDone.[0m
+No modules to process in combine-js-to-schema-cli. If this is unexpected, please check if you set up your NativeComponent correctly. See combine-js-to-schema.js for how codegen finds modules.
+Analyzing dependencies
+[NitroModules] 🔥 Your app is boosted by nitro modules!
+[NitroModules] Found react-native 0.79.6 (79) in /Users/mattdyor/SparksApp/node_modules/react-native!
+[NitroModules] 🔥 NitroScreenRecorder is boosted by nitro!
+Downloading dependencies
+Generating Pods project
+Setting USE_HERMES build settings
+Setting REACT_NATIVE_PATH build settings
+Setting SWIFT_ACTIVE_COMPILATION_CONDITIONS build settings
+[Ccache]: Removing Ccache from CC, LD, CXX & LDPLUSPLUS build settings
+[SPM] Cleaning old SPM dependencies from Pods project
+[SPM] Adding SPM dependencies to Pods project
+[Privacy Manifest Aggregation] Appending aggregated reasons to existing PrivacyInfo.xcprivacy file.
+[Privacy Manifest Aggregation] Reading .xcprivacy files to aggregate all used Required Reason APIs.
+Setting CLANG_CXX_LANGUAGE_STANDARD to c++20 on /Users/mattdyor/SparksApp/ios/Sparks.xcodeproj
+
+==================== DEPRECATION NOTICE =====================
+Calling `pod install` directly is deprecated in React Native
+because we are moving away from Cocoapods toward alternative
+solutions to build the project.
+* If you are using Expo, please run:
+`npx expo run:ios`
+* If you are using the Community CLI, please run:
+`yarn ios`
+=============================================================
+
+Pod install took 13 [s] to run
+Integrating client project
+Pod installation complete! There are 129 dependencies from the Podfile and 147 total pods installed.
+
+[!] Can't merge pod_target_xcconfig for pod targets: ["expo-dev-menu", "Main", "ReactNativeCompatibles", "SafeAreaView", "Vendored"]. Singular build setting DEFINES_MODULE has different values.
+
+[!] Can't merge pod_target_xcconfig for pod targets: ["expo-dev-menu", "Main", "ReactNativeCompatibles", "SafeAreaView", "Vendored"]. Singular build setting DEFINES_MODULE has different values.
+Deploying to Matt's iPhone (2) in Release mode...
+env: load .env
+env: export EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID EXPO_PUBLIC_GEMINI_API_KEY EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+› Skipping dev server
+Unexpected devicectl JSON version output from devicectl. Connecting to physical Apple devices may not work as expected.
+› Using --device 00008120-0001093E1490C01E
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS ./index.ts ▓▓▓▓▓▓░░░░░░░░░░ 40.7% (477/748)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓░░░░░░░ 62.1% ( 785/1024)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.8% (1702/1730)
+iOS Bundled 10931ms index.ts (1744 modules)
+Writing bundle output to: /var/folders/v2/lnb8x7lx1bs5ztnzhxwr4nyc0000gn/T/5ukak731l4r/main.jsbundle
+Copying 38 asset files
+Done writing bundle output
+› Auto signing app using team(s): 56Q4PHKXUA
+› Planning build
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'Yoga' from project 'Pods')
+› Executing react-native Pods/Yoga » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-debug' from project 'Pods')
+› Executing react-native Pods/React-debug » Create Symlinks to Header Folders
+    Run script build phase '[CP-User] [Hermes] Replace Hermes for the right configuration, if needed' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'hermes-engine' from project 'Pods')
+› Executing react-native Pods/hermes-engine » [CP-User] [Hermes] Replace Hermes for the right configuration, if needed
+› Preparing react-native Pods/DoubleConversion » DoubleConversion-Info.plist
+› Executing react-native Pods/fmt » Create Symlinks to Header Folders
+› Preparing Pods/RCT-Folly-RCT-Folly_privacy » ResourceBundle-RCT-Folly_privacy-RCT-Folly-Info.plist
+› Preparing Pods/boost-boost_privacy » ResourceBundle-boost_privacy-boost-Info.plist
+› Preparing react-native Pods/fmt » fmt-Info.plist
+› Preparing Pods/glog-glog_privacy » ResourceBundle-glog_privacy-glog-Info.plist
+› Preparing react-native Pods/glog » glog-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'RCT-Folly' from project 'Pods')
+› Executing react-native Pods/RCT-Folly » Create Symlinks to Header Folders
+› Preparing react-native Pods/RCT-Folly » RCT-Folly-Info.plist
+› Preparing react-native Pods/React-debug » React-debug-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-rendererdebug' from project 'Pods')
+› Executing react-native Pods/React-rendererdebug » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-featureflags' from project 'Pods')
+› Executing react-native Pods/React-featureflags » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-oscompat » React-oscompat-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-jsinspectortracing' from project 'Pods')
+› Executing react-native Pods/React-jsinspectortracing » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-jsi » React-jsi-Info.plist
+› Preparing react-native Pods/React-perflogger » React-perflogger-Info.plist
+› Preparing react-native Pods/React-jsinspectortracing » React-jsinspectortracing-Info.plist
+› Preparing react-native Pods/React-featureflags » React-featureflags-Info.plist
+› Preparing react-native Pods/React-jsinspector » React-jsinspector-Info.plist
+› Preparing Pods/React-cxxreact-React-cxxreact_privacy » ResourceBundle-React-cxxreact_privacy-React-cxxreact-Info.plist
+› Preparing react-native Pods/React-logger » React-logger-Info.plist
+› Preparing react-native Pods/React-cxxreact » React-cxxreact-Info.plist
+› Preparing react-native Pods/React-jsiexecutor » React-jsiexecutor-Info.plist
+› Preparing react-native Pods/React-hermes » React-hermes-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-utils' from project 'Pods')
+› Executing react-native Pods/React-utils » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-utils » React-utils-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-renderercss' from project 'Pods')
+› Executing react-native Pods/React-renderercss » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'ReactCommon' from project 'Pods')
+› Executing react-native Pods/ReactCommon » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-jsitooling' from project 'Pods')
+› Executing react-native Pods/React-jsitooling » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-performancetimeline' from project 'Pods')
+› Executing react-native Pods/React-performancetimeline » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-performancetimeline » React-performancetimeline-Info.plist
+› Executing react-native Pods/React-rendererconsistency » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-rendererconsistency » React-rendererconsistency-Info.plist
+› Preparing react-native Pods/React-rendererdebug » React-rendererdebug-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-runtimescheduler' from project 'Pods')
+› Executing react-native Pods/React-runtimescheduler » Create Symlinks to Header Folders
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-graphics' from project 'Pods')
+› Executing react-native Pods/React-graphics » Create Symlinks to Header Folders
+› Preparing Pods/React-Core-React-Core_privacy » ResourceBundle-React-Core_privacy-React-Core-Info.plist
+› Preparing react-native Pods/RCTDeprecation » RCTDeprecation-Info.plist
+› Preparing react-native Pods/SocketRocket » SocketRocket-Info.plist
+› Preparing react-native Pods/Yoga » Yoga-Info.plist
+› Preparing react-native Pods/React-jsitooling » React-jsitooling-Info.plist
+› Preparing react-native Pods/React-runtimescheduler » React-runtimescheduler-Info.plist
+› Preparing react-native Pods/React-Core » React-Core-Info.plist
+› Preparing react-native Pods/ReactCommon » ReactCommon-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-NativeModulesApple' from project 'Pods')
+› Executing react-native Pods/React-NativeModulesApple » Create Symlinks to Header Folders
+› Preparing react-native Pods/RCTTypeSafety » RCTTypeSafety-Info.plist
+› Preparing react-native Pods/React-graphics » React-graphics-Info.plist
+› Preparing react-native Pods/React-renderercss » React-renderercss-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-Fabric' from project 'Pods')
+› Executing react-native Pods/React-Fabric » [CP-User] [RN]Check rncore
+› Executing react-native Pods/React-Fabric » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-Fabric » React-Fabric-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-ImageManager' from project 'Pods')
+› Executing react-native Pods/React-ImageManager » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-NativeModulesApple » React-NativeModulesApple-Info.plist
+› Executing react-native Pods/React-RCTFBReactNativeSpec » [CP-User] [RN]Check FBReactNativeSpec
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-FabricComponents' from project 'Pods')
+› Executing react-native Pods/React-FabricComponents » [CP-User] [RN]Check rncore
+› Executing react-native Pods/React-FabricComponents » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-ImageManager » React-ImageManager-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-FabricImage' from project 'Pods')
+› Executing react-native Pods/React-FabricImage » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-FabricImage » React-FabricImage-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-jserrorhandler' from project 'Pods')
+› Executing react-native Pods/React-jserrorhandler » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RCTFBReactNativeSpec » React-RCTFBReactNativeSpec-Info.plist
+› Preparing react-native Pods/React-RCTNetwork » React-RCTNetwork-Info.plist
+› Preparing react-native Pods/React-jserrorhandler » React-jserrorhandler-Info.plist
+› Preparing react-native Pods/React-RCTImage » React-RCTImage-Info.plist
+› Executing react-native Pods/React-RuntimeCore » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RCTBlob » React-RCTBlob-Info.plist
+› Preparing react-native Pods/React-CoreModules » React-CoreModules-Info.plist
+› Preparing react-native Pods/React-RuntimeCore » React-RuntimeCore-Info.plist
+› Preparing react-native Pods/React-FabricComponents » React-FabricComponents-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-domnativemodule' from project 'Pods')
+› Executing react-native Pods/React-domnativemodule » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-domnativemodule » React-domnativemodule-Info.plist
+› Executing react-native Pods/React-featureflagsnativemodule » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-featureflagsnativemodule » React-featureflagsnativemodule-Info.plist
+› Executing react-native Pods/React-idlecallbacksnativemodule » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-idlecallbacksnativemodule » React-idlecallbacksnativemodule-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-microtasksnativemodule' from project 'Pods')
+› Executing react-native Pods/React-microtasksnativemodule » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-microtasksnativemodule » React-microtasksnativemodule-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-defaultsnativemodule' from project 'Pods')
+› Executing react-native Pods/React-defaultsnativemodule » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-defaultsnativemodule » React-defaultsnativemodule-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-Mapbuffer' from project 'Pods')
+› Executing react-native Pods/React-Mapbuffer » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RCTText » React-RCTText-Info.plist
+› Preparing react-native Pods/React-RCTAnimation » React-RCTAnimation-Info.plist
+› Preparing react-native Pods/React-Mapbuffer » React-Mapbuffer-Info.plist
+› Executing react-native Pods/React-RuntimeHermes » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RCTFabric » React-RCTFabric-Info.plist
+› Preparing react-native Pods/React-RuntimeHermes » React-RuntimeHermes-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-RuntimeApple' from project 'Pods')
+› Executing react-native Pods/React-RuntimeApple » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RuntimeApple » React-RuntimeApple-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-RCTRuntime' from project 'Pods')
+› Executing react-native Pods/React-RCTRuntime » Create Symlinks to Header Folders
+› Preparing react-native Pods/React-RCTRuntime » React-RCTRuntime-Info.plist
+› Preparing react-native Pods/React-RCTAppDelegate » React-RCTAppDelegate-Info.plist
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'ReactCodegen' from project 'Pods')
+› Compiling sparksapp Pods/ReactCodegen » NitroModulesSpec-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » RNCWebViewSpec-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » RCTThirdPartyComponentsProvider.mm
+› Compiling sparksapp Pods/ReactCodegen » RCTModulesConformingToProtocolsProvider.mm
+› Compiling sparksapp Pods/ReactCodegen » RCTModuleProviders.mm
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » safeareacontextJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » safeareacontext-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » rnviewshotJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » rnviewshot-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » rnsvgJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » rnsvg-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » rnscreensJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » rnscreens-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » rngesturehandler_codegenJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » rngesturehandler_codegen-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » rnasyncstorageJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » rnasyncstorage-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » expo-media-libraryJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » expo-media-library-generated.mm
+
+⚠️  (ios/build/generated/ios/expo-media-library/expo-media-library.h:19:13)
+
+  17 | 
+  18 | // Avoid multiple includes of expo-media-library symbols
+> 19 | #ifndef expo-media-library_H
+     |             ^ extra tokens at end of #ifndef directive [-Wextra-tokens]
+  20 | #define expo-media-library_H
+  21 | 
+  22 | #import <Foundation/Foundation.h>
+
+
+⚠️  (ios/build/generated/ios/expo-media-library/expo-media-library.h:20:13)
+
+  18 | // Avoid multiple includes of expo-media-library symbols
+  19 | #ifndef expo-media-library_H
+> 20 | #define expo-media-library_H
+     |             ^ ISO C99 requires whitespace after the macro name [-Wc99-extensions]
+  21 | 
+  22 | #import <Foundation/Foundation.h>
+  23 | #import <RCTRequired/RCTRequired.h>
+
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » States.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling sparksapp Pods/ReactCodegen » RNGoogleSignInCGenJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » RNGoogleSignInCGen-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » RNDateTimePickerCGenJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » RNDateTimePickerCGen-generated.mm
+› Compiling sparksapp Pods/ReactCodegen » RNCWebViewSpecJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » Props.cpp
+› Compiling sparksapp Pods/ReactCodegen » NitroModulesSpecJSI-generated.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » EventEmitters.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling sparksapp Pods/ReactCodegen » ComponentDescriptors.cpp
+› Executing sparksapp Pods/ReactCodegen » Create Symlinks to Header Folders
+› Compiling react-native-nitro-modules Pods/NitroModules » NativeNitroModules+NewArch.mm
+› Compiling react-native-nitro-modules Pods/NitroModules » NativeNitroModules+OldArch.mm
+› Preparing sparksapp Pods/ReactCodegen » ReactCodegen-Info.plist
+› Preparing react-native-nitro-modules Pods/NitroModules » NitroModules-Info.plist
+› Preparing Pods/ZXingObjC » ZXingObjC-Info.plist
+› Preparing Pods/ExpoMediaLibrary-ExpoMediaLibrary_privacy » ResourceBundle-ExpoMediaLibrary_privacy-ExpoMediaLibrary-Info.plist
+› Preparing Pods/EXTaskManager-ExpoTaskManager_privacy » ResourceBundle-ExpoTaskManager_privacy-EXTaskManager-Info.plist
+› Preparing Pods/EXNotifications-ExpoNotifications_privacy » ResourceBundle-ExpoNotifications_privacy-EXNotifications-Info.plist
+› Preparing Pods/ExpoFileSystem-ExpoFileSystem_privacy » ResourceBundle-ExpoFileSystem_privacy-ExpoFileSystem-Info.plist
+› Compiling @react-native-google-signin/google-signin Pods/RNGoogleSignin » RNGoogleSignin.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGCircle.mm
+› Compiling react-native-webview Pods/react-native-webview » RNCWebView.mm
+› Compiling react-native-view-shot Pods/react-native-view-shot » RNViewShot.mm
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaContext.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConvert.mm
+› Compiling react-native-gesture-handler Pods/RNGestureHandler » RNGestureHandlerButtonComponentView.mm
+› Compiling @react-native-community/datetimepicker Pods/RNDateTimePicker » RNDateTimePickerComponentView.mm
+› Copying   sparksapp ../Library/Developer/Xcode/DerivedData/Sparks-fwoktudzghycgqhbyryytjzrisvf/Build/Products/Release-iphoneos/ReactAppDependencyProvider/ReactAppDependencyProvider.framework/Headers/RCTAppDependencyProvider.h ➜ ios/build/generated/ios/RCTAppDependencyProvider.h
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewState.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewShadowNode.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewComponentView.mm
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaProviderComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSearchBar.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderSubviewShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderSubview.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderConfigShadowNode.cpp
+› Compiling react-native-webview Pods/react-native-webview » RNCWebViewModule.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderConfig.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStack.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSScreenNavigationContainer.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenFooter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenContentWrapper.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenContainer.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreen.mm
+› Compiling react-native-screens Pods/RNScreens » RNSModule.mm
+› Compiling react-native-screens Pods/RNScreens » RNSModalScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSModalScreen.mm
+› Compiling react-native-screens Pods/RNScreens » RNSFullWindowOverlayShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSFullWindowOverlay.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGUse.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGTextPath.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGText.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGTSpan.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSymbol.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSvgViewModule.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSvgView.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGShadowNodes.cpp
+› Compiling react-native-svg Pods/RNSVG » RNSVGRenderableModule.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGRect.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGRadialGradient.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGPattern.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGPath.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGMask.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGMarker.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGLinearGradient.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGLine.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGImageShadowNode.cpp
+› Compiling react-native-svg Pods/RNSVG » RNSVGImage.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGGroup.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGForeignObject.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFilterPrimitive.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFilter.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeOffset.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeMerge.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeGaussianBlur.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeFlood.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeComposite.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeColorMatrix.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeBlend.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGEllipse.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGDefs.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGConvert.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGClipPath.mm
+› Compiling @react-native-google-signin/google-signin Pods/RNGoogleSignin » RNGoogleSignInButtonComponentView.mm
+› Compiling react-native-gesture-handler Pods/RNGestureHandler » RNGestureHandlerModule.mm
+› Compiling @react-native-community/datetimepicker Pods/RNDateTimePicker » ShadowNodes.cpp
+› Compiling @react-native-async-storage/async-storage Pods/RNCAsyncStorage » RNCAsyncStorage.mm
+› Preparing expo-image-manipulator Pods/libwebp » libwebp-Info.plist
+› Preparing expo-dev-menu-interface Pods/expo-dev-menu-interface » expo-dev-menu-interface-Info.plist
+› Preparing Pods/expo-dev-menu-EXDevMenu » ResourceBundle-EXDevMenu-expo-dev-menu-Info.plist
+› Preparing unimodules-app-loader Pods/UMAppLoader » UMAppLoader-Info.plist
+› Preparing Pods/SDWebImage-SDWebImage » ResourceBundle-SDWebImage-SDWebImage-Info.plist
+› Preparing react-native Pods/React-RCTSettings » React-RCTSettings-Info.plist
+› Preparing Pods/RNSVG-RNSVGFilters » ResourceBundle-RNSVGFilters-RNSVG-Info.plist
+› Preparing Pods/PromisesObjC-FBLPromises_Privacy » ResourceBundle-FBLPromises_Privacy-PromisesObjC-Info.plist
+› Preparing Pods/GoogleUtilities-GoogleUtilities_Privacy » ResourceBundle-GoogleUtilities_Privacy-GoogleUtilities-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/GoogleSignIn-GoogleSignIn » ResourceBundle-GoogleSignIn-GoogleSignIn-Info.plist
+› Preparing Pods/GTMSessionFetcher-GTMSessionFetcher_Core_Privacy » ResourceBundle-GTMSessionFetcher_Core_Privacy-GTMSessionFetcher-Info.plist
+› Preparing Pods/GTMAppAuth-GTMAppAuth_Privacy » ResourceBundle-GTMAppAuth_Privacy-GTMAppAuth-Info.plist
+› Preparing Pods/FirebaseRemoteConfig-FirebaseRemoteConfig_Privacy » ResourceBundle-FirebaseRemoteConfig_Privacy-FirebaseRemoteConfig-Info.plist
+› Preparing Pods/FirebaseInstallations-FirebaseInstallations_Privacy » ResourceBundle-FirebaseInstallations_Privacy-FirebaseInstallations-Info.plist
+› Preparing Pods/FirebaseCoreInternal-FirebaseCoreInternal_Privacy » ResourceBundle-FirebaseCoreInternal_Privacy-FirebaseCoreInternal-Info.plist
+› Preparing Pods/FirebaseCore-FirebaseCore_Privacy » ResourceBundle-FirebaseCore_Privacy-FirebaseCore-Info.plist
+› Preparing Pods/FirebaseABTesting-FirebaseABTesting_Privacy » ResourceBundle-FirebaseABTesting_Privacy-FirebaseABTesting-Info.plist
+› Preparing expo-modules-core Pods/ExpoModulesCore » ExpoModulesCore-Info.plist
+› Preparing expo-constants Pods/EXConstants-EXConstants » ResourceBundle-EXConstants-EXConstants-Info.plist
+› Preparing Pods/EXApplication-ExpoApplication_privacy » ResourceBundle-ExpoApplication_privacy-EXApplication-Info.plist
+› Preparing Pods/AppAuth-AppAuthCore_Privacy » ResourceBundle-AppAuthCore_Privacy-AppAuth-Info.plist
+› Preparing Pods/expo-dev-launcher-EXDevLauncher » ResourceBundle-EXDevLauncher-expo-dev-launcher-Info.plist
+› Preparing Pods/SDWebImage » SDWebImage-Info.plist
+› Preparing react-native Pods/React-RCTLinking » React-RCTLinking-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/PromisesObjC » PromisesObjC-Info.plist
+› Compiling sparksapp Pods/ReactAppDependencyProvider » RCTAppDependencyProvider.mm
+› Preparing expo-image-manipulator Pods/SDWebImageWebPCoder » SDWebImageWebPCoder-Info.plist
+› Preparing react-native Pods/React-RCTVibration » React-RCTVibration-Info.plist
+› Preparing Pods/RNCAsyncStorage-RNCAsyncStorage_resources » ResourceBundle-RNCAsyncStorage_resources-RNCAsyncStorage-Info.plist
+› Preparing Pods/GoogleUtilities » GoogleUtilities-Info.plist
+› Preparing Pods/GTMSessionFetcher » GTMSessionFetcher-Info.plist
+› Preparing expo-updates-interface Pods/EXUpdatesInterface » EXUpdatesInterface-Info.plist
+› Preparing expo-image-loader Pods/EXImageLoader » EXImageLoader-Info.plist
+› Preparing react-native-nitro-screen-recorder Pods/NitroScreenRecorder » NitroScreenRecorder-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseSharedSwift » FirebaseSharedSwift-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseCoreInternal » FirebaseCoreInternal-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseRemoteConfigInterop » FirebaseRemoteConfigInterop-Info.plist
+› Preparing expo-manifests Pods/EXManifests » EXManifests-Info.plist
+› Preparing expo-json-utils Pods/EXJSONUtils » EXJSONUtils-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseCore » FirebaseCore-Info.plist
+› Preparing Pods/EXConstants-ExpoConstants_privacy » ResourceBundle-ExpoConstants_privacy-EXConstants-Info.plist
+› Preparing expo-eas-client Pods/EASClient » EASClient-Info.plist
+› Executing expo-constants Pods/EXConstants » [CP-User] Generate app.config for prebuilt Constants.manifest
+› Preparing sparksapp Pods/ReactAppDependencyProvider » ReactAppDependencyProvider-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseInstallations » FirebaseInstallations-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseABTesting » FirebaseABTesting-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/AppAuth » AppAuth-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/FirebaseRemoteConfig » FirebaseRemoteConfig-Info.plist
+› Preparing @react-native-firebase/app Pods/RNFBApp » RNFBApp-Info.plist
+› Preparing expo-dev-menu Pods/expo-dev-menu » expo-dev-menu-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/AppCheckCore » AppCheckCore-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/GTMAppAuth » GTMAppAuth-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/GoogleSignIn » GoogleSignIn-Info.plist
+› Preparing @react-native-firebase/remote-config Pods/RNFBRemoteConfig » RNFBRemoteConfig-Info.plist
+› Preparing react-native-webview Pods/react-native-webview » react-native-webview-Info.plist
+› Preparing react-native-safe-area-context Pods/react-native-safe-area-context » react-native-safe-area-context-Info.plist
+› Preparing react-native-view-shot Pods/react-native-view-shot » react-native-view-shot-Info.plist
+› Preparing react-native-screens Pods/RNScreens » RNScreens-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/RNGoogleSignin » RNGoogleSignin-Info.plist
+› Preparing react-native-svg Pods/RNSVG » RNSVG-Info.plist
+› Preparing @react-native-async-storage/async-storage Pods/RNCAsyncStorage » RNCAsyncStorage-Info.plist
+› Preparing react-native-gesture-handler Pods/RNGestureHandler » RNGestureHandler-Info.plist
+› Preparing expo-task-manager Pods/EXTaskManager » EXTaskManager-Info.plist
+› Preparing expo-video-thumbnails Pods/ExpoVideoThumbnails » ExpoVideoThumbnails-Info.plist
+› Preparing expo-splash-screen Pods/ExpoSplashScreen » ExpoSplashScreen-Info.plist
+› Preparing video-overlay Pods/VideoOverlay » VideoOverlay-Info.plist
+› Preparing expo-print Pods/ExpoPrint » ExpoPrint-Info.plist
+› Preparing expo-speech Pods/ExpoSpeech » ExpoSpeech-Info.plist
+› Preparing expo-sharing Pods/ExpoSharing » ExpoSharing-Info.plist
+› Preparing expo-speech-recognition Pods/ExpoSpeechRecognition » ExpoSpeechRecognition-Info.plist
+› Preparing expo-media-library Pods/ExpoMediaLibrary » ExpoMediaLibrary-Info.plist
+› Preparing expo-location Pods/ExpoLocation » ExpoLocation-Info.plist
+› Preparing expo-linking Pods/ExpoLinking » ExpoLinking-Info.plist
+› Preparing expo-linear-gradient Pods/ExpoLinearGradient » ExpoLinearGradient-Info.plist
+› Preparing expo-keep-awake Pods/ExpoKeepAwake » ExpoKeepAwake-Info.plist
+› Preparing expo-image-picker Pods/ExpoImagePicker » ExpoImagePicker-Info.plist
+› Preparing expo-haptics Pods/ExpoHaptics » ExpoHaptics-Info.plist
+› Preparing expo-font Pods/ExpoFont » ExpoFont-Info.plist
+› Preparing expo-document-picker Pods/ExpoDocumentPicker » ExpoDocumentPicker-Info.plist
+› Preparing expo-file-system Pods/ExpoFileSystem » ExpoFileSystem-Info.plist
+› Preparing expo-crypto Pods/ExpoCrypto » ExpoCrypto-Info.plist
+› Preparing expo-blur Pods/ExpoBlur » ExpoBlur-Info.plist
+› Preparing expo-asset Pods/ExpoAsset » ExpoAsset-Info.plist
+› Preparing expo-apple-authentication Pods/ExpoAppleAuthentication » ExpoAppleAuthentication-Info.plist
+› Preparing @react-native-google-signin/google-signin Pods/ExpoAdapterGoogleSignIn » ExpoAdapterGoogleSignIn-Info.plist
+› Preparing expo-application Pods/EXApplication » EXApplication-Info.plist
+› Preparing expo-image-manipulator Pods/ExpoImageManipulator » ExpoImageManipulator-Info.plist
+› Preparing expo-audio Pods/ExpoAudio » ExpoAudio-Info.plist
+› Preparing expo-video Pods/ExpoVideo » ExpoVideo-Info.plist
+› Preparing expo-av Pods/EXAV » EXAV-Info.plist
+› Preparing expo-insights Pods/ExpoInsights » ExpoInsights-Info.plist
+› Preparing expo-notifications Pods/EXNotifications » EXNotifications-Info.plist
+› Preparing @react-native-community/datetimepicker Pods/RNDateTimePicker » RNDateTimePicker-Info.plist
+› Preparing expo Pods/Expo » Expo-Info.plist
+› Preparing expo-constants Pods/EXConstants » EXConstants-Info.plist
+› Preparing expo-camera Pods/ExpoCamera » ExpoCamera-Info.plist
+› Preparing expo-dev-launcher Pods/expo-dev-launcher » expo-dev-launcher-Info.plist
+› Compiling expo-dev-launcher Pods/expo-dev-launcher » EXDevLauncherController.m
+› Preparing Pods/Pods-Sparks » Pods-Sparks-Info.plist
+› Executing Sparks » [Expo] Configure project
+› Copying   ../Library/Developer/Xcode/DerivedData/Sparks-fwoktudzghycgqhbyryytjzrisvf/Build/Products/Release-iphoneos/Sparks.app/PrivacyInfo.xcprivacy ➜ ios/Sparks/PrivacyInfo.xcprivacy
+› Preparing Sparks » Info.plist
+› Linking   Sparks » Sparks
+⚠️  ld: ignoring duplicate libraries: '-lc++'
+› Generating debug Sparks » Sparks.app.dSYM
+› Executing Sparks » Bundle React Native code and images
+› Executing Sparks » [CP] Copy Pods Resources
+› Executing Sparks » [CP-User] [RNFB] Core Configuration
+      A firebase.json file was not found, whilst this file is optional it is recommended to include it to configure firebase services in React Native Firebase.
+› Signing   Sparks » Sparks.app
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'fmt' from project 'Pods')
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-rendererconsistency' from project 'Pods')
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-RuntimeCore' from project 'Pods')
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-featureflagsnativemodule' from project 'Pods')
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-idlecallbacksnativemodule' from project 'Pods')
+    Run script build phase 'Create Symlinks to Header Folders' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'React-RuntimeHermes' from project 'Pods')
+    Run script build phase '[CP-User] [RNFB] Core Configuration' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'Sparks' from project 'Sparks')
+› Build Succeeded
+
+› 0 error(s), and 38 warning(s)
+
+Waiting on http://localhost:8081
+› Installing /Users/mattdyor/Library/Developer/Xcode/DerivedData/Sparks-fwoktudzghycgqhbyryytjzrisvf/Build/Products/Release-iphoneos/Sparks.app
+- GeneratingApplicationMap
+✔ Complete 100%

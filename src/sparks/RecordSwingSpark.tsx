@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    FlatList,
     Switch,
     Alert,
     Modal,
@@ -12,6 +11,7 @@ import {
     Dimensions,
     Image,
     ScrollView,
+    Linking,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { RecordSwing, RecordedSwing } from '../components/RecordSwing';
@@ -38,7 +38,7 @@ import {
     SaveCancelButtons,
     SettingsFeedbackSection,
 } from '../components/SettingsComponents';
-import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { VoiceTranscript } from '../components/shared';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
@@ -250,8 +250,9 @@ const RecordSwingSettingsView: React.FC<{
     settings: RecordSwingSettings;
     onSave: (settings: RecordSwingSettings) => void;
     onCancel: () => void;
+    onDeleteOldVideos: () => void;
     sparkId?: string;
-}> = ({ settings, onSave, onCancel, sparkId = 'record-swing' }) => {
+}> = ({ settings, onSave, onCancel, onDeleteOldVideos, sparkId = 'record-swing' }) => {
     const { colors } = useTheme();
     const [tempSettings, setTempSettings] = useState<RecordSwingSettings>({ ...settings });
 
@@ -349,6 +350,18 @@ const RecordSwingSettingsView: React.FC<{
                     </View>
                 </SettingsSection>
 
+                <SettingsSection title="Data Management">
+                    <TouchableOpacity
+                        style={[styles.deleteOldVideosButton, { backgroundColor: '#d92d20' }]}
+                        onPress={onDeleteOldVideos}
+                    >
+                        <Text style={styles.deleteOldVideosButtonText}>Delete Old Videos</Text>
+                    </TouchableOpacity>
+                    <Text style={[settingStyles.helpText, { color: colors.textSecondary, marginTop: 8 }]}>
+                        Deletes all videos recorded before today.
+                    </Text>
+                </SettingsSection>
+
                 <View style={{ marginTop: 20 }}>
                     <SaveCancelButtons onSave={handleSave} onCancel={onCancel} />
                 </View>
@@ -398,9 +411,17 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
     const [selectedVideo, setSelectedVideo] = useState<RecordedSwing | null>(null);
     const [playbackRate, setPlaybackRate] = useState(1.0);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackMode, setPlaybackMode] = useState<'single' | 'sequence'>('single');
+    const [sequenceItems, setSequenceItems] = useState<RecordedSwing[]>([]);
+    const [sequenceIndex, setSequenceIndex] = useState(0);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [editingRecording, setEditingRecording] = useState<RecordedSwing | null>(null);
+    const [editQuality, setEditQuality] = useState<'good' | 'bad' | ''>('');
+    const [editDistance, setEditDistance] = useState('');
     const [voiceContext, setVoiceContext] = useState<'idle' | 'recording' | 'reviewing'>('idle');
     const [lastRecording, setLastRecording] = useState<RecordedSwing | null>(null);
     const [showConfetti, setShowConfetti] = useState(false);
+    const [showOlderVideos, setShowOlderVideos] = useState(false);
     const confettiRef = useRef<any>(null);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -483,6 +504,154 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
     const handleUpdateRecording = (timestamp: number, updates: Partial<RecordedSwing>) => {
         setRecordings(prev => prev.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r));
+        setSelectedVideo(prev => prev && prev.timestamp === timestamp ? { ...prev, ...updates } : prev);
+        setSequenceItems(prev => prev.map(r => r.timestamp === timestamp ? { ...r, ...updates } : r));
+    };
+
+    const removeRecording = (timestamp: number) => {
+        setRecordings(prev => prev.filter(r => r.timestamp !== timestamp));
+        setSequenceItems(prev => {
+            const nextItems = prev.filter(r => r.timestamp !== timestamp);
+            if (nextItems.length === 0) {
+                setPlaybackMode('single');
+                setSequenceIndex(0);
+                setSelectedVideo(null);
+                return nextItems;
+            }
+            if (playbackMode === 'sequence') {
+                setSequenceIndex(prevIndex => Math.min(prevIndex, nextItems.length - 1));
+            }
+            return nextItems;
+        });
+        setSelectedVideo(prev => prev && prev.timestamp === timestamp ? null : prev);
+        HapticFeedback.light();
+    };
+
+    const getTodaysShotsSorted = useCallback(() => {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+
+        return recordings
+            .filter((recording) => recording.timestamp >= startOfDay && recording.timestamp < endOfDay)
+            .sort((a, b) => a.timestamp - b.timestamp);
+    }, [recordings]);
+
+    const getStartOfToday = useCallback(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    }, []);
+
+    const openSinglePlayback = (recording: RecordedSwing) => {
+        setPlaybackMode('single');
+        setSequenceItems([]);
+        setSequenceIndex(0);
+        setSelectedVideo(recording);
+        setVoiceContext('reviewing');
+    };
+
+    const playTodaysShots = () => {
+        const todaysShots = getTodaysShotsSorted();
+        if (todaysShots.length === 0) {
+            Alert.alert('No Shots Today', 'Record a swing today to use Play Today\'s Shots.');
+            return;
+        }
+
+        setPlaybackMode('sequence');
+        setSequenceItems(todaysShots);
+        setSequenceIndex(0);
+        setSelectedVideo(todaysShots[0]);
+        setVoiceContext('reviewing');
+    };
+
+    const openUpdateModal = (recording: RecordedSwing) => {
+        setEditingRecording(recording);
+        setEditQuality(recording.quality ?? '');
+        setEditDistance(recording.distance ?? '');
+        setShowUpdateModal(true);
+    };
+
+    const closeUpdateModal = () => {
+        setShowUpdateModal(false);
+        setEditingRecording(null);
+    };
+
+    const saveRecordingUpdates = () => {
+        if (!editingRecording) return;
+
+        const updates: Partial<RecordedSwing> = {
+            quality: editQuality || undefined,
+            distance: editDistance.trim() || undefined,
+        };
+
+        handleUpdateRecording(editingRecording.timestamp, updates);
+        HapticFeedback.success();
+        closeUpdateModal();
+    };
+
+    const deleteFromUpdateModal = () => {
+        if (!editingRecording) return;
+
+        Alert.alert(
+            'Delete Recording',
+            'Are you sure you want to remove this swing?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: () => {
+                        removeRecording(editingRecording.timestamp);
+                        closeUpdateModal();
+                    },
+                },
+            ]
+        );
+    };
+
+    const deleteOldVideos = useCallback(() => {
+        const startOfToday = getStartOfToday();
+        const oldCount = recordings.filter((r) => r.timestamp < startOfToday).length;
+
+        if (oldCount === 0) {
+            Alert.alert('No Old Videos', 'There are no videos from before today to delete.');
+            return;
+        }
+
+        Alert.alert(
+            'Delete Old Videos',
+            `Delete ${oldCount} video${oldCount === 1 ? '' : 's'} from before today?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        setRecordings((prev) => prev.filter((r) => r.timestamp >= startOfToday));
+                        setShowOlderVideos(false);
+                        HapticFeedback.success();
+                    },
+                },
+            ]
+        );
+    }, [getStartOfToday, recordings]);
+
+    const viewRecordingInPhotos = async () => {
+        if (!editingRecording?.uri) {
+            Alert.alert('Unavailable', 'No video is available to open.');
+            return;
+        }
+
+        try {
+            const canOpen = await Linking.canOpenURL(editingRecording.uri);
+            if (!canOpen) {
+                Alert.alert('Unavailable', 'Unable to open this video in Photos on this device.');
+                return;
+            }
+            await Linking.openURL(editingRecording.uri);
+        } catch (error) {
+            Alert.alert('Unable to Open', 'Could not open this video in Photos.');
+        }
     };
 
     const handleTriggerRecording = () => {
@@ -605,9 +774,22 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
     // Video Player - only load source if we have a video selected to prevent "shadow" background audio
     const player = useVideoPlayer(selectedVideo ? selectedVideo.uri : '', (player) => {
-        player.loop = false;
+        player.loop = playbackMode === 'single';
         // player.play() is handled in useEffect to ensure it only starts when we want it to
     });
+
+    const closePlaybackModal = useCallback((resumeListening: boolean = true) => {
+        player.pause();
+        setSelectedVideo(null);
+        setPlaybackRate(1.0);
+        setPlaybackMode('single');
+        setSequenceItems([]);
+        setSequenceIndex(0);
+        setVoiceContext('idle');
+        if (resumeListening && settings.isListeningMode) {
+            setTimeout(() => startVoiceListening(), 500);
+        }
+    }, [player, settings.isListeningMode, startVoiceListening]);
 
     useEffect(() => {
         if (selectedVideo?.uri) {
@@ -622,25 +804,30 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
     }, [player, playbackRate]);
 
     useEffect(() => {
+        player.loop = playbackMode === 'single';
+    }, [player, playbackMode]);
+
+    useEffect(() => {
         // Subscribe to player status
         const sub1 = player.addListener('playingChange', (event) => {
             setIsPlaying(event.isPlaying);
             // Detect end of playback: Not playing and (currentTime approx duration)
             if (!event.isPlaying && player.currentTime > 0 && Math.abs(player.currentTime - player.duration) < 0.5) {
-                console.log('🎥 RecordSwingSpark: Playback finished detected via position, returning to listening state');
-                player.pause(); // Ensure it stops
-                setSelectedVideo(null);
-                setVoiceContext('idle');
-                // Auto-resume listening if it was active
-                if (settings.isListeningMode) {
-                    startVoiceListening();
+                if (playbackMode === 'sequence' && sequenceItems.length > 0) {
+                    const nextIndex = sequenceIndex + 1;
+                    if (nextIndex < sequenceItems.length) {
+                        setSequenceIndex(nextIndex);
+                        setSelectedVideo(sequenceItems[nextIndex]);
+                    } else {
+                        closePlaybackModal(true);
+                    }
                 }
             }
         });
         return () => {
             sub1.remove();
         };
-    }, [player, settings.isListeningMode, startVoiceListening, voiceContext]);
+    }, [player, playbackMode, sequenceItems, sequenceIndex, closePlaybackModal]);
 
     // Ensure player pauses when modal closes to prevent shadow audio
     useEffect(() => {
@@ -696,6 +883,9 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 
         // 1. Auto-play if enabled
         if (settings.autoPlay) {
+            setPlaybackMode('single');
+            setSequenceItems([]);
+            setSequenceIndex(0);
             setSelectedVideo(recording);
             setVoiceContext('reviewing');
         } else {
@@ -710,30 +900,10 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         }
     }, [settings.isListeningMode, settings.autoPlay, startVoiceListening]);
 
-
-
-    const deleteRecording = (timestamp: number) => {
-        Alert.alert(
-            'Delete Recording',
-            'Are you sure you want to delete this swing?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () => {
-                        setRecordings(prev => prev.filter(r => r.timestamp !== timestamp));
-                        HapticFeedback.light();
-                    },
-                },
-            ]
-        );
-    };
-
     const renderItem = ({ item }: { item: RecordedSwing }) => (
         <TouchableOpacity
             style={[styles.card, { backgroundColor: colors.surface }]}
-            onPress={() => setSelectedVideo(item)}
+            onPress={() => openSinglePlayback(item)}
         >
             <View style={[styles.thumbnail, { backgroundColor: colors.border + '40' }]}>
                 {item.thumbnail ? (
@@ -753,8 +923,13 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     <Text style={[styles.cardTitle, { color: colors.text }]}>
                         Swing {item.quality === 'good' ? '🔥' : item.quality === 'bad' ? '💩' : ''}
                     </Text>
-                    <TouchableOpacity onPress={() => deleteRecording(item.timestamp)}>
-                        <Text style={{ color: colors.error, padding: 4 }}>Delete</Text>
+                    <TouchableOpacity
+                        onPress={(event) => {
+                            event.stopPropagation();
+                            openUpdateModal(item);
+                        }}
+                    >
+                        <Text style={{ color: colors.primary, padding: 4, fontWeight: '700' }}>Update</Text>
                     </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
@@ -770,6 +945,32 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         </TouchableOpacity>
     );
 
+    const todaysShotCount = getTodaysShotsSorted().length;
+    const startOfToday = getStartOfToday();
+    const todaysRecordings = recordings.filter((r) => r.timestamp >= startOfToday);
+    const olderRecordings = recordings.filter((r) => r.timestamp < startOfToday);
+    const hasOlderRecordings = olderRecordings.length > 0;
+    const displayedRecordings = showOlderVideos ? recordings : todaysRecordings;
+    const selectedPlaybackVideo = playbackMode === 'sequence' ? sequenceItems[sequenceIndex] || selectedVideo : selectedVideo;
+    const formatReviewTimestamp = (timestamp: number) => {
+        const value = new Date(timestamp);
+        const now = new Date();
+        const isToday =
+            value.getFullYear() === now.getFullYear() &&
+            value.getMonth() === now.getMonth() &&
+            value.getDate() === now.getDate();
+
+        return isToday ? value.toLocaleTimeString() : value.toLocaleString();
+    };
+    const reviewMetaParts = selectedPlaybackVideo
+        ? [
+            playbackMode === 'sequence' ? `${Math.min(sequenceIndex + 1, sequenceItems.length)}/${sequenceItems.length}` : null,
+            formatReviewTimestamp(selectedPlaybackVideo.timestamp),
+            selectedPlaybackVideo.quality === 'good' ? '🔥' : selectedPlaybackVideo.quality === 'bad' ? '💩' : null,
+            selectedPlaybackVideo.distance || null,
+        ].filter(Boolean)
+        : [];
+
     if (propsShowSettings) {
         return (
             <RecordSwingSettingsView
@@ -779,13 +980,18 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     onCloseSettings?.();
                 }}
                 onCancel={() => onCloseSettings?.()}
+                onDeleteOldVideos={deleteOldVideos}
             />
         );
     }
 
     return (
         <BaseSpark>
-            <View style={styles.container}>
+            <ScrollView
+                style={styles.container}
+                contentContainerStyle={styles.containerContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: colors.text }]}>🏌️‍♂️ Record Swing</Text>
                 </View>
@@ -817,7 +1023,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     </Text>
                     {voiceContext === 'idle' && (
                         <Text style={[styles.listenSubtext, { color: colors.textSecondary }]}>
-                            Say "Record Swing" to start hands-free
+                            Say "Record Swing"
                         </Text>
                     )}
 
@@ -852,31 +1058,58 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                     />
                 </View>
 
-                <Text style={[styles.listTitle, { color: colors.text }]}>Recent Swings</Text>
-                <FlatList
-                    data={recordings}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.timestamp.toString()}
-                    contentContainerStyle={styles.listContainer}
-                    ListEmptyComponent={
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                            No recordings yet. Tap the button above to start!
+                <TouchableOpacity
+                    style={[
+                        styles.playTodayButton,
+                        {
+                            backgroundColor: todaysShotCount > 0 ? '#5f6368' : colors.border,
+                            opacity: todaysShotCount > 0 ? 1 : 0.7,
+                        },
+                    ]}
+                    onPress={playTodaysShots}
+                    disabled={todaysShotCount === 0}
+                >
+                    <Text style={styles.playTodayButtonText}>
+                        Play Today's Shots{todaysShotCount > 0 ? ` (${todaysShotCount})` : ''}
+                    </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.listTitle, { color: colors.text }]}>
+                    {showOlderVideos ? 'All Swings' : "Today's Swings"}
+                </Text>
+                {hasOlderRecordings && (
+                    <TouchableOpacity
+                        style={[styles.showMoreButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                        onPress={() => setShowOlderVideos((prev) => !prev)}
+                    >
+                        <Text style={[styles.showMoreButtonText, { color: colors.text }]}>
+                            {showOlderVideos ? 'Show Today Only' : `Show More (${olderRecordings.length} older)`}
                         </Text>
-                    }
-                />
+                    </TouchableOpacity>
+                )}
+                <View style={styles.listContainer}>
+                    {displayedRecordings.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                            {showOlderVideos ? 'No recordings yet. Tap the button above to start!' : 'No swings recorded today yet.'}
+                        </Text>
+                    ) : (
+                        displayedRecordings.map((item) => (
+                            <View key={item.timestamp.toString()}>
+                                {renderItem({ item })}
+                            </View>
+                        ))
+                    )}
+                </View>
 
                 {/* Video Player Modal */}
                 <Modal
                     visible={!!selectedVideo}
                     transparent={false}
                     animationType="slide"
-                    onRequestClose={() => {
-                        setSelectedVideo(null);
-                        setVoiceContext('idle');
-                    }}
+                    onRequestClose={() => closePlaybackModal(true)}
                 >
                     <View style={[styles.videoPlayerModal, { backgroundColor: '#000' }]}>
-                        {selectedVideo && (
+                        {selectedPlaybackVideo && (
                             <>
                                 <VideoView
                                     player={player}
@@ -885,7 +1118,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                                     allowsFullscreen
                                     allowsPictureInPicture
                                 />
-                                <View style={styles.playbackControls}>
+                                <View style={styles.playbackControlsOverlay}>
                                     <View style={styles.speedControls}>
                                         {[1.0, 0.5, 0.25].map((rate) => (
                                             <TouchableOpacity
@@ -905,28 +1138,102 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
+                                        {/* Close Button */}
+                                        <TouchableOpacity
+                                            style={[styles.speedButton, { backgroundColor: colors.surface, minWidth: 44, paddingHorizontal: 0 }]}
+                                            onPress={() => closePlaybackModal(true)}
+                                        >
+                                            <Text style={[styles.speedButtonText, { color: colors.text }]}>Ⓧ</Text>
+                                        </TouchableOpacity>
                                     </View>
-                                    <TouchableOpacity
-                                        style={[styles.modalCloseButton, { backgroundColor: colors.surface }]}
-                                        onPress={() => {
-                                            player.pause(); // Ensure audio stops
-                                            setSelectedVideo(null);
-                                            setPlaybackRate(1.0);
-                                            setVoiceContext('idle');
-                                            // Resume listening when returning to main screen
-                                            if (settings.isListeningMode) {
-                                                setTimeout(() => startVoiceListening(), 500);
-                                            }
-                                        }}
-                                    >
-                                        <Text style={[styles.modalCloseButtonText, { color: colors.text }]}>Close</Text>
-                                    </TouchableOpacity>
+                                    <View style={styles.videoMetaRow}>
+                                        <Text style={styles.videoMetaDenseText}>
+                                            {reviewMetaParts.join(' • ')}
+                                        </Text>
+                                    </View>
                                 </View>
                             </>
                         )}
                     </View>
                 </Modal>
-            </View>
+
+                <Modal
+                    visible={showUpdateModal}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={closeUpdateModal}
+                >
+                    <View style={styles.updateModalBackdrop}>
+                        <ScrollView
+                            style={styles.updateModalScroll}
+                            contentContainerStyle={[styles.updateModalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <Text style={[styles.updateModalTitle, { color: colors.text }]}>Update Swing</Text>
+
+                            <TouchableOpacity
+                                style={[styles.viewInPhotosButton, { borderColor: colors.border, backgroundColor: colors.background || 'transparent' }]}
+                                onPress={viewRecordingInPhotos}
+                            >
+                                <Text style={[styles.viewInPhotosButtonText, { color: colors.text }]}>View in Photos</Text>
+                            </TouchableOpacity>
+
+                            <Text style={[styles.updateFieldLabel, { color: colors.text }]}>Quality</Text>
+                            <View style={styles.updateChoiceRow}>
+                                <TouchableOpacity
+                                    style={[styles.choiceButton, editQuality === 'good' && { backgroundColor: colors.primary }]}
+                                    onPress={() => setEditQuality('good')}
+                                >
+                                    <Text style={[styles.choiceButtonText, editQuality === 'good' && styles.choiceButtonTextActive]}>🔥</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.choiceButton, editQuality === 'bad' && { backgroundColor: colors.primary }]}
+                                    onPress={() => setEditQuality('bad')}
+                                >
+                                    <Text style={[styles.choiceButtonText, editQuality === 'bad' && styles.choiceButtonTextActive]}>💩</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.choiceButton, editQuality === '' && { backgroundColor: colors.primary }]}
+                                    onPress={() => setEditQuality('')}
+                                >
+                                    <Text style={[styles.choiceButtonText, editQuality === '' && styles.choiceButtonTextActive]}>Average</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={[styles.updateFieldLabel, { color: colors.text }]}>Distance</Text>
+                            <TextInput
+                                value={editDistance}
+                                onChangeText={setEditDistance}
+                                style={[styles.updateTextInput, { borderColor: colors.border, color: colors.text }]}
+                                placeholder="Ex: 150 yards"
+                                placeholderTextColor={colors.textSecondary}
+                            />
+
+                            <TouchableOpacity
+                                style={[styles.saveChangesButton, { backgroundColor: colors.primary }]}
+                                onPress={saveRecordingUpdates}
+                            >
+                                <Text style={styles.saveChangesButtonText}>Save Changes</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.cancelChangesButton, { borderColor: colors.border }]}
+                                onPress={closeUpdateModal}
+                            >
+                                <Text style={[styles.cancelChangesButtonText, { color: colors.text }]}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.removeRecordingButton}
+                                onPress={deleteFromUpdateModal}
+                            >
+                                <Text style={styles.removeRecordingButtonText}>Remove</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </Modal>
+            </ScrollView>
 
             {showConfetti && (
                 <ConfettiCannon
@@ -944,7 +1251,10 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    containerContent: {
         padding: 20,
+        paddingBottom: 24,
     },
     header: {
         flexDirection: 'row',
@@ -994,12 +1304,26 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     recordSection: {
-        marginBottom: 30,
+        marginBottom: 10,
     },
     listTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 12,
+    },
+    playTodayButton: {
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    playTodayButtonText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
     },
     listContainer: {
         paddingBottom: 20,
@@ -1052,17 +1376,31 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontWeight: '600',
     },
+    showMoreButton: {
+        alignSelf: 'center',
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 999,
+        borderWidth: 1,
+    },
+    showMoreButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
     videoPlayerModal: {
         flex: 1,
-        justifyContent: 'center',
     },
     fullVideo: {
-        flex: 1,
-        width: '100%',
+        ...StyleSheet.absoluteFillObject,
     },
-    playbackControls: {
+    playbackControlsOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 28,
         backgroundColor: 'rgba(0,0,0,0.8)',
     },
     speedControls: {
@@ -1084,14 +1422,132 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16,
     },
-    modalCloseButton: {
-        padding: 16,
-        borderRadius: 12,
+
+    videoMetaRow: {
+        marginTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.2)',
+        paddingTop: 10,
         alignItems: 'center',
     },
-    modalCloseButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
+    videoMetaDenseText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    updateModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    updateModalScroll: {
+        maxHeight: '90%',
+    },
+    updateModalCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 16,
+    },
+    updateModalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    updateFieldLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 6,
+        marginTop: 8,
+    },
+    updateTextInput: {
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 15,
+        minHeight: 44,
+    },
+    updateChoiceRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    choiceButton: {
+        flex: 1,
+        backgroundColor: '#333',
+        borderRadius: 10,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    choiceButtonText: {
+        color: '#ddd',
+        fontWeight: '600',
+    },
+    choiceButtonTextActive: {
+        color: '#fff',
+    },
+    saveChangesButton: {
+        marginTop: 16,
+        borderRadius: 10,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    saveChangesButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+    cancelChangesButton: {
+        marginTop: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cancelChangesButtonText: {
+        fontWeight: '600',
+        fontSize: 15,
+    },
+    removeRecordingButton: {
+        marginTop: 10,
+        borderRadius: 10,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#d92d20',
+    },
+    removeRecordingButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+    viewInPhotosButton: {
+        marginTop: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewInPhotosButtonText: {
+        fontWeight: '600',
+        fontSize: 15,
+    },
+    deleteOldVideosButton: {
+        borderRadius: 10,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+    },
+    deleteOldVideosButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 15,
     },
 });
 
