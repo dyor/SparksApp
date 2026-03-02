@@ -53,6 +53,7 @@ interface SparkState {
     durationSeconds: number;
     source: 'screen' | 'front_camera' | 'rear_camera';
     isOverlayProcess?: boolean;
+    includeSubtitles: boolean;
   };
   setVideoCaptureData: (data: Partial<SparkState['videoCapture']>) => void;
 }
@@ -70,7 +71,8 @@ export const useSparkStore = create<SparkState>()(
         script: '',
         countdownSeconds: 5,
         durationSeconds: 60,
-        source: 'screen'
+        source: 'screen',
+        includeSubtitles: true
       },
 
       // Actions

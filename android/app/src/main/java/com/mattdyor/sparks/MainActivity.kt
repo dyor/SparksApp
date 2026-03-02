@@ -10,6 +10,9 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
+import com.margelo.nitro.nitroscreenrecorder.NitroScreenRecorder
+import android.content.Intent
+import android.util.Log
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,4 +65,17 @@ class MainActivity : ReactActivity() {
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
   }
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    super.onActivityResult(requestCode, resultCode, data)
+    Log.d("MainActivity", "onActivityResult: requestCode=$requestCode, resultCode=$resultCode")
+    
+    try {
+      // Handle screen recording activity results
+      NitroScreenRecorder.handleActivityResult(requestCode, resultCode, data)
+    } catch (e: Exception) {
+      Log.e("MainActivity", "Error handling activity result: ${e.message}")
+      e.printStackTrace()
+    }
+  }
+
 }

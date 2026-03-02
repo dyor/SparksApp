@@ -307,7 +307,7 @@ function AppContent() {
             uri: persistentUri,
             source: videoCapture.isOverlayProcess ? 'overlay' : 'screen',
             script: videoCapture.script,
-            status: 'editing',
+            status: 'recorded',
             countdownSeconds: videoCapture.countdownSeconds,
             durationSeconds: videoCapture.durationSeconds,
             timestamp: Date.now(),

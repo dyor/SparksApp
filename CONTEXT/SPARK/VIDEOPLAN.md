@@ -12,9 +12,11 @@ This spark starts as a **Beta** feature.
 - **Creation Entry**: "Create New Video" button at the top of the list.
 - **Status Tracking**:
   - `recording`: Currently being captured.
-  - `editing`: Captured but needs trimming/adjustments (default after recording).
-  - `publishing`: Ready for upload.
-  - `published`: Successfully uploaded to external platforms.
+  - `recorded`: Finished recording/auto-exported (Ready for Publishing Studio).
+  - `editing`: User has initiated a manual edit in the system Photos app.
+  - `publishing`: In the process of being uploaded to social media.
+  - `published`: Successfully uploaded.
+  - `archived`: Original raw footage (after auto-export) or finished project.
 
 ### 2.2 Recording Engine
 - **Source Selection**:
@@ -47,9 +49,9 @@ interface VideoAI {
     id: string;
     uri: string;
     thumbnail?: string;
-    source: 'screen' | 'front_camera' | 'rear_camera';
+    source: 'screen' | 'front_camera' | 'rear_camera' | 'overlay';
     script?: string;
-    status: 'recording' | 'editing' | 'publishing' | 'published';
+    status: 'recording' | 'recorded' | 'editing' | 'publishing' | 'published' | 'archived';
     countdownSeconds: number;
     durationSeconds: number;
     timestamp: number;
@@ -92,6 +94,7 @@ interface VideoAI {
 - [x] **CATextLayer Rendering**: Uses AVFoundation Core Animation for professional text rendering.
 - [x] **Script Parsing**: Automated parsing of `START-END: Text` script format.
 - [x] **Export UI**: New "Export with Overlays" button in the editor.
+- [x] **Automated Overlays**: (New) Automatic burn-in during recording flow for Camera shots.
 - [x] **Eye-Contact Optimization**: Adjusted recorder UI for natural lens contact.
 
 ### Phase 4: Nitro Screen Capture (Phase 4 Completed)
@@ -107,9 +110,21 @@ interface VideoAI {
 - [x] **Export Loading UI**: Added professional `ActivityIndicator` HUD during export.
 - [x] **Smart Overlay Logic**: Disabled post-processing export for Screen Recordings and Overlays.
 
-### Phase 6: Publishing & AI (Future)
-- [ ] **Publishing**: YouTube Shorts & Instagram Reels integration.
-- [ ] **AI Video Analysis**: Analyze user-recorded videos for technique/content.
+### Phase 6: Publishing Studio & YouTube Shorts
+- [ ] **Publishing Studio UI**: Introduce a tabbed interface (Recording Studio vs. Publishing Studio).
+- [ ] **Enhanced Statuses**:
+    - `exported`: The original source video after an overlay burn-in has been created.
+    - `editing`: The primary active status for videos intended for social media.
+- [ ] **Recording Studio Workflow**:
+    - Front/Rear Camera: "Export with Overlays" (to `exported`) or "Edit in Photos" (to `editing`).
+    - Screen/Overlay: Only "Edit in Photos" (to `editing`).
+- [ ] **Publishing Studio Workflow**:
+    - Show only videos in `editing` status.
+    - **"Start Publishing"**: 
+        1. User selects the *edited* file from native Photos app via `MediaLibrary`.
+        2. Application sets status to `publishing`.
+        3. Initial integration: **YouTube Shorts** (Metadata + video upload).
+- [ ] **Linkage**: Maintain metadata and deep links back to the original Recording Studio entry.
 
 ---
 

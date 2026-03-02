@@ -6,6 +6,10 @@
     <true/>
     <key>AVAudioSessionCategoryPlayback</key>
     <true/>
+    <key>BroadcastExtensionAppGroupIdentifier</key>
+    <string>group.com.mattdyor.sparks.screen-recorder</string>
+    <key>BroadcastExtensionBundleIdentifier</key>
+    <string>com.mattdyor.sparks.BroadcastExtension</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CFBundleAllowMixedLocalizations</key>
@@ -25,7 +29,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.42</string>
+    <string>1.0.43</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -44,7 +48,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1.0.42</string>
+    <string>1.0.43</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>

@@ -25,7 +25,9 @@ interface VideoEditorModalProps {
     onClose: () => void;
     onSave: (updatedVideo: VideoAI) => void;
     onStartExport: (metadata: { script?: string, countdown: number, duration: number, isOverlayProcess?: boolean }) => void;
+    onDelete?: (id: string) => void;
     colors: any;
+    mode?: 'recording' | 'publishing';
 }
 
 export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
@@ -34,7 +36,9 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
     onClose,
     onSave,
     onStartExport,
+    onDelete,
     colors,
+    mode = 'recording',
 }) => {
     const [status, setStatus] = useState<VideoAI['status']>('editing');
     const [script, setScript] = useState('');
@@ -101,6 +105,13 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
         HapticFeedback.success();
     };
 
+    const handleDelete = () => {
+        if (video && onDelete) {
+            onDelete(video.id);
+            onClose();
+        }
+    };
+
     const openInSystemEditor = async () => {
         if (!video?.uri) return;
         try {
@@ -115,16 +126,61 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                     Alert.alert('Saved to Gallery', 'The video has been saved to your gallery. You can edit it there using the system tools.');
                 }
             }
+
+            // Update status to editing as user is likely going to make changes now
+            if (status !== 'editing') {
+                setStatus('editing');
+                onSave({
+                    ...video,
+                    status: 'editing',
+                    script: script.trim() || undefined,
+                });
+            }
         } catch (e) {
             console.error('System Editor Error:', e);
             Alert.alert('Error', 'Could not open the system video editor or sharing menu.');
         }
     };
-
-    const handlePublish = (platform: 'YouTube' | 'Instagram') => {
+    const handlePublish = async (platform: 'YouTube' | 'Instagram') => {
+        if (!video?.uri) return;
         HapticFeedback.light();
-        Alert.alert('Coming Soon', `Publishing to ${platform} Shorts/Reels will be available in the next version.`);
-        setStatus('publishing');
+
+        try {
+            const canShare = await Sharing.isAvailableAsync();
+            if (canShare) {
+                await Sharing.shareAsync(video.uri, {
+                    dialogTitle: `Publish to ${platform}`,
+                    mimeType: 'video/mp4',
+                    UTI: 'public.mpeg-4'
+                });
+
+                // Update platform flags in metadata
+                const isYouTube = platform === 'YouTube';
+                const updatedMetadata = {
+                    ...video.metadata,
+                    isYouTubePublished: isYouTube ? true : video.metadata?.isYouTubePublished,
+                    isInstagramPublished: !isYouTube ? true : video.metadata?.isInstagramPublished,
+                };
+
+                onSave({
+                    ...video,
+                    metadata: updatedMetadata,
+                    status: (updatedMetadata.isYouTubePublished && updatedMetadata.isInstagramPublished) ? 'published' : 'publishing'
+                });
+            } else {
+                Alert.alert('Sharing Unavailable', 'Your device does not support native sharing.');
+            }
+        } catch (error) {
+            console.error('Publish Error:', error);
+        }
+    };
+
+    const handleArchive = () => {
+        if (!video) return;
+        setStatus('archived');
+        onSave({ ...video, status: 'archived' });
+        HapticFeedback.success();
+        onClose();
     };
 
 
@@ -169,6 +225,13 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
             // Notify ScreenRecorder of simulated finish so VideoSpark picks it up
             // (We reuse the listener logic in VideoSpark to add the new video)
             await ScreenRecorder.stopRecording(resultUri);
+
+            // Mark THIS original video as ARCHIVED
+            onSave({
+                ...video,
+                status: 'archived',
+                script: script.trim() || undefined
+            });
 
             setIsExporting(false);
             Alert.alert(
@@ -223,35 +286,88 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                         contentContainerStyle={styles.scrollContent}
                     >
                         <View style={styles.header}>
-                            <Text style={[styles.title, { color: colors.text }]}>Video Editor (Beta)</Text>
+                            <Text style={[styles.title, { color: colors.text }]}>
+                                {mode === 'recording' ? 'Recording Studio' : 'Publishing Studio'}
+                            </Text>
                             <View style={[styles.statusTag, { backgroundColor: getStatusColor(status) }]}>
                                 <Text style={styles.statusTagText}>{status.toUpperCase()}</Text>
                             </View>
                         </View>
 
-                        <Text style={[styles.label, { color: colors.text }]}>Script / Description</Text>
-                        <TextInput
-                            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-                            multiline
-                            value={script}
-                            onChangeText={setScript}
-                            placeholder="What happens in this video?"
-                            placeholderTextColor={colors.textSecondary}
-                        />
+                        {mode === 'recording' && (
+                            <>
+                                <Text style={[styles.label, { color: colors.text }]}>Script / Description</Text>
+                                <TextInput
+                                    style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                                    multiline
+                                    value={script}
+                                    onChangeText={setScript}
+                                    placeholder="What happens in this video?"
+                                    placeholderTextColor={colors.textSecondary}
+                                />
+                            </>
+                        )}
 
                         <View style={styles.actionSection}>
                             <Text style={[styles.label, { color: colors.text }]}>Actions</Text>
-                            <TouchableOpacity
-                                style={[styles.actionButton, { borderColor: colors.primary, marginBottom: 12 }]}
-                                onPress={openInSystemEditor}
-                            >
-                                <Text style={styles.actionEmoji}>✂️</Text>
-                                <Text style={[styles.actionText, { color: colors.text }]}>Edit in Photos</Text>
-                            </TouchableOpacity>
-
-                            {video.source !== 'overlay' && video.source !== 'screen' && (
+                            {mode === 'recording' && (
                                 <TouchableOpacity
-                                    style={[styles.actionButton, { borderColor: '#BB86FC' }]}
+                                    style={[styles.actionButton, { borderColor: colors.primary, marginBottom: 12 }]}
+                                    onPress={openInSystemEditor}
+                                >
+                                    <Text style={styles.actionEmoji}>✂️</Text>
+                                    <Text style={[styles.actionText, { color: colors.text }]}>Edit in Photos</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {mode === 'publishing' && (
+                                <View style={styles.socialPublishingRow}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.socialPublishingBtn,
+                                            { backgroundColor: '#FF000020', borderColor: '#FF0000' },
+                                            video.metadata?.isYouTubePublished && { backgroundColor: '#FF000040' }
+                                        ]}
+                                        onPress={() => handlePublish('YouTube')}
+                                    >
+                                        <Text style={styles.socialPublishingEmoji}>
+                                            {video.metadata?.isYouTubePublished ? '✅' : '🟥'}
+                                        </Text>
+                                        <Text style={[styles.socialPublishingText, { color: '#FF0000' }]}>
+                                            YouTube {video.metadata?.isYouTubePublished ? '✓' : ''}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.socialPublishingBtn,
+                                            { backgroundColor: '#E1306C20', borderColor: '#E1306C' },
+                                            video.metadata?.isInstagramPublished && { backgroundColor: '#E1306C40' }
+                                        ]}
+                                        onPress={() => handlePublish('Instagram')}
+                                    >
+                                        <Text style={styles.socialPublishingEmoji}>
+                                            {video.metadata?.isInstagramPublished ? '✅' : '🟪'}
+                                        </Text>
+                                        <Text style={[styles.socialPublishingText, { color: '#E1306C' }]}>
+                                            Instagram {video.metadata?.isInstagramPublished ? '✓' : ''}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {mode === 'publishing' && (video.metadata?.isYouTubePublished || video.metadata?.isInstagramPublished) && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, { borderColor: colors.primary, marginTop: 12 }]}
+                                    onPress={handleArchive}
+                                >
+                                    <Text style={styles.actionEmoji}>📦</Text>
+                                    <Text style={[styles.actionText, { color: colors.text }]}>Archive Project</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {video.source !== 'overlay' && video.source !== 'screen' && status !== 'archived' && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, { borderColor: '#BB86FC', marginTop: mode === 'publishing' ? 12 : 0 }]}
                                     onPress={handleExportWithOverlays}
                                 >
                                     <Text style={styles.actionEmoji}>✨</Text>
@@ -261,37 +377,42 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                         </View>
 
                         <Text style={[styles.label, { color: colors.text }]}>Change Status</Text>
-                        <View style={styles.statusRow}>
-                            {(['editing', 'publishing', 'published'] as VideoAI['status'][]).map((s) => (
-                                <TouchableOpacity
-                                    key={s}
-                                    style={[
-                                        styles.statusBtn,
-                                        { borderColor: colors.border },
-                                        status === s && { backgroundColor: getStatusColor(s), borderColor: getStatusColor(s) }
-                                    ]}
-                                    onPress={() => setStatus(s)}
-                                >
-                                    <Text style={[styles.statusBtnText, status === s && { color: '#fff' }]}>
-                                        {s.toUpperCase()}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusScroll}>
+                            {(['recording', 'recorded', 'editing', 'publishing', 'published', 'archived'] as VideoAI['status'][]).map((s, index) => {
+                                const statusList = ['recording', 'recorded', 'editing', 'publishing', 'published', 'archived'];
+                                const originalStatusIndex = statusList.indexOf(video?.status || 'recording');
+                                const isFutureStatus = index > originalStatusIndex && originalStatusIndex !== -1;
 
-                        <View style={styles.publishSection}>
-                            <Text style={[styles.label, { color: colors.text }]}>Social Publishing</Text>
-                            <View style={styles.publishRow}>
-                                <TouchableOpacity style={styles.socialBtn} onPress={() => handlePublish('YouTube')}>
-                                    <Text style={styles.socialIcon}>🟥</Text>
-                                    <Text style={styles.socialText}>YouTube</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.socialBtn} onPress={() => handlePublish('Instagram')}>
-                                    <Text style={styles.socialIcon}>🟪</Text>
-                                    <Text style={styles.socialText}>Instagram</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+                                return (
+                                    <TouchableOpacity
+                                        key={s}
+                                        disabled={isFutureStatus}
+                                        style={[
+                                            styles.statusPill,
+                                            { borderColor: colors.border },
+                                            status === s && { backgroundColor: getStatusColor(s), borderColor: getStatusColor(s) },
+                                            isFutureStatus && { opacity: 0.3 }
+                                        ]}
+                                        onPress={() => {
+                                            setStatus(s);
+                                            HapticFeedback.light();
+                                        }}
+                                    >
+                                        <Text style={[styles.statusPillText, status === s && { color: '#fff' }, { color: colors.text }]}>
+                                            {s.toUpperCase()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[styles.deleteMainBtn, { borderColor: colors.error }]}
+                            onPress={handleDelete}
+                        >
+                            <Text style={[styles.deleteMainBtnText, { color: colors.error }]}>Delete video</Text>
+                        </TouchableOpacity>
+
 
                         <TouchableOpacity
                             style={[styles.saveButton, { backgroundColor: colors.primary }]}
@@ -323,9 +444,11 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'recording': return '#ff4444';
+        case 'recorded': return '#4bb543';
         case 'editing': return '#ffbb33';
         case 'publishing': return '#33b5e5';
         case 'published': return '#00C851';
+        case 'archived': return '#999';
         default: return '#999';
     }
 };
@@ -390,33 +513,82 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         marginBottom: 8,
-        marginTop: 20,
+        marginTop: 16,
     },
     input: {
         borderWidth: 1,
         borderRadius: 12,
         padding: 12,
-        minHeight: 100,
         fontSize: 16,
+        minHeight: 100,
         textAlignVertical: 'top',
     },
     actionSection: {
-        marginTop: 10,
+        marginTop: 12,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: 12,
         padding: 14,
-        gap: 10,
+        borderRadius: 12,
+        borderWidth: 1,
     },
     actionEmoji: {
         fontSize: 20,
+        marginRight: 10,
     },
     actionText: {
         fontSize: 16,
         fontWeight: '600',
+    },
+    statusScroll: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    statusPill: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        marginRight: 8,
+        minWidth: 90,
+        alignItems: 'center',
+    },
+    statusPillText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    socialPublishingRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    socialPublishingBtn: {
+        flex: 1,
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+    },
+    socialPublishingEmoji: {
+        fontSize: 24,
+        marginBottom: 8,
+    },
+    socialPublishingText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    deleteMainBtn: {
+        marginTop: 30,
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    deleteMainBtnText: {
+        fontSize: 16,
+        fontWeight: '700',
     },
     statusRow: {
         flexDirection: 'row',
@@ -470,21 +642,19 @@ const styles = StyleSheet.create({
     },
     overlayContainer: {
         position: 'absolute',
-        left: 20,
-        right: 20,
         backgroundColor: 'rgba(0,0,0,0.7)',
         padding: 15,
-        borderRadius: 12,
+        borderRadius: 18,
         alignItems: 'center',
+        alignSelf: 'center',
+        maxWidth: '85%',
+        bottom: 40,
     },
     overlayPreview: {
-        top: 40, // Below close button
-        width: '70%',
-        alignSelf: 'center',
-        padding: 8,
+        padding: 10,
     },
     overlayExport: {
-        top: 80, // High for eye contact in final export
+        bottom: 100, // Slightly higher when full screen to clear bottom safe area
     },
     overlayText: {
         color: '#fff',

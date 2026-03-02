@@ -314,12 +314,12 @@ const styles = StyleSheet.create({
     },
     recordingScriptOverlay: {
         position: 'absolute',
-        top: 40, // Absolute top for camera lens contact
-        left: 20,
-        right: 20,
+        top: 60, // Near lens for eye contact
+        alignSelf: 'center',
+        maxWidth: '85%',
         backgroundColor: 'rgba(0,0,0,0.7)',
-        padding: 24,
-        borderRadius: 16,
+        padding: 20,
+        borderRadius: 20,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',

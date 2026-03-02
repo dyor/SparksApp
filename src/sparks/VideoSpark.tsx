@@ -14,6 +14,7 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { BaseSpark } from '../components/BaseSpark';
@@ -23,6 +24,20 @@ import { VideoRecorderView } from '../components/VideoRecorderView';
 import { ScreenRecorder } from '../services/ScreenRecorderService';
 import { VideoEditorModal } from '../components/VideoEditorModal';
 import { GeminiService } from '../services/GeminiService';
+import * as ImagePicker from 'expo-image-picker';
+import { burnScript, BurnScriptItem } from 'video-overlay';
+import {
+    SettingsContainer,
+    SettingsScrollView,
+    SettingsHeader,
+    SettingsFeedbackSection,
+    SettingsButton,
+    SettingsSection,
+    SettingsToggle,
+} from '../components/SettingsComponents';
+import * as FileSystem from 'expo-file-system';
+import { BetaBadge } from '../components/BetaBadge';
+import { getSparkById } from '../components/SparkRegistry';
 
 export interface VideoAI {
     id: string;
@@ -30,17 +45,27 @@ export interface VideoAI {
     thumbnail?: string;
     source: 'screen' | 'front_camera' | 'rear_camera' | 'overlay';
     script?: string;
-    status: 'recording' | 'editing' | 'publishing' | 'published';
+    status: 'recording' | 'recorded' | 'editing' | 'publishing' | 'published' | 'archived';
     countdownSeconds: number;
     durationSeconds: number;
     timestamp: number;
     metadata?: {
         youtubeUrl?: string;
         instagramUrl?: string;
+        isYouTubePublished?: boolean;
+        isInstagramPublished?: boolean;
     };
 }
 
-const VideoSpark: React.FC = () => {
+interface VideoSparkProps {
+    showSettings?: boolean;
+    onCloseSettings?: () => void;
+}
+
+const VideoSpark: React.FC<VideoSparkProps> = ({
+    showSettings = false,
+    onCloseSettings
+}) => {
     const { colors } = useTheme();
     const { setSparkData, isHydrated, videoCapture, setVideoCaptureData } = useSparkStore();
 
@@ -53,9 +78,19 @@ const VideoSpark: React.FC = () => {
     const [screenRecordTimer, setScreenRecordTimer] = useState(0);
     const [isScreenRecording, setIsScreenRecording] = useState(false);
 
-    const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<VideoAI | null>(null);
+    const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<{ video: VideoAI, mode: 'recording' | 'publishing' } | null>(null);
     const [isImprovingScript, setIsImprovingScript] = useState(false);
     const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'recording' | 'publishing' | 'archived'>('recording');
+    const [isAutoExporting, setIsAutoExporting] = useState(false);
+
+    const sparkRecord = getSparkById('video-spark');
+    const displayTitle = sparkRecord?.metadata.title || 'Video';
+
+    const hasOverlays = (script?: string) => {
+        if (!script) return false;
+        return /^(\d+)s?-(\d+)s?:\s*(.+)$/im.test(script);
+    };
 
 
     // Handle Screen Recording Auto-Finish & Script Timer
@@ -137,28 +172,139 @@ const VideoSpark: React.FC = () => {
         }
     };
 
-    const handleRecordingComplete = (uri: string, source: 'front_camera' | 'rear_camera') => {
+    const handleRecordingComplete = async (uri: string, source: 'front_camera' | 'rear_camera') => {
         setShowRecorder(false);
+        HapticFeedback.success();
+
+        let finalUri = uri;
+        let finalSource: VideoAI['source'] = source;
+        let finalStatus: VideoAI['status'] = 'recorded';
+
+        // Automated Export with Overlays check
+        if (videoCapture.includeSubtitles && hasOverlays(videoCapture.script)) {
+            setIsAutoExporting(true);
+            try {
+                const lines = (videoCapture.script || '').split('\n');
+                const scriptItems: BurnScriptItem[] = lines.map(line => {
+                    const match = line.match(/^(\d+)s?-(\d+)s?:\s*(.+)$/i);
+                    if (match) {
+                        return {
+                            start: parseInt(match[1]),
+                            end: parseInt(match[2]),
+                            text: match[3]
+                        };
+                    }
+                    return null;
+                }).filter((item): item is BurnScriptItem => item !== null);
+
+                if (scriptItems.length > 0) {
+                    const filename = `SparkAuto_${Date.now()}.mp4`;
+                    const outputUri = FileSystem.documentDirectory + filename;
+                    const resultUri = await burnScript(uri, scriptItems, outputUri);
+                    finalUri = resultUri;
+                    finalSource = 'overlay';
+
+                    // Archive the original raw video
+                    const rawVideo: VideoAI = {
+                        id: Date.now().toString() + '_raw',
+                        uri,
+                        source,
+                        script: videoCapture.script,
+                        status: 'archived',
+                        countdownSeconds: videoCapture.countdownSeconds,
+                        durationSeconds: videoCapture.durationSeconds,
+                        timestamp: Date.now(),
+                    };
+                    setSparkData('video', { videos: [rawVideo, ...videos] });
+                }
+            } catch (e) {
+                console.error('Auto Export Error:', e);
+            } finally {
+                setIsAutoExporting(false);
+            }
+        }
 
         const newVideo: VideoAI = {
             id: Date.now().toString(),
-            uri,
-            source,
+            uri: finalUri,
+            source: finalSource,
             script: videoCapture.script,
-            status: 'editing', // Default to editing
+            status: finalStatus,
             countdownSeconds: videoCapture.countdownSeconds,
             durationSeconds: videoCapture.durationSeconds,
             timestamp: Date.now(),
         };
 
         setSparkData('video', { videos: [newVideo, ...videos] });
-        HapticFeedback.success();
     };
 
     const handleSaveVideo = (updatedVideo: VideoAI) => {
         const updatedVideos = videos.map(v => v.id === updatedVideo.id ? updatedVideo : v);
         setSparkData('video', { videos: updatedVideos });
         setSelectedVideoForEdit(null);
+    };
+
+    const handleDeleteVideoFromModal = (id: string) => {
+        Alert.alert(
+            'Delete Video',
+            'Are you sure you want to delete this video? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        const updatedVideos = videos.filter(v => v.id !== id);
+                        setSparkData('video', { videos: updatedVideos });
+                        setSelectedVideoForEdit(null);
+                        HapticFeedback.success();
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleStartPublishing = (video: VideoAI) => {
+        Alert.alert(
+            'Start Publishing',
+            'Please select your final edited video from your Photos app to continue to YouTube Shorts.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Select Video',
+                    onPress: async () => {
+                        try {
+                            const result = await ImagePicker.launchImageLibraryAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                                allowsEditing: false,
+                                quality: 1,
+                            });
+
+                            if (!result.canceled && result.assets && result.assets.length > 0) {
+                                const selectedUri = result.assets[0].uri;
+                                HapticFeedback.success();
+
+                                // Persist selected file to app storage
+                                const filename = `Published_${Date.now()}.mp4`;
+                                const persistentUri = FileSystem.documentDirectory + filename;
+                                await FileSystem.copyAsync({ from: selectedUri, to: persistentUri });
+
+                                const updatedVideos = videos.map(v =>
+                                    v.id === video.id
+                                        ? { ...v, uri: persistentUri, status: 'publishing' as const }
+                                        : v
+                                );
+                                setSparkData('video', { videos: updatedVideos });
+                                Alert.alert('Ready to Publish', 'Final video selected. It is now ready for upload to YouTube Shorts.');
+                            }
+                        } catch (error) {
+                            console.error('Picker Error:', error);
+                            Alert.alert('Error', 'Failed to select video. Make sure you have granted Photos permissions.');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const deleteVideo = (id: string) => {
@@ -188,7 +334,7 @@ const VideoSpark: React.FC = () => {
                 key={video.id}
                 style={[styles.card, { backgroundColor: colors.surface }]}
                 activeOpacity={0.7}
-                onPress={() => setSelectedVideoForEdit(video)}
+                onPress={() => setSelectedVideoForEdit({ video, mode: activeTab === 'publishing' ? 'publishing' : 'recording' })}
             >
                 <View style={[styles.thumbnailPlaceholder, { backgroundColor: colors.border + '40' }]}>
                     {video.thumbnail ? (
@@ -210,9 +356,6 @@ const VideoSpark: React.FC = () => {
                                 video.source === 'overlay' ? 'OVERLAY' :
                                     video.source.replace('_', ' ').toUpperCase()}
                         </Text>
-                        <TouchableOpacity onPress={() => deleteVideo(video.id)}>
-                            <Text style={{ fontSize: 18 }}>🗑️</Text>
-                        </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
                         {dateStr}
@@ -225,6 +368,24 @@ const VideoSpark: React.FC = () => {
                             📜 {video.script}
                         </Text>
                     )}
+
+                    {activeTab === 'publishing' && (video.status === 'editing' || video.status === 'recorded') && (
+                        <TouchableOpacity
+                            style={[styles.publishActionBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => handleStartPublishing(video)}
+                        >
+                            <Text style={styles.publishActionBtnText}>Start Publishing</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {activeTab === 'publishing' && video.status === 'publishing' && (
+                        <TouchableOpacity
+                            style={[styles.publishActionBtn, { backgroundColor: '#FF0000' }]}
+                            onPress={() => setSelectedVideoForEdit({ video, mode: 'publishing' })}
+                        >
+                            <Text style={styles.publishActionBtnText}>🏁 Ready to Publish</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </TouchableOpacity>
         );
@@ -233,12 +394,49 @@ const VideoSpark: React.FC = () => {
     const getStatusColor = (status: VideoAI['status']) => {
         switch (status) {
             case 'recording': return '#ff4444';
+            case 'recorded': return '#4bb543';
             case 'editing': return '#ffbb33';
             case 'publishing': return '#33b5e5';
             case 'published': return '#00C851';
+            case 'archived': return '#999';
             default: return '#999';
         }
     };
+
+    if (showSettings) {
+        return (
+            <SettingsContainer>
+                <SettingsScrollView>
+                    <SettingsHeader
+                        title={`${displayTitle} Settings`}
+                        subtitle="Capture and publish professional video sparks"
+                        icon="🎥"
+                        sparkId="video-spark"
+                    />
+                    <SettingsFeedbackSection sparkName="Video" sparkId="video" />
+
+                    <SettingsSection title="Video Preferences">
+                        <SettingsToggle
+                            label="Include Subtitles Automatically"
+                            value={videoCapture.includeSubtitles}
+                            onValueChange={(val) => setVideoCaptureData({ includeSubtitles: val })}
+                        />
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            When enabled, we will automatically burn your script overlays into camera recordings if timestamps are detected.
+                        </Text>
+                    </SettingsSection>
+
+                    <View style={{ paddingVertical: 20 }}>
+                        <SettingsButton
+                            title="Close"
+                            onPress={onCloseSettings || (() => { })}
+                            variant="secondary"
+                        />
+                    </View>
+                </SettingsScrollView>
+            </SettingsContainer>
+        );
+    }
 
     return (
         <BaseSpark>
@@ -251,26 +449,85 @@ const VideoSpark: React.FC = () => {
                     <Text style={[styles.title, { color: colors.text }]}>🎬✨ Video</Text>
                 </View>
 
-                <TouchableOpacity
-                    style={[styles.createButton, { backgroundColor: colors.primary }]}
-                    onPress={handleCreateNewVideo}
-                >
-                    <Text style={styles.createButtonText}>+ Create New Video</Text>
-                </TouchableOpacity>
-
-                <View style={styles.listContainer}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>My Videos</Text>
-
-                    {videos.length === 0 ? (
-                        <View style={styles.emptyContainer}>
-                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                No videos yet. Start by creating a new one!
-                            </Text>
-                        </View>
-                    ) : (
-                        videos.map(renderVideoCard)
-                    )}
+                {/* Studio Tabs */}
+                <View style={styles.tabsRow}>
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('recording')}
+                        style={[styles.tab, activeTab === 'recording' && styles.activeTab]}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'recording' && styles.activeTabText]}>Recording</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('publishing')}
+                        style={[styles.tab, activeTab === 'publishing' && styles.activeTab]}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'publishing' && styles.activeTabText]}>Publishing </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('archived')}
+                        style={[styles.tab, activeTab === 'archived' && styles.activeTab]}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'archived' && styles.activeTabText]}>Archived </Text>
+                    </TouchableOpacity>
                 </View>
+
+                {activeTab === 'recording' ? (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.createButton, { backgroundColor: colors.primary }]}
+                            onPress={handleCreateNewVideo}
+                        >
+                            <Text style={styles.createButtonText}>+ Create New Video</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.listContainer}>
+
+                            {videos.filter(v => ['recording', 'recorded', 'editing'].includes(v.status)).length === 0 ? (
+                                <View style={styles.emptyContainer}>
+                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                        No active recordings. Start by creating a new one!
+                                    </Text>
+                                </View>
+                            ) : (
+                                videos.filter(v => ['recording', 'recorded', 'editing'].includes(v.status)).map(renderVideoCard)
+                            )}
+                        </View>
+                    </>
+                ) : activeTab === 'publishing' ? (
+                    <View style={styles.listContainer}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Publishing Pipeline</Text>
+                        <Text style={[styles.tabSubtext, { color: colors.textSecondary }]}>
+                            Manage videos ready for social media. 'Recorded' or 'Editing' videos can be sent to the publishing queue.
+                        </Text>
+
+                        {videos.filter(v => ['recorded', 'editing', 'publishing', 'published'].includes(v.status)).length === 0 ? (
+                            <View style={styles.emptyContainer}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No videos in the pipeline. Finish a recording to see it here!
+                                </Text>
+                            </View>
+                        ) : (
+                            videos.filter(v => ['recorded', 'editing', 'publishing', 'published'].includes(v.status)).map(renderVideoCard)
+                        )}
+                    </View>
+                ) : (
+                    <View style={styles.listContainer}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Project Archive</Text>
+                        <Text style={[styles.tabSubtext, { color: colors.textSecondary }]}>
+                            Original raw recordings and completed projects are stored here.
+                        </Text>
+
+                        {videos.filter(v => v.status === 'archived').length === 0 ? (
+                            <View style={styles.emptyContainer}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No archived videos yet.
+                                </Text>
+                            </View>
+                        ) : (
+                            videos.filter(v => v.status === 'archived').map(renderVideoCard)
+                        )}
+                    </View>
+                )}
             </ScrollView>
 
             {/* Creation Options Modal */}
@@ -413,12 +670,21 @@ const VideoSpark: React.FC = () => {
 
             <VideoEditorModal
                 visible={!!selectedVideoForEdit}
-                video={selectedVideoForEdit}
+                video={selectedVideoForEdit?.video || null}
+                mode={selectedVideoForEdit?.mode}
                 onClose={() => setSelectedVideoForEdit(null)}
                 onSave={handleSaveVideo}
+                onDelete={handleDeleteVideoFromModal}
                 onStartExport={(metadata) => setVideoCaptureData(metadata)}
                 colors={colors}
             />
+
+            {isAutoExporting && (
+                <View style={[styles.autoExportOverlay, { backgroundColor: colors.surface + 'CC' }]}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.autoExportText, { color: colors.text }]}>Applying Overlays...</Text>
+                </View>
+            )}
         </BaseSpark>
     );
 };
@@ -710,6 +976,70 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '900',
         textAlign: 'center',
+    },
+    tabsRow: {
+        flexDirection: 'row',
+        marginBottom: 20,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        borderRadius: 12,
+        padding: 4,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    activeTab: {
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#666',
+    },
+    activeTabText: {
+        color: '#000',
+    },
+    tabSubtext: {
+        fontSize: 12,
+        fontStyle: 'italic',
+        lineHeight: 18,
+        marginBottom: 20,
+        paddingHorizontal: 4,
+    },
+    publishActionBtn: {
+        marginTop: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    publishActionBtnText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: 'bold',
+    },
+    helpText: {
+        fontSize: 12,
+        marginTop: 8,
+        lineHeight: 18,
+    },
+    autoExportOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+        borderRadius: 24,
+    },
+    autoExportText: {
+        marginTop: 10,
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
 

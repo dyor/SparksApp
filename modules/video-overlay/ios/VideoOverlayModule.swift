@@ -78,24 +78,42 @@ public class VideoOverlayModule: Module {
                   let start = item["start"] as? Double,
                   let end = item["end"] as? Double else { continue }
             
+            let font = UIFont.systemFont(ofSize: 48, weight: .black)
+            let margin: CGFloat = 40
+            let textPadding: CGFloat = 30
+            let maxWidth = videoSize.width - (margin * 2) - (textPadding * 2)
+            
+            let attributes: [NSAttributedString.Key: Any] = [ .font: font ]
+            let constraintSize = CGSize(width: maxWidth, height: videoSize.height * 0.4) // Max 40% height
+            let boundingBox = (text as NSString).boundingRect(with: constraintSize, options: .usesLineFragmentOrigin, attributes: attributes, context: nil)
+            
+            let finalWidth = ceil(boundingBox.width) + (textPadding * 2)
+            let finalHeight = ceil(boundingBox.height) + (textPadding * 2)
+            
             let textLayer = CATextLayer()
             textLayer.string = text
-            textLayer.font = UIFont.systemFont(ofSize: 48, weight: .black)
+            textLayer.font = font
             textLayer.fontSize = 48
             textLayer.foregroundColor = UIColor.white.cgColor
             textLayer.alignmentMode = .center
             textLayer.isWrapped = true
-            textLayer.truncationMode = .end
+            textLayer.truncationMode = .none
             textLayer.contentsScale = UIScreen.main.scale
             
             // Background Bubble Effect
             textLayer.backgroundColor = UIColor(white: 0, alpha: 0.7).cgColor
-            textLayer.cornerRadius = 12
+            textLayer.cornerRadius = 24
             
-            // Positioning
-            let margin: CGFloat = 40
-            let height: CGFloat = 120
-            textLayer.frame = CGRect(x: margin, y: 80, width: videoSize.width - (margin * 2), height: height)
+            // Positioning: Center horizontally, place near bottom (y: 80 from bottom)
+            let xPos = (videoSize.width - finalWidth) / 2
+            let yPos: CGFloat = 80 // Bottom margin in AVFoundation (0,0 is bottom-left)
+            
+            textLayer.frame = CGRect(x: xPos, y: yPos, width: finalWidth, height: finalHeight)
+            
+            // Center text vertically within the bubble
+            // CATextLayer can be tricky to center vertically, manual adjustment of the contents center:
+            // Since we added padding, we just need to ensure the text layer's height matches the bubble height.
+            // CA-TextLayer renders text from the top, so we are good as long as we use the bounding box + padding.
             
             // Visibility Animation
             textLayer.opacity = 0
