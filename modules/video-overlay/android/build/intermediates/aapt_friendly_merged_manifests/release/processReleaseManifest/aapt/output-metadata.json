@@ -5,7 +5,7 @@
     "kind": "Directory"
   },
   "applicationId": "modules.videooverlay",
-  "variantName": "debug",
+  "variantName": "release",
   "elements": [
     {
       "type": "SINGLE",

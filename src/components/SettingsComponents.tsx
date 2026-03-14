@@ -546,6 +546,7 @@ interface FeedbackModalProps {
   onClose: () => void;
   sparkName: string;
   sparkId: string;
+  initialRating?: number;
   onSubmit: (rating: number, feedback: string) => void;
 }
 
@@ -554,6 +555,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   onClose,
   sparkName,
   sparkId,
+  initialRating = 0,
   onSubmit,
 }) => {
   const { colors } = useTheme();
@@ -564,18 +566,23 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const handleSubmit = async () => {
     // Prevent double submission
     if (isSubmitting) return;
-    
-    setIsSubmitting(true);
-    
+
+    // For non-5 star ratings passed automatically, feedback text is required
+    if (initialRating > 0 && initialRating < 5 && feedback.trim().length === 0) {
+      Alert.alert("Feedback Required", "Please let us know how we can improve before submitting your rating.");
+      setIsSubmitting(false);
+      return;
+    }
+
     // Dismiss keyboard immediately without waiting
     if (textInputRef.current) {
       textInputRef.current.blur();
     }
     Keyboard.dismiss();
-    
+
     try {
       // Submit immediately - don't wait for keyboard animation
-      await onSubmit(0, feedback); // Rating is handled separately now
+      await onSubmit(initialRating, feedback);
       HapticFeedback.success();
       onClose();
       // Reset form
@@ -639,7 +646,9 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           textAlign: "center",
         }}
       >
-        Your feedback helps us improve {sparkName}
+        {initialRating > 0 && initialRating < 5
+          ? `We'd love to earn 5 stars next time! Please let us know how we can improve ${sparkName}.`
+          : `Your feedback helps us improve ${sparkName}`}
       </Text>
 
       <TextInput
@@ -832,6 +841,7 @@ export const SettingsFeedbackSection = forwardRef<
 >(function SettingsFeedbackSection({ sparkName, sparkId = "app" }, ref) {
   const { colors } = useTheme();
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [modalInitialRating, setModalInitialRating] = useState(0);
   const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -892,7 +902,7 @@ export const SettingsFeedbackSection = forwardRef<
           "⚠️ Analytics not initialized, attempting to initialize..."
         );
         try {
-          await AnalyticsService.initialize();
+          await ServiceFactory.ensureAnalyticsInitialized();
           console.log("✅ Analytics initialized for feedback submission");
         } catch (error) {
           console.error("❌ Failed to initialize analytics:", error);
@@ -911,12 +921,11 @@ export const SettingsFeedbackSection = forwardRef<
       const deviceId =
         await FeedbackNotificationService.getPersistentDeviceId();
 
-      // Submit feedback only (rating is handled separately)
       const feedbackData: any = {
         userId: deviceId,
         sparkId,
         sparkName,
-        rating: 0, // No rating for feedback-only submissions
+        rating: rating, // Now accepts the rating passed from the modal
         platform: Platform.OS as "ios" | "android" | "web",
         comment: "", // Ensure comment is not undefined
         feedback: feedback.trim() || "", // Ensure feedback is not undefined
@@ -1048,6 +1057,10 @@ export const SettingsFeedbackSection = forwardRef<
       console.log("✅ Feedback list reloaded");
 
       HapticFeedback.success();
+
+      // We no longer show this alert here if it was a <5 star rating, 
+      // because that goes through the handleSubmitFeedback path instead.
+      // But it's valid if it was exactly 5 stars.
       Alert.alert(
         "Thank You!",
         `Your ${rating}-star rating has been recorded.`
@@ -1128,7 +1141,12 @@ export const SettingsFeedbackSection = forwardRef<
         <StarRating
           rating={0}
           onRatingChange={(rating) => {
-            if (rating > 0) {
+            if (rating > 0 && rating < 5) {
+              // Open modal for feedback instead of submitting immediately
+              setModalInitialRating(rating);
+              setShowFeedbackModal(true);
+            } else if (rating === 5) {
+              // Submit 5 star immediately
               handleRatingSubmit(rating);
             }
           }}
@@ -1139,7 +1157,10 @@ export const SettingsFeedbackSection = forwardRef<
       {/* Submit Feedback Button */}
       <TouchableOpacity
         style={styles.feedbackButton}
-        onPress={() => setShowFeedbackModal(true)}
+        onPress={() => {
+          setModalInitialRating(0);
+          setShowFeedbackModal(true);
+        }}
       >
         <Text style={styles.feedbackButtonText}>💬 Share Feedback</Text>
       </TouchableOpacity>
@@ -1259,6 +1280,7 @@ export const SettingsFeedbackSection = forwardRef<
         onClose={() => setShowFeedbackModal(false)}
         sparkName={sparkName}
         sparkId={sparkId}
+        initialRating={modalInitialRating}
         onSubmit={handleSubmitFeedback}
       />
     </SettingsSection>

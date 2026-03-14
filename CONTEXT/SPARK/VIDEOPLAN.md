@@ -134,3 +134,31 @@ The Video Spark will adapt the following patterns from `RecordSwingSpark.tsx`:
 - **Haptics**: `HapticFeedback.light()` for countdown ticks, `success()` for start/stop.
 - **Permissions**: Using `PermissionService` to ensure Camera/Mic/Media access.
 - **Modals**: Full-screen modal for recording to ensure maximum real estate.
+
+---
+
+## 6. Build Error Resolutions
+
+### iOS: Provisioning Profile & App Groups Mismatch
+The `react-native-nitro-screen-recorder` requires App Groups to share video data between the broadcast extension and the main app. If EAS fails to sync this automatically, it must be done manually in the Apple Developer Portal.
+
+- [ ] Log in to the [Apple Developer Portal - Identifiers](https://developer.apple.com/account/resources/identifiers/list/bundleId).
+- [ ] Select **App Groups** from the dropdown menu (top right).
+- [ ] Create or verify the existence of the App Group: `group.com.mattdyor.sparks.screen-recorder`.
+- [ ] Switch the dropdown back to **App IDs**.
+- [ ] Find and click the main app identifier: `com.mattdyor.sparks`.
+- [ ] Scroll to the **App Groups** capability.
+- [ ] Check the box for **App Groups**.
+- [ ] Click **Edit** next to App Groups, check `group.com.mattdyor.sparks.screen-recorder`, and click **Save**.
+- [ ] Go back to App IDs and find the extension identifier: `com.mattdyor.sparks.BroadcastExtension`.
+- [ ] Scroll to the **App Groups** capability, check the box, click **Edit**, select the same App Group (`group.com.mattdyor.sparks.screen-recorder`), and click **Save**.
+- [ ] Run `eas build -p ios` again. EAS should now successfully pull the updated remote provisioning profiles.
+
+### Android: Google Play Foreground Service Permissions
+
+- [x] **Permissions Removed**: We removed `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and `FOREGROUND_SERVICE_MEDIA_PROJECTION` (and the associated `ScreenRecordingService`) from `AndroidManifest.xml` since audio like Soundboard or Spanish Flashcards only play while the app is actively in the foreground. 
+- [x] **Disabled Screen Recording on Android**: Due to Google Play Console strictly blocking apps that request `FOREGROUND_SERVICE_MEDIA_PROJECTION` without Google-approved video justifications, we have implemented an automatic fallback to bypass this completely:
+  - Added a custom `withDisableAndroidScreenRecorder.js` Expo prebuild config plugin to actively strip the permissions and services added automatically by the `react-native-nitro-screen-recorder` library's underlying native plugin.
+  - Removed the "Screen" recording option entirely from the `VideoSpark` UI on Android, forcing users to use the standard front/rear camera workflows instead. IOS remains fully able to initiate global screen recordings. 
+- ⚠️ **Important Note on Video Studio (MediaProjection)**: Google has mandated that any app using the Android `MediaProjection` API (which `react-native-nitro-screen-recorder` uses to capture the screen device feed) must attach it to a foreground service from Android 10 onwards, *even if you are only recording while the app is actively on-screen*. 
+- **Next Steps**: Android enforces that permission strictly for screen recording at the system API level. If you find that Video Studio's screen recording feature suddenly crashes when you try to use it on Android, it's because of this strict enforcement. We will need to restore the permission and provide the required justifications to the Google Play Console if that happens.

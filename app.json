@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.43",
+    "version": "1.0.46",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -101,7 +101,7 @@
           }
         ]
       },
-      "buildNumber": "1.0.43"
+      "buildNumber": "1.0.46"
     },
     "android": {
       "compileSdkVersion": 35,
@@ -129,8 +129,8 @@
         "android.permission.WAKE_LOCK"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.43",
-      "versionCode": 68,
+      "versionName": "1.0.46",
+      "versionCode": 71,
       "package": "com.mattdyor.sparks"
     },
     "extra": {

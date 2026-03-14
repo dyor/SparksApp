@@ -41,7 +41,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
     if (disabled) return;
 
     HapticFeedback.light();
-    
+
     // Animate the pressed star
     Animated.sequence([
       Animated.timing(scaleAnimations[selectedRating - 1], {
@@ -79,7 +79,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
           style={styles.starButton}
           activeOpacity={0.7}
         >
-          <View style={[styles.star, { width: size, height: size }]}>
+          <View style={styles.star}>
             {/* Background star */}
             <Text
               style={[
@@ -92,7 +92,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
             >
               ★
             </Text>
-            
+
             {/* Filled star overlay */}
             {isFilled && (
               <View style={styles.filledStarOverlay}>
@@ -109,7 +109,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
                 </Text>
               </View>
             )}
-            
+
             {/* Half-filled star overlay */}
             {isHalfFilled && (
               <View style={[styles.halfFilledStarOverlay, { width: size / 2 }]}>
@@ -148,7 +148,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
       <View style={styles.starsContainer}>
         {Array.from({ length: maxRating }, (_, index) => renderStar(index))}
       </View>
-      
+
       {showLabel && animatedRating > 0 && (
         <Text style={[styles.ratingLabel, { color: colors.text }]}>
           {getRatingLabel(animatedRating)}
@@ -177,6 +177,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 4, // Add padding to prevent clipping of the font glyph
   },
   starText: {
     textAlign: 'center',

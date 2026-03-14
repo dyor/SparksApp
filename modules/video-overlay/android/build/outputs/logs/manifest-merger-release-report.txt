@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml:2:13-83
-INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml:2:13-83
+ADDED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml:2:13-83
+INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml:2:13-83
 	package
-		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml
+		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml
 	xmlns:android
-		ADDED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml:2:23-81
+		ADDED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml:2:23-81
 uses-sdk
-INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml reason: use-sdk injection requested
-INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml
-INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml
+INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml reason: use-sdk injection requested
+INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml
+INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml
 	android:targetSdkVersion
-		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml
+		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml
 	android:minSdkVersion
-		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest3896363210457133049.xml
+		INJECTED from /Users/mattdyor/SparksApp/modules/video-overlay/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2858361002246131663.xml

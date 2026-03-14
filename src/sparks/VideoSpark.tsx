@@ -62,6 +62,8 @@ interface VideoSparkProps {
     onCloseSettings?: () => void;
 }
 
+const EMPTY_VIDEOS: VideoAI[] = [];
+
 const VideoSpark: React.FC<VideoSparkProps> = ({
     showSettings = false,
     onCloseSettings
@@ -70,7 +72,7 @@ const VideoSpark: React.FC<VideoSparkProps> = ({
     const { setSparkData, isHydrated, videoCapture, setVideoCaptureData } = useSparkStore();
 
     // Reactive access to videos from the store
-    const videos = useSparkStore(state => state.sparkData['video']?.videos || []) as VideoAI[];
+    const videos = useSparkStore(state => state.sparkData['video']?.videos ?? EMPTY_VIDEOS) as VideoAI[];
 
     // Recorder State
     const [showRecorder, setShowRecorder] = useState(false);
@@ -122,7 +124,12 @@ const VideoSpark: React.FC<VideoSparkProps> = ({
     const startRecordingSession = () => {
         setShowOptions(false);
 
-        if (videoCapture.source === 'screen') {
+        let finalSource = videoCapture.source;
+        if (Platform.OS === 'android' && finalSource === 'screen') {
+            finalSource = 'front_camera';
+        }
+
+        if (finalSource === 'screen') {
             ScreenRecorder.startRecording();
             return;
         }
@@ -568,15 +575,17 @@ const VideoSpark: React.FC<VideoSparkProps> = ({
 
                                     <Text style={[styles.inputLabel, { color: colors.text }]}>Recording Source</Text>
                                     <View style={styles.sourceButtons}>
+                                        {Platform.OS === 'ios' && (
+                                            <TouchableOpacity
+                                                style={[styles.sourceButton, { borderColor: videoCapture.source === 'screen' ? colors.primary : colors.border }]}
+                                                onPress={() => setVideoCaptureData({ source: 'screen' })}
+                                            >
+                                                <Text style={styles.sourceButtonEmoji}>📱</Text>
+                                                <Text style={[styles.sourceButtonText, { color: colors.text }]}>Screen</Text>
+                                            </TouchableOpacity>
+                                        )}
                                         <TouchableOpacity
-                                            style={[styles.sourceButton, { borderColor: videoCapture.source === 'screen' ? colors.primary : colors.border }]}
-                                            onPress={() => setVideoCaptureData({ source: 'screen' })}
-                                        >
-                                            <Text style={styles.sourceButtonEmoji}>📱</Text>
-                                            <Text style={[styles.sourceButtonText, { color: colors.text }]}>Screen</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.sourceButton, { borderColor: videoCapture.source === 'front_camera' ? colors.primary : colors.border }]}
+                                            style={[styles.sourceButton, { borderColor: (videoCapture.source === 'front_camera' || (Platform.OS === 'android' && videoCapture.source === 'screen')) ? colors.primary : colors.border }]}
                                             onPress={() => setVideoCaptureData({ source: 'front_camera' })}
                                         >
                                             <Text style={styles.sourceButtonEmoji}>🤳</Text>

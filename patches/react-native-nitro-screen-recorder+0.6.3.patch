@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-nitro-screen-recorder/lib/commonjs/expo-plugin/withScreenRecorder.js b/node_modules/react-native-nitro-screen-recorder/lib/commonjs/expo-plugin/withScreenRecorder.js
+index ab7d3f6..15e2a5f 100644
+--- a/node_modules/react-native-nitro-screen-recorder/lib/commonjs/expo-plugin/withScreenRecorder.js
++++ b/node_modules/react-native-nitro-screen-recorder/lib/commonjs/expo-plugin/withScreenRecorder.js
+@@ -25,6 +25,7 @@ const withScreenRecorder = (config, props = {}) => {
+     }
+     config = (0, withBroadcastExtension_1.withBroadcastExtension)(config, props);
+     /*---------------ANDROID-------------------- */
++    /* 
+     const androidPermissions = [
+         // already conditionally added
+         ...(props.enableMicrophonePermission !== false
+@@ -39,5 +40,7 @@ const withScreenRecorder = (config, props = {}) => {
+         [config_plugins_1.AndroidConfig.Permissions.withPermissions, androidPermissions],
+         [withAndroidScreenRecording_1.withAndroidScreenRecording, props],
+     ]);
++    */
++    return config;
+ };
+ exports.default = (0, config_plugins_1.createRunOncePlugin)(withScreenRecorder, pkg.name, pkg.version);
