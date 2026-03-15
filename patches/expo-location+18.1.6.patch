@@ -1,0 +1,14 @@
+diff --git a/node_modules/expo-location/android/src/main/AndroidManifest.xml b/node_modules/expo-location/android/src/main/AndroidManifest.xml
+index 2b64552..ee55291 100644
+--- a/node_modules/expo-location/android/src/main/AndroidManifest.xml
++++ b/node_modules/expo-location/android/src/main/AndroidManifest.xml
+@@ -3,9 +3,5 @@
+   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+ 
+   <application>
+-    <service
+-      android:name=".services.LocationTaskService"
+-      android:exported="false"
+-      android:foregroundServiceType="location" />
+   </application>
+ </manifest>
