@@ -107,10 +107,6 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     metadata: sparkMetadata.soundboard,
     component: SoundboardSpark,
   },
-  "golf-brain": {
-    metadata: sparkMetadata["golf-brain"],
-    component: GolfBrainSpark,
-  },
   "quick-convert": {
     metadata: sparkMetadata["quick-convert"],
     component: QuickConvertSpark,
@@ -227,11 +223,15 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     metadata: sparkMetadata.infinite,
     component: InfiniteSpark,
   },
-  "record-swing": {
-    metadata: sparkMetadata["record-swing"],
-    component: RecordSwingSpark,
-  },
   ...(Platform.OS !== 'android' ? {
+    "golf-brain": {
+      metadata: sparkMetadata["golf-brain"],
+      component: GolfBrainSpark,
+    },
+    "record-swing": {
+      metadata: sparkMetadata["record-swing"],
+      component: RecordSwingSpark,
+    },
     video: {
       metadata: sparkMetadata.video,
       component: VideoSpark,

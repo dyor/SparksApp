@@ -5,5 +5,10 @@ module.exports = {
                 android: null, // disable Android auto-linking
             },
         },
+        'expo-video': {
+            platforms: {
+                android: null, // disable Android auto-linking
+            },
+        },
     },
 };
