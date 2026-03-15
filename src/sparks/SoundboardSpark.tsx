@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, TextInput, Modal, Linking, AppState } from 'react-native';
-import { useAudioPlayer, useAudioRecorder, AudioModule, setAudioModeAsync, AudioSource, AudioPlayer, AudioRecorder, RecordingPresets } from 'expo-audio';
+import { useAudioPlayer, useAudioRecorder, createAudioPlayer, AudioModule, setAudioModeAsync, AudioSource, AudioPlayer, AudioRecorder, RecordingPresets, getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
@@ -172,7 +172,7 @@ const SoundboardSettings: React.FC<{
       // Probe duration
       let duration = 0;
       try {
-        const player = AudioModule.createAudioPlayer(newPath);
+        const player = createAudioPlayer(newPath);
         // Wait briefly for metadata to load if needed, or just use duration if available
         duration = player.duration;
       } catch { }
@@ -650,7 +650,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
           setActivePlayer(null);
         }
 
-        const previewPlayer = AudioModule.createAudioPlayer(recordedUri);
+        const previewPlayer = createAudioPlayer(recordedUri);
         setActivePlayer(previewPlayer);
 
         previewPlayer.addListener('timeUpdate', (event) => {
@@ -806,11 +806,13 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     checkFileSystemStatus();
 
     // Pre-warm permissions
-    AudioModule.getPermissionsAsync().then(({ status, canAskAgain }) => {
-      if (status !== 'granted' && canAskAgain) {
-        AudioModule.requestPermissionsAsync();
-      }
-    });
+    getRecordingPermissionsAsync()
+      .then((result) => {
+        if (!result.granted && result.canAskAgain) {
+          requestRecordingPermissionsAsync();
+        }
+      })
+      .catch((error) => console.warn('SoundboardSpark: permission prewarm failed', error));
   }, [getSparkData, isHydrated]);
 
   // Save data whenever soundChips change
@@ -854,7 +856,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         if (!preloadedPlayersRef.current[chip.id]) {
           try {
             const absoluteUri = toAbsoluteUri(chip.filePath);
-            const newPlayer = AudioModule.createAudioPlayer(absoluteUri);
+            const newPlayer = createAudioPlayer(absoluteUri);
             preloadedPlayersRef.current[chip.id] = newPlayer;
             console.log(`✅ Pre-loaded sound: ${chip.displayName}`);
           } catch (error) {
@@ -928,7 +930,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       if (!playbackPlayer) {
         console.log(`⚠️ Sound ${chip.id} not pre-loaded, loading now...`);
-        playbackPlayer = AudioModule.createAudioPlayer(toAbsoluteUri(chip.filePath));
+        playbackPlayer = createAudioPlayer(toAbsoluteUri(chip.filePath));
       } else {
         // Reset to start/trim position
         playbackPlayer.seek((chip.trimStart || 0) / 1000);
