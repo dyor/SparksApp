@@ -131,7 +131,15 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
-        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "android.permission.FOREGROUND_SERVICE_CAMERA",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+        "android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING",
+        "android.permission.FOREGROUND_SERVICE_HEALTH",
+        "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED"
       ],
       "edgeToEdgeEnabled": true,
       "versionName": "1.0.56",

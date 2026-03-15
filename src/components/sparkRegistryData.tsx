@@ -12,7 +12,7 @@ import { FoodCamSpark } from "../sparks/FoodCamSpark";
 import { SpanishFriendSpark } from "../sparks/SpanishFriendSpark";
 import { TeeTimeTimerSpark } from "../sparks/TeeTimeTimerSpark";
 import { SoundboardSpark } from "../sparks/SoundboardSpark";
-import { GolfBrainSpark } from "../sparks/GolfBrainSpark";
+// import { GolfBrainSpark } from "../sparks/GolfBrainSpark";
 import QuickConvertSpark from "../sparks/QuickConvertSpark";
 import SpanishReaderSpark from "../sparks/SpanishReaderSpark";
 import TripStorySpark from "../sparks/TripStorySpark";
@@ -43,8 +43,8 @@ import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
 import { InfiniteSpark } from "../sparks/InfiniteSpark";
-import RecordSwingSpark from "../sparks/RecordSwingSpark";
-import VideoSpark from "../sparks/VideoSpark";
+// import RecordSwingSpark from "../sparks/RecordSwingSpark";
+// import VideoSpark from "../sparks/VideoSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -226,15 +226,15 @@ export const sparkRegistry: Record<string, BaseSpark> = {
   ...(Platform.OS !== 'android' ? {
     "golf-brain": {
       metadata: sparkMetadata["golf-brain"],
-      component: GolfBrainSpark,
+      component: require("../sparks/GolfBrainSpark").GolfBrainSpark,
     },
     "record-swing": {
       metadata: sparkMetadata["record-swing"],
-      component: RecordSwingSpark,
+      component: require("../sparks/RecordSwingSpark").default,
     },
     video: {
       metadata: sparkMetadata.video,
-      component: VideoSpark,
+      component: require("../sparks/VideoSpark").default,
     }
   } : {}),
 };
