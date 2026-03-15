@@ -20,6 +20,7 @@ import ShortSaverSpark from "../sparks/ShortSaverSpark";
 import SongSaverSpark from "../sparks/SongSaverSpark";
 import SparkSpark from "../sparks/SparkSpark";
 import { MinuteMinderSpark } from "../sparks/MinuteMinderSpark";
+import { Platform } from "react-native";
 import { BuzzyBingoSpark } from "../sparks/BuzzyBingoSpark";
 import { CardScoreSpark } from "../sparks/CardScoreSpark";
 import { GolfWisdomSpark } from "../sparks/GolfWisdomSpark";
@@ -230,10 +231,12 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     metadata: sparkMetadata["record-swing"],
     component: RecordSwingSpark,
   },
-  video: {
-    metadata: sparkMetadata.video,
-    component: VideoSpark,
-  },
+  ...(Platform.OS !== 'android' ? {
+    video: {
+      metadata: sparkMetadata.video,
+      component: VideoSpark,
+    }
+  } : {}),
 };
 
 // Memoization cache for enhanced spark objects

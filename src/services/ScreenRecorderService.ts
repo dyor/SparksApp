@@ -1,15 +1,32 @@
 import { Alert, Platform } from 'react-native';
 import { HapticFeedback } from '../utils/haptics';
-import {
+// Conditional import for Nitro Screen Recorder
+let NitroRecorder: any = {
+    startInAppRecording: async () => { throw new Error('Not supported on Android') },
+    stopInAppRecording: async () => null,
+    startGlobalRecording: async () => { throw new Error('Not supported on Android') },
+    stopGlobalRecording: async () => null,
+    getMicrophonePermissionStatus: () => 'denied',
+    requestMicrophonePermission: async () => 'denied',
+};
+
+if (Platform.OS !== 'android') {
+    try {
+        NitroRecorder = require('react-native-nitro-screen-recorder');
+    } catch (e) {
+        console.warn('Failed to load react-native-nitro-screen-recorder:', e);
+    }
+}
+
+const {
     startInAppRecording,
     stopInAppRecording,
     startGlobalRecording,
     stopGlobalRecording,
-    getCameraPermissionStatus,
     getMicrophonePermissionStatus,
-    requestCameraPermission,
     requestMicrophonePermission
-} from 'react-native-nitro-screen-recorder';
+} = NitroRecorder;
+
 
 // This service now uses nitro-screen-recorder for high-performance capture.
 // It supports both In-App (iOS) and Global (iOS/Android) recording.
@@ -65,7 +82,7 @@ class ScreenRecorderService {
                         enableMic: true,
                         enableCamera: false,
                     },
-                    onRecordingFinished: (file) => {
+                    onRecordingFinished: (file: any) => {
                         console.log('✅ In-App Recording Finished:', file.path);
                         this.setStatus('idle', 'file://' + file.path);
                     }
@@ -74,7 +91,7 @@ class ScreenRecorderService {
                 // Global Recording for Android (or iOS fallback)
                 await startGlobalRecording({
                     options: { enableMic: true },
-                    onRecordingError: (err) => console.error('Global Recording Error:', err)
+                    onRecordingError: (err: any) => console.error('Global Recording Error:', err)
                 });
             }
 
