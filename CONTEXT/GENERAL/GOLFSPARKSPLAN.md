@@ -1,0 +1,356 @@
+# Golf Sparks Plan — Publishing a Golf-Only Variant from the Shared Codebase
+
+**Purpose**: Define how to ship a second app, **Golf Sparks**, that contains only the golf-category sparks, while continuing to develop and publish the full **Sparks** app from the same codebase.
+
+**Status**: Proposal (not started)
+
+**Last Updated**: 2026-04-23
+
+---
+
+## 🎯 Goal
+
+Produce two separately-published apps from one source tree:
+
+| | Full Sparks (today) | Golf Sparks (new) |
+|---|---|---|
+| App name | Sparks | Golf Sparks |
+| Bundle ID (iOS) | `com.mattdyor.sparks` | `com.mattdyor.golfsparks` |
+| Package (Android) | `com.mattdyor.sparks` | `com.mattdyor.golfsparks` |
+| EAS projectId | `18230acd-…209c7` | **new, separate projectId** |
+| Firebase project | `sparks-app` (existing) | **new, separate project** |
+| Contents | all ~40 sparks | golf-category sparks only |
+| Icon / splash | current | new golf-themed assets |
+| Store listings | App Store + Play | separate App Store + Play listings |
+
+Design constraints:
+- One git repo, one source tree, no fork. Both variants build from `main`.
+- Zero duplication of spark code. Golf Sparks is a **filtered view** of the same registry.
+- Adding a new golf spark should require only registry/metadata work — no variant-specific edits.
+- Non-golf sparks should not ship in the Golf Sparks binary (app size + App Store review surface area).
+- Keep both apps' data isolated (different bundle IDs → different `AsyncStorage` sandboxes → no cross-contamination).
+
+---
+
+## 📋 The Golf Subset
+
+The canonical source of truth is `sparkMetadata.ts` — any entry with `category: "golf"` is in. Today that is:
+
+| id | title | iOS | Android | Notes |
+|---|---|---|---|---|
+| `tee-time-timer` | Tee Time Timer | ✅ | ✅ | |
+| `golfWisdom` | Golf Wisdom | ✅ | ✅ | uses `golfWisdomService`, `GolfWisdomNotificationService` |
+| `skins` | Skins | ✅ | ✅ | |
+| `scorecard` | Scorecard | ✅ | ✅ | |
+| `golf-brain` | Golf Brain | ✅ | ❌ | currently iOS-only in registry |
+| `record-swing` | Record Swing (Beta) | ✅ | ❌ | currently iOS-only, uses `expo-speech-recognition`, `expo-video` |
+
+**Decision needed**: do we keep `golf-brain` and `record-swing` iOS-only in the Golf app, or invest in Android support for these? Recommend shipping Golf v1 with the same iOS/Android matrix as today and treat Android parity as a separate effort.
+
+**Non-golf sparks categorized in a golf-adjacent way**: `card-score` (`utility`) is not in the golf category despite plausible golfer use. Include it in the Golf Sparks app.
+
+---
+
+## 🏗 Architecture: build-time variant flag
+
+Pick **single-variable, build-time flag** over other approaches because:
+
+- **No runtime cost** — filtered registry is baked into the bundle.
+- **App size stays small** — unused sparks are tree-shakeable from the filtered registry.
+- **Cleanest store story** — two bundle IDs, two listings, two sets of reviews.
+- **No monorepo refactor** — keeps current layout; only touches config and the registry.
+
+The flag: `EXPO_PUBLIC_APP_VARIANT=full | golf` (default `full`).
+
+Six things read it:
+1. `app.config.ts` — app name, slug, bundle ID, icon, splash, Firebase file, EAS projectId.
+2. `eas.json` — new `*-golf` profiles set the env var.
+3. `src/variants/variantConfig.ts` — single source of truth for what the running app is allowed to show.
+4. `sparkRegistryData.tsx` — filters the registry against `variantConfig.allowedSparkIds`.
+5. `package.json` scripts — `ios:golf`, `android:golf`, `build:ios:golf`, etc.
+6. `MarketplaceScreen.tsx` — hides category pills + the "All Sparks" subheader (and everything above it) in the `golf` variant, since those affordances are meaningless with a single category. Details in Phase 1b.
+
+Everything else downstream (`SparkSelectionScreen`, `SparkStatsSpark`, `sparkStore`) already calls `getAllSparks()` / `sparkRegistry` — they don't need to know a variant exists.
+
+---
+
+## 🧩 Implementation Phases
+
+### Phase 0 — Decisions (before touching code)
+
+- [ ] Confirm bundle IDs: `com.mattdyor.golfsparks` (iOS + Android)
+- [ ] Create new EAS project (`eas init --force` in a worktree, or via expo.dev console) → note the `projectId`
+- [ ] Decide: separate App Store Connect / Play Console apps (yes)
+- [ ] Decide: shared privacy policy URL or distinct (yes - keeping current privacy policy)
+- [ ] Assets: commission/design golf icon, splash, adaptive icon, favicon (`assets/variants/golf/`)
+
+### Phase 1 — Introduce the variant flag without shipping anything
+
+Goal: land the scaffolding behind the default `full` variant so nothing changes for the current app.
+
+- [ ] Create `src/variants/variantConfig.ts`:
+  ```ts
+  import Constants from 'expo-constants';
+  import { sparkMetadata } from '../components/sparkMetadata';
+
+  export type AppVariant = 'full' | 'golf';
+
+  export const variant: AppVariant =
+    (process.env.EXPO_PUBLIC_APP_VARIANT as AppVariant) ||
+    (Constants.expoConfig?.extra?.variant as AppVariant) ||
+    'full';
+
+  const golfIds = Object.values(sparkMetadata)
+    .filter(m => m.category === 'golf')
+    .map(m => m.id);
+
+  export const allowedSparkIds: ReadonlySet<string> | null =
+    variant === 'golf' ? new Set(golfIds) : null; // null = allow all
+
+  export const isAllowed = (id: string) =>
+    allowedSparkIds === null || allowedSparkIds.has(id);
+  ```
+- [ ] In `src/components/sparkRegistryData.tsx`, wrap the exported `sparkRegistry` with a filter:
+  ```ts
+  import { isAllowed } from '../variants/variantConfig';
+  const rawRegistry: Record<string, BaseSpark> = { /* …existing… */ };
+  export const sparkRegistry = Object.fromEntries(
+    Object.entries(rawRegistry).filter(([id]) => isAllowed(id))
+  );
+  ```
+  Keep the existing Platform-gated spreads for `golf-brain`/`record-swing`/`video` intact — those are an orthogonal axis.
+- [ ] Add `EXPO_PUBLIC_APP_VARIANT=full` to existing EAS profiles' `env` so the flag is always explicit.
+- [ ] Run `npm test` + iOS smoke test: registry unchanged, all ~40 sparks still present.
+- [ ] Commit: `feat: add variant scaffolding (full-only, no behavior change)`
+
+### Phase 1b — Trim Discover Sparks for the Golf variant
+
+The Discover Sparks page (`src/screens/MarketplaceScreen.tsx`) renders, top-to-bottom:
+header → New Sparks grid → Top Rated grid → Property pills → Category pills → "All Sparks" subheader → alphabetical grid. In the Golf variant most of these either collapse to the same content or filter on a single value, so hide "All Sparks" and everything above it. Keep the page header and the alphabetical grid.
+
+- [ ] In `MarketplaceScreen.tsx`, import `variant` from `src/variants/variantConfig.ts` and derive `const showDiscoverChrome = variant !== 'golf';`.
+- [ ] Wrap these blocks with `{showDiscoverChrome && ( … )}`:
+  - New Sparks section (currently lines 121–151)
+  - Top Rated section (currently lines 153–189)
+  - Property Filter Pills (currently lines 193–214)
+  - Category Filter Pills (currently lines 216–235)
+  - "All Sparks" subheader (currently lines 237–240) — keep the grid that follows
+- [ ] Leave `<Text style={styles.title}>Discover Sparks</Text>` + subtitle in place as the page header. The alphabetical grid of golf sparks immediately follows.
+- [ ] Verify: with `EXPO_PUBLIC_APP_VARIANT=full`, the page is visually unchanged. With `golf`, only header + grid render.
+- [ ] Commit: `feat(marketplace): collapse Discover UI for golf variant`
+
+**Note**: the grid displays `allSparksAlphabetical` which is derived from `allSparks = getAllSparks()`. Because Phase 1's registry filter already excludes non-golf sparks from `getAllSparks()`, the grid will contain exactly the golf subset with no extra filtering here.
+
+### Phase 1c — Seed default My Sparks for the Golf variant
+
+The home screen ("My Sparks") is driven by `sparkStore.userSparkIds` (initial value `[]` at `sparkStore.ts:67`). A fresh install of Sparks lands on an empty home; the user discovers and adds sparks from the Marketplace. For Golf Sparks we want a non-empty first-run home featuring the flagship trio — **Golf Brain**, **Record Swing**, **Tee Time Timer** — so the app feels populated the moment it opens.
+
+Because Zustand's `persist` middleware rehydrates from AsyncStorage on re-launches, changing the store's initial value only affects installs with no persisted state (= first install, or after a data reset). Existing users' custom "My Sparks" ordering is preserved.
+
+- [ ] In `src/store/sparkStore.ts`, import `variant` from `../variants/variantConfig.ts`.
+- [ ] Replace the literal `userSparkIds: []` initial value with:
+  ```ts
+  const GOLF_DEFAULT_SPARKS = ['golf-brain', 'record-swing', 'tee-time-timer'];
+  // ...
+  userSparkIds: variant === 'golf' ? [...GOLF_DEFAULT_SPARKS] : [],
+  ```
+- [ ] Keep the order in `GOLF_DEFAULT_SPARKS` intentional — it's the display order on the home screen. Current pick: Golf Brain (round tracking), Record Swing (video), Tee Time Timer (pre-round prep).
+- [ ] Verify first-install seeding: `npm run ios:golf`, fully delete the app from the simulator (`xcrun simctl uninstall booted com.mattdyor.golfsparks`), reinstall. Home should show the three sparks in order.
+- [ ] Verify preservation: install, remove one of the three from My Sparks, kill and relaunch → removal persists (store wasn't re-seeded).
+- [ ] Commit: `feat(store): seed golf variant My Sparks with golf-brain, record-swing, tee-time-timer`
+
+**Open question — existing Golf Sparks users after an update.** If Golf Sparks is already shipped and a user has an empty `userSparkIds`, they'll stay empty; the seed only fires on *fresh* installs. If we want to retro-seed, we'd need a migration step (e.g., bump a schema version in the store and re-seed on upgrade). For v1 this is probably fine — users with empty collections explicitly cleared them.
+
+**Why these three, not all seven?** Leaving Golf Wisdom, Skins, Scorecard, and card-score out of the default keeps the home uncluttered and invites discovery from the Marketplace grid (Phase 1b leaves that intact). Revisit after user feedback — the constant is trivial to edit.
+
+### Phase 2 — Dynamic app config
+
+Replace static `app.json` with `app.config.ts` so name/slug/bundleId/icons/firebase files vary by variant.
+
+- [ ] Convert `app.json` → `app.config.ts` (Expo reads either; if both exist, `app.config.ts` wins):
+  ```ts
+  import { ExpoConfig, ConfigContext } from 'expo/config';
+
+  const variant = (process.env.EXPO_PUBLIC_APP_VARIANT || 'full') as 'full' | 'golf';
+  const isGolf = variant === 'golf';
+
+  export default ({ config }: ConfigContext): ExpoConfig => ({
+    ...config,
+    name: isGolf ? 'Golf Sparks' : 'Sparks',
+    slug: isGolf ? 'golf-sparks' : 'sparks-app',
+    // version: share or diverge — recommend share for now
+    icon: isGolf ? './assets/variants/golf/icon.png' : './assets/icon.png',
+    splash: {
+      image: isGolf ? './assets/variants/golf/splash.png' : './assets/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#ffffff',
+    },
+    ios: {
+      ...config.ios,
+      bundleIdentifier: isGolf ? 'com.mattdyor.golfsparks' : 'com.mattdyor.sparks',
+      googleServicesFile: isGolf
+        ? './GoogleService-Info-golf.plist'
+        : './GoogleService-Info.plist',
+    },
+    android: {
+      ...config.android,
+      package: isGolf ? 'com.mattdyor.golfsparks' : 'com.mattdyor.sparks',
+      googleServicesFile: isGolf ? './google-services-golf.json' : './google-services.json',
+      adaptiveIcon: {
+        foregroundImage: isGolf
+          ? './assets/variants/golf/adaptive-icon.png'
+          : './assets/adaptive-icon.png',
+        backgroundColor: '#ffffff',
+      },
+    },
+    extra: {
+      eas: { projectId: isGolf ? 'NEW_GOLF_PROJECT_ID' : '18230acd-b45d-4f62-8406-6f3c8de209c7' },
+      variant,
+    },
+    // keywords + description also vary — golfers won't search for "flashcards"
+    description: isGolf
+      ? 'Golf utilities — round tracking, skins, swing recording, tee-time prep.'
+      : 'A collection of interactive micro-experiences…',
+    keywords: isGolf
+      ? ['golf', 'scorecard', 'skins', 'swing', 'tee time']
+      : ['games', 'education', 'interactive', 'micro-experiences', 'entertainment'],
+  });
+  ```
+- [ ] Move existing `app.json` contents (permissions, plugins, etc.) into `app.config.ts` as the base — do **not** keep both files.
+- [ ] Smoke test `npm run ios` and `npm run android` with default (`full`) — name, icon, bundleId unchanged.
+- [ ] Commit: `feat: dynamic app config keyed on EXPO_PUBLIC_APP_VARIANT`
+
+### Phase 3 — EAS + local run scripts for the Golf variant
+
+- [ ] Add Golf profiles to `eas.json`:
+  ```json
+  "development-golf": {
+    "extends": "development",
+    "env": { "EXPO_PUBLIC_APP_VARIANT": "golf" }
+  },
+  "preview-golf": {
+    "extends": "preview",
+    "env": { "EXPO_PUBLIC_APP_VARIANT": "golf" }
+  },
+  "production-golf": {
+    "extends": "production",
+    "env": { "EXPO_PUBLIC_APP_VARIANT": "golf", "NODE_ENV": "production" }
+  }
+  ```
+  (EAS supports `extends` — if not, duplicate the profile bodies.)
+- [ ] Add scripts to `package.json`:
+  ```json
+  "ios:golf": "EXPO_PUBLIC_APP_VARIANT=golf expo run:ios",
+  "android:golf": "EXPO_PUBLIC_APP_VARIANT=golf expo run:android",
+  "start:golf": "EXPO_PUBLIC_APP_VARIANT=golf expo start",
+  "build:ios:golf": "npx eas-cli build --platform ios --profile production-golf",
+  "build:android:golf": "npx eas-cli build --platform android --profile production-golf",
+  "submit:ios:golf": "npx eas-cli submit --platform ios --profile production-golf",
+  "submit:android:golf": "npx eas-cli submit --platform android --profile production-golf"
+  ```
+- [ ] Sanity check: `npm run ios:golf` installs a *second* app on the simulator (different bundle ID), with the name **Golf Sparks** and only the six golf sparks visible.
+- [ ] Commit: `feat: EAS + script wiring for Golf Sparks variant`
+
+### Phase 4 — Firebase + store onboarding
+
+This is paperwork/console work, not code:
+
+- [ ] Create Firebase project "Golf Sparks"; add iOS + Android apps with new bundle IDs; download plist/json to repo root (gitignore decision: these are **not** secrets but have project IDs — follow repo's current convention, which commits them).
+- [ ] Create App Store Connect app for `com.mattdyor.golfsparks`; run TestFlight internal test with the `production-golf` build.
+- [ ] Create Play Console app for `com.mattdyor.golfsparks`; internal testing track.
+- [ ] Duplicate and minimize the privacy policy for Golf Sparks (it doesn't collect food photos, Spanish audio, etc.).
+- [ ] Remote config: if `FirebaseRemoteConfig` keys are referenced by golf sparks, mirror them into the new Firebase project. Review `CONTEXT/GENERAL/REMOTE_CONFIG_VALUES.md`.
+
+### Phase 5 — Trim the binary (optional but worth it)
+
+The registry filter hides non-golf sparks at runtime, but the code still ships in the bundle. To shrink the Golf app:
+
+- [ ] Convert the non-golf imports in `sparkRegistryData.tsx` to lazy `require()` inside a variant-gated block (same pattern already used for `golf-brain`/`record-swing`/`video` on Android). Under Metro, inline `require()`s inside a conditional branch are not bundled when the branch is provably dead.
+- [ ] Verify with `npx expo export --platform ios --dev false` and inspect bundle size before/after.
+- [ ] Also consider: plugins in `app.config.ts` that only non-golf sparks need (e.g. `expo-apple-authentication` if nothing in the golf subset uses sign-in) can be omitted for `golf` — this reduces native build size too. Audit each plugin against the six sparks before removing.
+
+---
+
+## 🧪 Testing Strategy
+
+Adapt `TESTPLAN.md`'s Level 1/2/3 model per variant.
+
+### Per-commit (any change)
+- [ ] `npm test` — unchanged
+- [ ] `npm run ios` — full variant, smoke
+- [ ] `npm run ios:golf` — golf variant, confirm only 6 sparks appear
+
+### Per golf-only change
+- [ ] `npm run ios:golf` and `npm run android:golf`
+- [ ] All 7 golf sparks open, persist data, match current iOS/Android support matrix
+- [ ] Discover Sparks page shows only the page header + the alphabetical grid — no New/Top Rated sections, no category or property pills, no "All Sparks" subheader
+- [ ] Fresh install (simulator uninstall → reinstall) shows Golf Brain, Record Swing, Tee Time Timer on the home screen in that order; removing one persists across relaunch
+
+### Before publishing Golf Sparks
+- [ ] TestFlight / internal track install on real devices
+- [ ] Confirm icon, splash, app name, about page all say "Golf Sparks"
+- [ ] Privacy policy link resolves
+- [ ] Push notifications fire from the *new* Firebase project, not the old one
+- [ ] No stray references to non-golf sparks (e.g. SparkStatsSpark aggregating over hidden sparks)
+
+### Regression for the full app
+- [ ] After every Phase-1/2/3 change, run the existing `TESTPLAN.md` Level 1 smoke on the full variant. The variant work should be invisible there.
+
+---
+
+## 🔄 Adding a new spark after launch
+
+The common case — adding a new non-golf spark — should require **zero** variant-specific work:
+
+1. Add `sparkMetadata` entry with its normal category (e.g. `productivity`).
+2. Add to `rawRegistry` in `sparkRegistryData.tsx`.
+3. Build both variants. Golf Sparks silently excludes it because category ≠ `golf`.
+
+Adding a new **golf** spark:
+
+1. Same three steps, with `category: "golf"`.
+2. It appears in Golf Sparks automatically.
+3. No registry edits to the Golf variant — `variantConfig.ts` derives the allowed set from metadata.
+
+Promoting an existing spark into golf: change its `category` to `"golf"`. No other change.
+
+---
+
+## ⚠️ Risks & Open Questions
+
+1. **Shared store state**. If two golf sparks share state via `sparkStore`, that continues to work. But if any spark references a hidden spark by ID (e.g. `SparkStatsSpark` aggregating over `flashcards`), it will silently skip the missing entry in the golf build. Audit consumers of `getSparkById` for hard-coded IDs — if any hit a non-golf id, the golf build gets a `undefined`. Existing iOS-Android gating already has this property, so the code should be robust, but worth grepping.
+2. **Shared version number**. Phase 2 keeps `version` shared. That simplifies releases but means every Golf release bumps when Sparks bumps. If golf ships on a different cadence, add `version` and `buildNumber` / `versionCode` to the variant branch in `app.config.ts`. Recommend staying shared initially.
+3. **Firebase cost/complexity**. A second Firebase project means second Analytics, Remote Config, Crashlytics. Unavoidable if we want distinct bundle IDs (the Firebase SDK requires matching bundle ID). Accept the cost.
+4. **App Store review**. Apple may reject Golf Sparks as "minimum viable content" if only 3 of the 6 are substantive. Worth reviewing 4.2 / 4.3 guidelines before submission. Mitigation: ensure at least 3 golf sparks are polished + shippable (scorecard, skins, golf-wisdom are strong candidates).
+5. **`expo-apple-authentication` and other per-spark plugins**. Plugins in `app.config.ts` are applied to every build. Non-golf-relevant plugins inflate the golf binary. Phase 5 addresses this but needs per-plugin audit.
+6. **Shared patches**. `patches/` applies to `node_modules` regardless of variant. Confirm none of the patched modules is non-golf-only — if one is only used by (say) `SpanishReaderSpark`, the patch is dead weight in Golf Sparks but harmless.
+7. **Codegen / new-arch**. New Architecture is enabled. Confirm the filtered registry doesn't change which Turbo Modules are expected (it shouldn't — module registration is native-side and only depends on installed pods, not JS imports).
+
+---
+
+## ✅ Definition of Done
+
+- [ ] `npm run ios:golf` builds, installs as a second app on the simulator, shows only six golf sparks
+- [ ] `npm run build:ios:golf` produces an IPA that uploads to App Store Connect under `com.mattdyor.golfsparks`
+- [ ] Same for Android via `build:android:golf`
+- [ ] A new non-golf spark added after this work ships in Sparks without any Golf-Sparks-side change
+- [ ] A new golf spark added after this work ships in **both** apps without registry duplication
+- [ ] `TESTPLAN.md` Level 1 smoke passes for the full variant, unchanged
+- [ ] Golf variant has its own smoke pass documented in this plan's Testing Strategy section
+
+---
+
+## 📅 Rough Effort Estimate
+
+| Phase | Estimate | Blocking? |
+|---|---|---|
+| 0 — Decisions + console accounts | ½ day | yes (Phase 4) |
+| 1 — Variant scaffolding | 2–3 hours | no |
+| 1b — Discover Sparks UI trim | 30 min | no |
+| 1c — Seed default My Sparks | 30 min | no |
+| 2 — Dynamic app config | 3–4 hours | no |
+| 3 — EAS + scripts + local verify | 2–3 hours | no |
+| 4 — Firebase + store onboarding | 1 day (async review wait) | yes (ship) |
+| 5 — Binary trimming | ½ day | no (optional) |
+
+Total engineering: ~1.5–2 days. Total calendar to first TestFlight: ~1 week including Apple review.

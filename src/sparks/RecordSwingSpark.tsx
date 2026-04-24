@@ -27,6 +27,7 @@ export interface RecordSwingSettings {
     durationSeconds: number;
     voiceAssistantDurationSeconds: number; // Moved up
     autoPlay: boolean;
+    autoStartNext: boolean;
     voiceControlDuringRecording: boolean;
     isListeningMode: boolean;
 }
@@ -321,6 +322,22 @@ const RecordSwingSettingsView: React.FC<{
                     <View style={settingStyles.item}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flex: 1 }}>
+                                <Text style={[settingStyles.label, { color: colors.text }]}>Auto-Start Next</Text>
+                                <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
+                                    Record clips back-to-back with the delay between them until you cancel
+                                </Text>
+                            </View>
+                            <Switch
+                                value={!!tempSettings.autoStartNext}
+                                onValueChange={(val) => setTempSettings(prev => ({ ...prev, autoStartNext: val }))}
+                                trackColor={{ false: '#767577', true: colors.primary }}
+                            />
+                        </View>
+                    </View>
+                    {/* Auto-play after recording — disabled; remove once confirmed we won't revive it
+                    <View style={settingStyles.item}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
                                 <Text style={[settingStyles.label, { color: colors.text }]}>Auto-play after recording</Text>
                                 <Text style={[settingStyles.helpText, { color: colors.textSecondary }]}>
                                     Automatically play the swing at full speed when finished
@@ -333,6 +350,7 @@ const RecordSwingSettingsView: React.FC<{
                             />
                         </View>
                     </View>
+                    */}
                     <View style={settingStyles.item}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flex: 1 }}>
@@ -393,12 +411,13 @@ const settingStyles = StyleSheet.create({
 
 const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: propsShowSettings = false, onCloseSettings }) => {
     const { colors } = useTheme();
-    const { getSparkData, setSparkData, isHydrated } = useSparkStore();
+    const { setSparkData } = useSparkStore();
     const [recordings, setRecordings] = useState<RecordedSwing[]>([]);
     const [settings, setSettings] = useState<RecordSwingSettings>({
         countdownSeconds: 5,
         durationSeconds: 5,
         autoPlay: false,
+        autoStartNext: false,
         voiceAssistantDurationSeconds: 20,
         voiceControlDuringRecording: false,
         isListeningMode: false,
@@ -489,6 +508,9 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             Alert.alert("Error", error.message || "Failed to start voice recognition");
         }
     }, [voiceContext, lastRecording, settings.voiceAssistantDurationSeconds]);
+
+    const startVoiceListeningRef = useRef(startVoiceListening);
+    startVoiceListeningRef.current = startVoiceListening;
 
     const clearVoiceTimers = useCallback(() => {
         if (voiceTimeoutRef.current) {
@@ -836,33 +858,40 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         }
     }, [selectedVideo, player]);
 
-    // Load data on mount
+    // Load after Zustand persist has merged disk → memory (see CONTEXT/GENERAL/SPARKDATAPERSISTENCE.md).
+    // Avoid isHydrated + unstable deps: a re-run could clear timers or read the store before merge.
     useEffect(() => {
-        if (!isHydrated) return;
-        if (dataLoaded) return;
+        let cancelled = false;
 
-        const loadData = () => {
-            console.log('🔄 RecordSwingSpark: Loading data from sparkStore');
-            const data = getSparkData('record-swing');
+        const loadFromStore = () => {
+            if (cancelled) return;
+            console.log('🔄 RecordSwingSpark: Loading data from sparkStore (persist ready)');
+            const data = useSparkStore.getState().getSparkData('record-swing');
             if (data.recordings) setRecordings(data.recordings);
-            if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
-
+            if (data.settings) setSettings((prev) => ({ ...prev, ...data.settings }));
             setLoading(false);
             setDataLoaded(true);
 
-            // Auto-start listening if was active in database
             if (data.settings?.isListeningMode) {
                 setTimeout(() => {
-                    startVoiceListening();
+                    if (!cancelled) startVoiceListeningRef.current();
                 }, 500);
             }
         };
-        loadData();
+
+        const unsub = useSparkStore.persist.onFinishHydration(() => {
+            loadFromStore();
+        });
+
+        if (useSparkStore.persist.hasHydrated()) {
+            loadFromStore();
+        }
 
         return () => {
-            clearVoiceTimers();
+            cancelled = true;
+            unsub();
         };
-    }, [isHydrated, dataLoaded, getSparkData, startVoiceListening, clearVoiceTimers]);
+    }, []);
 
     // Save data whenever recordings or settings change
     useEffect(() => {
@@ -881,24 +910,31 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
         setLastRecording(recording);
         HapticFeedback.success();
 
-        // 1. Auto-play if enabled
-        if (settings.autoPlay) {
-            setPlaybackMode('single');
-            setSequenceItems([]);
-            setSequenceIndex(0);
-            setSelectedVideo(recording);
-            setVoiceContext('reviewing');
-        } else {
-            setVoiceContext('reviewing'); // Still allow quality tagging even if not auto-played
+        // Auto-Start Next: the camera stays open and RecordSwing itself
+        // starts the next countdown. Don't flip into 'reviewing' or resume the
+        // voice session — either would fight the next countdown.
+        if (settings.autoStartNext) {
+            setVoiceContext('idle');
+            return;
         }
 
-        // 2. Resume listening if it was on AND we aren't auto-playing (otherwise wait for playback finish)
-        if (settings.isListeningMode && !settings.autoPlay) {
+        // Auto-play after recording — disabled per product decision.
+        // if (settings.autoPlay) {
+        //     setPlaybackMode('single');
+        //     setSequenceItems([]);
+        //     setSequenceIndex(0);
+        //     setSelectedVideo(recording);
+        //     setVoiceContext('reviewing');
+        // } else {
+        setVoiceContext('reviewing'); // Allow quality tagging
+        // }
+
+        if (settings.isListeningMode) {
             setTimeout(() => {
                 startVoiceListening();
             }, 500);
         }
-    }, [settings.isListeningMode, settings.autoPlay, startVoiceListening]);
+    }, [settings.isListeningMode, settings.autoStartNext, startVoiceListening]);
 
     const renderItem = ({ item }: { item: RecordedSwing }) => (
         <TouchableOpacity
@@ -976,7 +1012,11 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
             <RecordSwingSettingsView
                 settings={settings}
                 onSave={(newSettings) => {
+                    console.log('💾 RecordSwingSpark: settings save', newSettings);
                     setSettings(newSettings);
+                    // Write directly as well so the save doesn't rely on the
+                    // [settings]-keyed effect firing before the modal unmounts.
+                    setSparkData('record-swing', { recordings, settings: newSettings });
                     onCloseSettings?.();
                 }}
                 onCancel={() => onCloseSettings?.()}
@@ -1038,6 +1078,7 @@ const RecordSwingSpark: React.FC<RecordSwingSparkProps> = ({ showSettings: props
                 <View style={styles.recordSection}>
                     <RecordSwing
                         onRecordingComplete={handleRecordingComplete}
+                        autoRestart={settings.autoStartNext}
                         onCountdownStart={() => {
                             console.log('🎥 RecordSwingSpark: Countdown started, clearing timers');
                             clearVoiceTimers();

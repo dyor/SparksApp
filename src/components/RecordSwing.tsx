@@ -29,6 +29,24 @@ export interface RecordedSwing {
   timestamp: number;
 }
 
+function formatRecordPipelineError(error: unknown, context: string): string {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: string }).code)
+      : "";
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : error && typeof error === "object" && "message" in error
+          ? String((error as { message?: unknown }).message)
+          : "Unknown error";
+  const parts = [context, message].filter(Boolean);
+  if (code) parts.push(`(${code})`);
+  return parts.join(" ");
+}
+
 export interface RecordSwingProps {
   holeNumber?: number;
   shotNumber?: number;
@@ -38,7 +56,11 @@ export interface RecordSwingProps {
   countdownSeconds?: number;
   durationSeconds?: number;
   onRecordingComplete?: (swing: RecordedSwing) => void;
+  onCancel?: () => void;
   onCountdownStart?: () => void;
+  // When true, after a recording is saved the camera stays open and
+  // immediately starts another countdown. User cancel ends the loop.
+  autoRestart?: boolean;
   isWaitingForVoice?: boolean;
   colors: {
     primary: string;
@@ -58,13 +80,27 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   countdownSeconds = 5,
   durationSeconds = 30,
   onRecordingComplete,
+  onCancel,
   onCountdownStart,
+  autoRestart = false,
   triggerCount = 0,
   isWaitingForVoice = false,
   colors,
   muteVideo = false,
 }) => {
+  const effectiveDurationSeconds = Math.max(1, durationSeconds);
+
+  // Tracks whether the user pressed Cancel; used to exit the autoRestart loop
+  // and to skip saving a partial clip that was only produced because
+  // cancelRecording had to resolve the pending recordAsync promise.
+  const cancelledRef = useRef(false);
+  // Keep latest autoRestart in a ref so recording flow reads the current value
+  // without rebinding every closure.
+  const autoRestartRef = useRef(autoRestart);
+  useEffect(() => { autoRestartRef.current = autoRestart; }, [autoRestart]);
+
   // State
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -106,6 +142,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
   const handleRecordSwing = async () => {
     console.log("⛳️ handleRecordSwing: triggered");
+    setRecordingError(null);
     try {
       console.log("⛳️ handleRecordSwing: checking status from hooks...", {
         camera: cameraPermission?.status,
@@ -128,15 +165,27 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       }
 
       console.log("⛳️ handleRecordSwing: allGranted =", allGranted);
-      if (!allGranted) return;
+      if (!allGranted) {
+        const missing: string[] = [];
+        if (cameraPermission?.status !== "granted") missing.push("Camera");
+        if (micPermission?.status !== "granted") missing.push("Microphone (needed with video for swing audio)");
+        if (mediaLibraryPermission?.status !== "granted") {
+          missing.push(Platform.OS === "android" ? "Photos / media access (to save the clip)" : "Photo Library (to save the clip)");
+        }
+        setRecordingError(
+          `Cannot start recording — permission not granted: ${missing.join(", ")}. Tap Open Settings below or enable permissions in system settings, then tap Refresh.`
+        );
+        return;
+      }
 
       setRecordedSwing(null);
       setIsCameraReady(false);
+      cancelledRef.current = false;
       setShowCamera(true);
       console.log("⛳️ handleRecordSwing: showCamera -> true");
     } catch (error) {
       console.error("⛳️ handleRecordSwing ERROR:", error);
-      Alert.alert("Error", "Failed to start recording");
+      setRecordingError(formatRecordPipelineError(error, "Could not open the camera"));
     }
   };
 
@@ -189,6 +238,12 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       onCountdownStart();
     }
 
+    if (countdownSeconds <= 0) {
+      setCountdown(null);
+      startRecording();
+      return;
+    }
+
     setCountdown(countdownSeconds);
     let count = countdownSeconds;
     countdownTimerRef.current = setInterval(() => {
@@ -210,7 +265,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   const startRecording = async () => {
     try {
       if (!cameraRef.current) {
-        Alert.alert("Error", "Camera not ready");
+        setRecordingError("Recording did not start — camera is not ready yet. Close the camera and try again.");
         return;
       }
 
@@ -225,26 +280,32 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         setRecordingDuration(duration);
 
         // Auto-stop at duration limit
-        if (duration >= durationSeconds) {
+        if (duration >= effectiveDurationSeconds) {
           stopRecording();
         }
       }, 1000);
 
       // Start recording
       const video = await cameraRef.current.recordAsync({
-        maxDuration: durationSeconds,
+        maxDuration: effectiveDurationSeconds,
         mute: muteVideo,
       });
 
       // Recording stopped (either manually or auto-stop)
       if (video && video.uri) {
+        // If user cancelled while recording under autoRestart, skip save so
+        // we don't pollute recordings with an aborted clip or restart the loop.
+        if (autoRestartRef.current && cancelledRef.current) {
+          cancelledRef.current = false;
+          return;
+        }
         // Capture the duration safely before it's reset
         await saveVideoToGallery(video.uri, duration);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during recording:", error);
-      console.error("Error message:", error?.message);
-      console.error("Error code:", error?.code);
+      console.error("Error message:", (error as { message?: string })?.message);
+      console.error("Error code:", (error as { code?: string })?.code);
       // Clean up on error
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
@@ -252,7 +313,12 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       }
       setIsRecording(false);
       setShowCamera(false);
-      Alert.alert("Error", `Failed to record video: ${error?.message || "Unknown error"}`);
+      setRecordingError(
+        formatRecordPipelineError(
+          error,
+          "Recording failed (camera / microphone pipeline). This is not because the clip was too short."
+        )
+      );
     }
   };
 
@@ -272,11 +338,12 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       setIsRecording(false);
       setRecordingDuration(0);
       HapticFeedback.success();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error stopping recording:", error);
       setIsRecording(false);
       setRecordingDuration(0);
       setShowCamera(false);
+      setRecordingError(formatRecordPipelineError(error, "Could not stop recording cleanly"));
     }
   };
 
@@ -337,22 +404,42 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
       // Store and notify
       setRecordedSwing(swing);
-      setShowCamera(false);
+      // In autoRestart mode keep the camera open so the next countdown runs in the same session.
+      // (Flipping showCamera off/on around the Modal collapses into one render and the
+      // CameraView never remounts, so onCameraReady — which fires startCountdown — never re-fires.)
+      if (!autoRestartRef.current) {
+        setShowCamera(false);
+      }
+      setRecordingError(null);
 
       if (onRecordingComplete) {
         onRecordingComplete(swing);
       }
-    } catch (error) {
+
+      if (autoRestartRef.current && !cancelledRef.current) {
+        // Brief pause so the user sees the clip ended before the next countdown.
+        setTimeout(() => {
+          if (!cancelledRef.current && autoRestartRef.current) {
+            startCountdown();
+          }
+        }, 300);
+      }
+    } catch (error: unknown) {
       console.error("Error saving video:", error);
       setShowCamera(false);
-      Alert.alert(
-        "Error",
-        "Video recorded but failed to save to gallery. Check app permissions."
+      setRecordingError(
+        formatRecordPipelineError(
+          error,
+          "Video was captured but saving to your library failed (Photos / media library permission or storage)."
+        )
       );
     }
   };
 
   const cancelRecording = () => {
+    // Mark cancelled FIRST so any in-flight recordAsync resolution skips save/restart.
+    cancelledRef.current = true;
+
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = null;
@@ -371,6 +458,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
     setIsRecording(false);
     setRecordingDuration(0);
     setShowCamera(false);
+    onCancel?.();
   };
 
   const openVideoPlayer = () => {
@@ -556,6 +644,30 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         </Text>
       </TouchableOpacity >
 
+      {recordingError ? (
+        <View
+          style={{
+            marginTop: 8,
+            marginBottom: 4,
+            padding: 10,
+            borderRadius: 8,
+            backgroundColor: `${colors.error}18`,
+            borderWidth: 1,
+            borderColor: colors.error,
+          }}
+        >
+          <Text style={{ color: colors.error, fontSize: 12, fontWeight: "600" }}>
+            {recordingError}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setRecordingError(null)}
+            style={{ alignSelf: "flex-end", marginTop: 6, paddingVertical: 4, paddingHorizontal: 8 }}
+          >
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* Permission Fallback UI */}
       {
         (!cameraPermission?.granted || !micPermission?.granted || !mediaLibraryPermission?.granted) && (
@@ -627,8 +739,10 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
               }}
               onMountError={(error) => {
                 console.error("⛳️ CameraView: mount error:", error);
-                Alert.alert("Camera Error", `Failed to start camera: ${error.message}`);
                 setShowCamera(false);
+                setRecordingError(
+                  formatRecordPipelineError(error, "Camera failed to start")
+                );
               }}
               mute={muteVideo}
             >
@@ -643,7 +757,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
               {isRecording && (
                 <View style={styles.recordingInfo}>
                   <Text style={styles.recordingDurationText}>
-                    🔴 Recording: {recordingDuration}s / {durationSeconds}s
+                    🔴 Recording: {recordingDuration}s / {effectiveDurationSeconds}s
                   </Text>
                 </View>
               )}
