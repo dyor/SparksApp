@@ -34,7 +34,14 @@ Design constraints:
 
 ## 📋 The Golf Subset
 
-The canonical source of truth is `sparkMetadata.ts` — any entry with `category: "golf"` is in. Today that is:
+The canonical source of truth is `sparkMetadata.ts`. A spark is in the Golf variant if **either**:
+
+- its primary `category: "golf"` (the spark is fundamentally about golf), OR
+- its optional `secondaryCategory: "golf"` (the spark's primary use lives elsewhere but it's also useful to golfers)
+
+Today's set:
+
+**Primary `category: "golf"` (7) — the headline golf experiences:**
 
 | id | title | iOS | Android | Notes |
 |---|---|---|---|---|
@@ -42,12 +49,23 @@ The canonical source of truth is `sparkMetadata.ts` — any entry with `category
 | `golfWisdom` | Golf Wisdom | ✅ | ✅ | uses `golfWisdomService`, `GolfWisdomNotificationService` |
 | `skins` | Skins | ✅ | ✅ | |
 | `scorecard` | Scorecard | ✅ | ✅ | |
+| `tripod-spark` | The Wolverine | ✅ | ✅ | tripod product spark |
 | `golf-brain` | Golf Brain | ✅ | ❌ | currently iOS-only in registry |
 | `record-swing` | Record Swing (Beta) | ✅ | ❌ | currently iOS-only, uses `expo-speech-recognition`, `expo-video` |
 
-**Decision needed**: do we keep `golf-brain` and `record-swing` iOS-only in the Golf app, or invest in Android support for these? Recommend shipping Golf v1 with the same iOS/Android matrix as today and treat Android parity as a separate effort.
+**`secondaryCategory: "golf"` (7) — useful adjacencies (not seeded into My Sparks by default; user opts in via Marketplace):**
 
-**Non-golf sparks categorized in a golf-adjacent way**: `card-score` (`utility`) is not in the golf category despite plausible golfer use. Include it in the Golf Sparks app.
+| id | title | Primary category | Why golf-relevant |
+|---|---|---|---|
+| `todo` | Todo List | productivity | pre-round prep checklists, gear |
+| `minute-minder` | Minute Minder | productivity | range-session timing, stretch routines |
+| `trip-story` | TripStory | travel | golf-trip recaps |
+| `short-saver` | Short Saver | media | save swing tips / coaching YouTubes |
+| `goal-tracker` | Goal Tracker | productivity | season goals, handicap targets |
+| `coming-up` | Coming Up | utility | tournament dates, member-guest |
+| `card-score` | CardScore | utility | post-round Wolf/Skins side games at the bar |
+
+**Decision needed**: do we keep `golf-brain` and `record-swing` iOS-only in the Golf app, or invest in Android support for these? Recommend shipping Golf v1 with the same iOS/Android matrix as today and treat Android parity as a separate effort.
 
 ---
 
@@ -90,6 +108,7 @@ Everything else downstream (`SparkSelectionScreen`, `SparkStatsSpark`, `sparkSto
 
 Goal: land the scaffolding behind the default `full` variant so nothing changes for the current app.
 
+- [ ] Add `secondaryCategory?: 'golf'` to `SparkMetadata` in `src/types/spark.ts`. Tagging a spark with this opts it into the Golf variant without changing its primary category (which still drives Discover-page grouping in the full variant).
 - [ ] Create `src/variants/variantConfig.ts`:
   ```ts
   import Constants from 'expo-constants';
@@ -102,8 +121,10 @@ Goal: land the scaffolding behind the default `full` variant so nothing changes 
     (Constants.expoConfig?.extra?.variant as AppVariant) ||
     'full';
 
+  // Golf Sparks includes any spark whose primary category is "golf" OR whose
+  // optional secondaryCategory is "golf".
   const golfIds = Object.values(sparkMetadata)
-    .filter(m => m.category === 'golf')
+    .filter(m => m.category === 'golf' || m.secondaryCategory === 'golf')
     .map(m => m.id);
 
   export const allowedSparkIds: ReadonlySet<string> | null =
@@ -330,16 +351,19 @@ Adapt `TESTPLAN.md`'s Level 1/2/3 model per variant.
 The common case — adding a new non-golf spark — should require **zero** variant-specific work:
 
 1. Add `sparkMetadata` entry with its normal category (e.g. `productivity`).
-2. Add to `rawRegistry` in `sparkRegistryData.tsx`.
-3. Build both variants. Golf Sparks silently excludes it because category ≠ `golf`.
+2. Add to `rawSparkRegistry` in `sparkRegistryData.tsx`.
+3. Build both variants. Golf Sparks silently excludes it because neither `category` nor `secondaryCategory` is `"golf"`.
 
-Adding a new **golf** spark:
+Adding a new **headliner golf** spark (lives in the golf section of Discover in the full variant):
 
 1. Same three steps, with `category: "golf"`.
 2. It appears in Golf Sparks automatically.
-3. No registry edits to the Golf variant — `variantConfig.ts` derives the allowed set from metadata.
 
-Promoting an existing spark into golf: change its `category` to `"golf"`. No other change.
+**Including an existing spark in Golf without changing its primary category**:
+
+1. Add `secondaryCategory: "golf"` to its `sparkMetadata` entry. That's it — no registry edits, no variant-specific list to maintain.
+
+This is how the cross-over sparks (todo, minute-minder, trip-story, short-saver, goal-tracker, coming-up, card-score) make it into Golf Sparks without leaving their natural categories in the full app.
 
 ---
 

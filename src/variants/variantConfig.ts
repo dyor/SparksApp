@@ -8,16 +8,12 @@ export const variant: AppVariant =
   ((Constants.expoConfig?.extra as { variant?: AppVariant } | undefined)?.variant) ||
   'full';
 
-// Sparks not tagged category: "golf" but included in the Golf Sparks app.
-// See CONTEXT/GENERAL/GOLFSPARKSPLAN.md §"The Golf Subset".
-const GOLF_EXTRA_SPARK_IDS = ['card-score'];
-
-const golfIds = [
-  ...Object.values(sparkMetadata)
-    .filter((m) => m.category === 'golf')
-    .map((m) => m.id),
-  ...GOLF_EXTRA_SPARK_IDS,
-];
+// Golf Sparks includes any spark whose primary category is "golf" OR whose
+// optional secondaryCategory is "golf". Tag a spark in sparkMetadata.ts to
+// surface it in the Golf variant without changing its primary category.
+const golfIds = Object.values(sparkMetadata)
+  .filter((m) => m.category === 'golf' || m.secondaryCategory === 'golf')
+  .map((m) => m.id);
 
 export const allowedSparkIds: ReadonlySet<string> | null =
   variant === 'golf' ? new Set(golfIds) : null; // null = allow all
