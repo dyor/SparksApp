@@ -31,10 +31,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...(config as ExpoConfig),
     name: 'Golf Sparks',
     slug: 'golf-sparks',
-    icon: pickFile('./assets/variants/golf/icon.png', './assets/icon.png'),
+    icon: pickFile('./assets/icon-golf.png', './assets/icon.png'),
     splash: {
       ...(config.splash || {}),
-      image: pickFile('./assets/variants/golf/splash.png', './assets/splash-icon.png'),
+      image: pickFile('./assets/splash-icon-golf.png', './assets/splash-icon.png'),
     },
     description:
       'Golf utilities — round tracking, skins, swing recording, tee-time prep.',
@@ -57,14 +57,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       adaptiveIcon: {
         ...(config.android?.adaptiveIcon || { backgroundColor: '#ffffff' }),
         foregroundImage: pickFile(
-          './assets/variants/golf/adaptive-icon.png',
+          './assets/adaptive-icon-golf.png',
           './assets/adaptive-icon.png'
         ),
       },
     },
     web: {
       ...(config.web || {}),
-      favicon: pickFile('./assets/variants/golf/favicon.png', './assets/favicon.png'),
+      favicon: pickFile('./assets/favicon-golf.png', './assets/favicon.png'),
     },
     extra: {
       ...(config.extra || {}),

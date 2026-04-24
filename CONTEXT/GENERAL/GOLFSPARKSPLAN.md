@@ -83,7 +83,8 @@ Everything else downstream (`SparkSelectionScreen`, `SparkStatsSpark`, `sparkSto
 - [x] App Store Connect / Play Console apps: separate (required by distinct bundle ID)
 - [x] Privacy policy: shared (keep current)
 - [x] Firebase: **same project** as Sparks. Need to register a new iOS app and a new Android app within the existing Firebase project (each requires the new bundle ID `com.dyor.golfsparks`); this lets Golf Sparks share Firestore/Auth/Remote Config but get its own bundle-ID-matched plist/json.
-- [ ] Assets: commission/design golf icon, splash, adaptive icon, favicon (`assets/variants/golf/`) — in progress; Phase 2 below falls back to existing Sparks assets until these land.
+- [x] Assets: golf icon (`assets/icon-golf.png`, 1024×1024), adaptive icon (`assets/adaptive-icon-golf.png`, 1024×1024), splash (`assets/splash-icon-golf.png`, 2048×2048), favicon (`assets/favicon-golf.png`, 64×64). Source: `assets/Gemini_Generated_Image_c6a2cgc6a2cgc6a2.png` (2048×2048 square stick-figure golfer with lightning).
+   - **Asset path gotcha**: keep variant assets as siblings of the existing ones (e.g. `assets/icon-golf.png`), not in a nested `assets/variants/golf/` subdirectory. Expo's asset resolver expects each declared image's parent directory to contain the project's `package.json` walk path; nesting one level deeper triggers `ConfigError: The expected package.json path: …/variants/golf/package.json does not exist`.
 
 ### Phase 1 — Introduce the variant flag without shipping anything
 
