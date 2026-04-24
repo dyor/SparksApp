@@ -6,6 +6,11 @@ import { MarketplaceStackParamList } from '../types/navigation';
 import { getAllSparks } from '../components/SparkRegistry';
 import { useTheme } from '../contexts/ThemeContext';
 import { NotificationBadge } from '../components/NotificationBadge';
+import { variant } from '../variants/variantConfig';
+
+// In single-category builds (golf) the New/Top/Filter chrome and "All Sparks"
+// subheader are meaningless — collapse to header + grid.
+const showDiscoverChrome = variant !== 'golf';
 
 type MarketplaceNavigationProp = StackNavigationProp<MarketplaceStackParamList, 'MarketplaceList'>;
 
@@ -116,7 +121,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
 
       <ScrollView>
         {/* Only show New Sparks and Top Rated when no filters are active */}
-        {!selectedCategory && !selectedProperty && (
+        {showDiscoverChrome && !selectedCategory && !selectedProperty && (
           <>
             {/* New Sparks Section */}
             <View style={styles.sectionHeader}>
@@ -190,54 +195,58 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
           </>
         )}
 
-        {/* Property Filter Pills */}
-        {properties.length > 0 && (
-          <View style={styles.categoryPillsContainer}>
-            {properties.map((property) => (
-              <TouchableOpacity
-                key={property}
-                style={[
-                  styles.categoryPill,
-                  selectedProperty === property && styles.categoryPillActive
-                ]}
-                onPress={() => handlePropertyPress(property)}
-              >
-                <Text style={[
-                  styles.categoryPillText,
-                  selectedProperty === property && styles.categoryPillTextActive
-                ]}>
-                  {property}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {showDiscoverChrome && (
+          <>
+            {/* Property Filter Pills */}
+            {properties.length > 0 && (
+              <View style={styles.categoryPillsContainer}>
+                {properties.map((property) => (
+                  <TouchableOpacity
+                    key={property}
+                    style={[
+                      styles.categoryPill,
+                      selectedProperty === property && styles.categoryPillActive
+                    ]}
+                    onPress={() => handlePropertyPress(property)}
+                  >
+                    <Text style={[
+                      styles.categoryPillText,
+                      selectedProperty === property && styles.categoryPillTextActive
+                    ]}>
+                      {property}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Category Filter Pills */}
+            <View style={styles.categoryPillsContainer}>
+              {categories.sort().map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryPill,
+                    selectedCategory === category && styles.categoryPillActive
+                  ]}
+                  onPress={() => handleCategoryPress(category)}
+                >
+                  <Text style={[
+                    styles.categoryPillText,
+                    selectedCategory === category && styles.categoryPillTextActive
+                  ]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* All Sparks Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>All Sparks</Text>
+            </View>
+          </>
         )}
-
-        {/* Category Filter Pills */}
-        <View style={styles.categoryPillsContainer}>
-          {categories.sort().map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.categoryPill,
-                selectedCategory === category && styles.categoryPillActive
-              ]}
-              onPress={() => handleCategoryPress(category)}
-            >
-              <Text style={[
-                styles.categoryPillText,
-                selectedCategory === category && styles.categoryPillTextActive
-              ]}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* All Sparks Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>All Sparks</Text>
-        </View>
         <View style={styles.grid}>
           {allSparksAlphabetical.map((spark) => {
             return (
