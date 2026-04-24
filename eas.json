@@ -16,7 +16,8 @@
         "resourceClass": "medium"
       },
       "env": {
-        "EXPO_PUBLIC_BUILD_TYPE": "development"
+        "EXPO_PUBLIC_BUILD_TYPE": "development",
+        "EXPO_PUBLIC_APP_VARIANT": "full"
       }
     },
     "preview": {
@@ -26,9 +27,15 @@
       },
       "android": {
         "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "full"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "full"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "autoIncrement": true,
@@ -50,6 +57,11 @@
     "production": {
       "android": {
         "releaseStatus": "draft"
+      }
+    },
+    "internal": {
+      "android": {
+        "track": "internal"
       }
     }
   }
