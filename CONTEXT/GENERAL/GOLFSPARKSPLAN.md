@@ -15,10 +15,10 @@ Produce two separately-published apps from one source tree:
 | | Full Sparks (today) | Golf Sparks (new) |
 |---|---|---|
 | App name | Sparks | Golf Sparks |
-| Bundle ID (iOS) | `com.mattdyor.sparks` | `com.mattdyor.golfsparks` |
-| Package (Android) | `com.mattdyor.sparks` | `com.mattdyor.golfsparks` |
-| EAS projectId | `18230acd-…209c7` | **new, separate projectId** |
-| Firebase project | `sparks-app` (existing) | **new, separate project** |
+| Bundle ID (iOS) | `com.mattdyor.sparks` | `com.dyor.golfsparks` |
+| Package (Android) | `com.mattdyor.sparks` | `com.dyor.golfsparks` |
+| EAS projectId | `18230acd-…209c7` | `78f77b31-8f3c-4c6e-9821-918e51bd817b` |
+| Firebase project | `sparks-app` (existing) | **same project** — new iOS+Android app entries within it for the new bundle ID |
 | Contents | all ~40 sparks | golf-category sparks only |
 | Icon / splash | current | new golf-themed assets |
 | Store listings | App Store + Play | separate App Store + Play listings |
@@ -78,11 +78,12 @@ Everything else downstream (`SparkSelectionScreen`, `SparkStatsSpark`, `sparkSto
 
 ### Phase 0 — Decisions (before touching code)
 
-- [ ] Confirm bundle IDs: `com.mattdyor.golfsparks` (iOS + Android)
-- [ ] Create new EAS project (`eas init --force` in a worktree, or via expo.dev console) → note the `projectId`
-- [ ] Decide: separate App Store Connect / Play Console apps (yes)
-- [ ] Decide: shared privacy policy URL or distinct (yes - keeping current privacy policy)
-- [ ] Assets: commission/design golf icon, splash, adaptive icon, favicon (`assets/variants/golf/`)
+- [x] Bundle ID: `com.dyor.golfsparks` (iOS + Android)
+- [x] EAS projectId: `78f77b31-8f3c-4c6e-9821-918e51bd817b` (`eas init --id 78f77b31-8f3c-4c6e-9821-918e51bd817b`)
+- [x] App Store Connect / Play Console apps: separate (required by distinct bundle ID)
+- [x] Privacy policy: shared (keep current)
+- [x] Firebase: **same project** as Sparks. Need to register a new iOS app and a new Android app within the existing Firebase project (each requires the new bundle ID `com.dyor.golfsparks`); this lets Golf Sparks share Firestore/Auth/Remote Config but get its own bundle-ID-matched plist/json.
+- [ ] Assets: commission/design golf icon, splash, adaptive icon, favicon (`assets/variants/golf/`) — in progress; Phase 2 below falls back to existing Sparks assets until these land.
 
 ### Phase 1 — Introduce the variant flag without shipping anything
 
@@ -165,60 +166,83 @@ Because Zustand's `persist` middleware rehydrates from AsyncStorage on re-launch
 
 ### Phase 2 — Dynamic app config
 
-Replace static `app.json` with `app.config.ts` so name/slug/bundleId/icons/firebase files vary by variant.
+Add an `app.config.ts` that **keeps `app.json` as the base** (Expo passes its contents in via `ConfigContext.config`) and overlays only the golf-variant overrides. Avoids translating 150+ lines of permissions/plugins/infoPlist into TS.
 
-- [ ] Convert `app.json` → `app.config.ts` (Expo reads either; if both exist, `app.config.ts` wins):
+When variant is `full`, the config returns `app.json` essentially unchanged. When `golf`, it overrides name, slug, bundle ID, package, EAS projectId, icons, Firebase files, description, and keywords — leaving plugins, permissions, and infoPlist untouched.
+
+For files that may not exist yet (golf assets, golf-bundle-ID Firebase plist/json), the config does an `fs.existsSync` check and falls back to the Sparks files. This lets `npm run ios:golf` build immediately with placeholder branding, and seamlessly upgrade once the proper files land.
+
+- [ ] Create `app.config.ts` at repo root (Expo prefers `.ts`/`.js` over `.json` when both exist):
   ```ts
   import { ExpoConfig, ConfigContext } from 'expo/config';
+  import * as fs from 'fs';
+  import * as path from 'path';
 
   const variant = (process.env.EXPO_PUBLIC_APP_VARIANT || 'full') as 'full' | 'golf';
   const isGolf = variant === 'golf';
 
-  export default ({ config }: ConfigContext): ExpoConfig => ({
-    ...config,
-    name: isGolf ? 'Golf Sparks' : 'Sparks',
-    slug: isGolf ? 'golf-sparks' : 'sparks-app',
-    // version: share or diverge — recommend share for now
-    icon: isGolf ? './assets/variants/golf/icon.png' : './assets/icon.png',
-    splash: {
-      image: isGolf ? './assets/variants/golf/splash.png' : './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#ffffff',
-    },
-    ios: {
-      ...config.ios,
-      bundleIdentifier: isGolf ? 'com.mattdyor.golfsparks' : 'com.mattdyor.sparks',
-      googleServicesFile: isGolf
-        ? './GoogleService-Info-golf.plist'
-        : './GoogleService-Info.plist',
-    },
-    android: {
-      ...config.android,
-      package: isGolf ? 'com.mattdyor.golfsparks' : 'com.mattdyor.sparks',
-      googleServicesFile: isGolf ? './google-services-golf.json' : './google-services.json',
-      adaptiveIcon: {
-        foregroundImage: isGolf
-          ? './assets/variants/golf/adaptive-icon.png'
-          : './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff',
+  const fileExists = (p: string) => fs.existsSync(path.resolve(__dirname, p));
+  const pickFile = (preferred: string, fallback: string) =>
+    fileExists(preferred) ? preferred : fallback;
+
+  export default ({ config }: ConfigContext): ExpoConfig => {
+    if (!isGolf) {
+      // Full variant — preserve app.json as-is, only stamp `extra.variant`.
+      return {
+        ...(config as ExpoConfig),
+        extra: { ...(config.extra || {}), variant },
+      };
+    }
+
+    return {
+      ...(config as ExpoConfig),
+      name: 'Golf Sparks',
+      slug: 'golf-sparks',
+      icon: pickFile('./assets/variants/golf/icon.png', './assets/icon.png'),
+      splash: {
+        ...(config.splash || {}),
+        image: pickFile('./assets/variants/golf/splash.png', './assets/splash-icon.png'),
       },
-    },
-    extra: {
-      eas: { projectId: isGolf ? 'NEW_GOLF_PROJECT_ID' : '18230acd-b45d-4f62-8406-6f3c8de209c7' },
-      variant,
-    },
-    // keywords + description also vary — golfers won't search for "flashcards"
-    description: isGolf
-      ? 'Golf utilities — round tracking, skins, swing recording, tee-time prep.'
-      : 'A collection of interactive micro-experiences…',
-    keywords: isGolf
-      ? ['golf', 'scorecard', 'skins', 'swing', 'tee time']
-      : ['games', 'education', 'interactive', 'micro-experiences', 'entertainment'],
-  });
+      description: 'Golf utilities — round tracking, skins, swing recording, tee-time prep.',
+      keywords: ['golf', 'scorecard', 'skins', 'swing', 'tee time'],
+      ios: {
+        ...(config.ios || {}),
+        bundleIdentifier: 'com.dyor.golfsparks',
+        googleServicesFile: pickFile(
+          './GoogleService-Info-golf.plist',
+          './GoogleService-Info.plist',
+        ),
+      },
+      android: {
+        ...(config.android || {}),
+        package: 'com.dyor.golfsparks',
+        googleServicesFile: pickFile('./google-services-golf.json', './google-services.json'),
+        adaptiveIcon: {
+          ...(config.android?.adaptiveIcon || { backgroundColor: '#ffffff' }),
+          foregroundImage: pickFile(
+            './assets/variants/golf/adaptive-icon.png',
+            './assets/adaptive-icon.png',
+          ),
+        },
+      },
+      web: {
+        ...(config.web || {}),
+        favicon: pickFile('./assets/variants/golf/favicon.png', './assets/favicon.png'),
+      },
+      extra: {
+        ...(config.extra || {}),
+        eas: { projectId: '78f77b31-8f3c-4c6e-9821-918e51bd817b' },
+        variant,
+      },
+    };
+  };
   ```
-- [ ] Move existing `app.json` contents (permissions, plugins, etc.) into `app.config.ts` as the base — do **not** keep both files.
-- [ ] Smoke test `npm run ios` and `npm run android` with default (`full`) — name, icon, bundleId unchanged.
+- [ ] Keep `app.json` — do not delete. It remains the source of truth for the full variant's shared values (permissions, plugins, infoPlist, version, etc.).
+- [ ] Smoke test full: `npm run ios` (or just `npx expo prebuild --no-install`) — name, icon, bundleId unchanged from before. iOS plist still has the same `CFBundleIdentifier`.
+- [ ] Smoke test golf with placeholder assets: `EXPO_PUBLIC_APP_VARIANT=golf npx expo prebuild --no-install --platform ios` (or the new `npm run ios:golf` from Phase 3) — name "Golf Sparks", bundle ID `com.dyor.golfsparks`, falls back to Sparks icon/plist with a console note.
 - [ ] Commit: `feat: dynamic app config keyed on EXPO_PUBLIC_APP_VARIANT`
+
+**Caveat — Firebase bundle-ID mismatch during placeholder period.** Until the new `GoogleService-Info-golf.plist` is downloaded from Firebase Console, the golf build uses the Sparks plist whose `BUNDLE_ID` is `com.mattdyor.sparks` — but the actual app bundle ID is `com.dyor.golfsparks`. `[FIRApp configure]` will warn and may refuse to initialize Analytics / Crashlytics / Remote Config. App will still launch and JS-only sparks will work, but Firebase-dependent features (notifications, remote config) will be silently broken. Drop the new plist in to fix.
 
 ### Phase 3 — EAS + local run scripts for the Golf variant
 
@@ -255,11 +279,13 @@ Replace static `app.json` with `app.config.ts` so name/slug/bundleId/icons/fireb
 
 This is paperwork/console work, not code:
 
-- [ ] Create Firebase project "Golf Sparks"; add iOS + Android apps with new bundle IDs; download plist/json to repo root (gitignore decision: these are **not** secrets but have project IDs — follow repo's current convention, which commits them).
-- [ ] Create App Store Connect app for `com.mattdyor.golfsparks`; run TestFlight internal test with the `production-golf` build.
-- [ ] Create Play Console app for `com.mattdyor.golfsparks`; internal testing track.
-- [ ] Duplicate and minimize the privacy policy for Golf Sparks (it doesn't collect food photos, Spanish audio, etc.).
-- [ ] Remote config: if `FirebaseRemoteConfig` keys are referenced by golf sparks, mirror them into the new Firebase project. Review `CONTEXT/GENERAL/REMOTE_CONFIG_VALUES.md`.
+- [ ] In the **existing** `sparks-app` Firebase Console project, register a new iOS app with bundle ID `com.dyor.golfsparks` → download plist as `GoogleService-Info-golf.plist` and place at repo root.
+- [ ] Same project: register a new Android app with package `com.dyor.golfsparks` → download as `google-services-golf.json` and place at repo root.
+- [ ] Verify both files commit (they're not secrets — match repo convention of committing the Sparks plist/json).
+- [ ] Create App Store Connect app for `com.dyor.golfsparks`; run TestFlight internal test with the `production-golf` build.
+- [ ] Create Play Console app for `com.dyor.golfsparks`; internal testing track.
+- [ ] Privacy policy reuse — confirmed in Phase 0 to keep current Sparks privacy policy URL.
+- [ ] Remote Config: keys live in the same Firebase project, so they're shared across both apps automatically. If a key should diverge by app, gate by Firebase app ID or set up Remote Config conditions on the bundle ID.
 
 ### Phase 5 — Trim the binary (optional but worth it)
 
@@ -320,7 +346,7 @@ Promoting an existing spark into golf: change its `category` to `"golf"`. No oth
 
 1. **Shared store state**. If two golf sparks share state via `sparkStore`, that continues to work. But if any spark references a hidden spark by ID (e.g. `SparkStatsSpark` aggregating over `flashcards`), it will silently skip the missing entry in the golf build. Audit consumers of `getSparkById` for hard-coded IDs — if any hit a non-golf id, the golf build gets a `undefined`. Existing iOS-Android gating already has this property, so the code should be robust, but worth grepping.
 2. **Shared version number**. Phase 2 keeps `version` shared. That simplifies releases but means every Golf release bumps when Sparks bumps. If golf ships on a different cadence, add `version` and `buildNumber` / `versionCode` to the variant branch in `app.config.ts`. Recommend staying shared initially.
-3. **Firebase cost/complexity**. A second Firebase project means second Analytics, Remote Config, Crashlytics. Unavoidable if we want distinct bundle IDs (the Firebase SDK requires matching bundle ID). Accept the cost.
+3. **Shared Firebase project**. Both apps live in the same Firebase project (per Phase 0 decision), with separate iOS/Android app entries for each bundle ID. Pros: shared Firestore data (a user's golf rounds are visible from either app, if they sign in to both), shared Auth users, shared Remote Config. Cons: Analytics events and Crashlytics are also pooled — distinguishing "Sparks crashes" from "Golf Sparks crashes" requires filtering by app ID in dashboards. Accept for v1.
 4. **App Store review**. Apple may reject Golf Sparks as "minimum viable content" if only 3 of the 6 are substantive. Worth reviewing 4.2 / 4.3 guidelines before submission. Mitigation: ensure at least 3 golf sparks are polished + shippable (scorecard, skins, golf-wisdom are strong candidates).
 5. **`expo-apple-authentication` and other per-spark plugins**. Plugins in `app.config.ts` are applied to every build. Non-golf-relevant plugins inflate the golf binary. Phase 5 addresses this but needs per-plugin audit.
 6. **Shared patches**. `patches/` applies to `node_modules` regardless of variant. Confirm none of the patched modules is non-golf-only — if one is only used by (say) `SpanishReaderSpark`, the patch is dead weight in Golf Sparks but harmless.
@@ -331,7 +357,7 @@ Promoting an existing spark into golf: change its `category` to `"golf"`. No oth
 ## ✅ Definition of Done
 
 - [ ] `npm run ios:golf` builds, installs as a second app on the simulator, shows only six golf sparks
-- [ ] `npm run build:ios:golf` produces an IPA that uploads to App Store Connect under `com.mattdyor.golfsparks`
+- [ ] `npm run build:ios:golf` produces an IPA that uploads to App Store Connect under `com.dyor.golfsparks`
 - [ ] Same for Android via `build:android:golf`
 - [ ] A new non-golf spark added after this work ships in Sparks without any Golf-Sparks-side change
 - [ ] A new golf spark added after this work ships in **both** apps without registry duplication
