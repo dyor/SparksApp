@@ -18,7 +18,7 @@ Produce two separately-published apps from one source tree:
 | Bundle ID (iOS) | `com.mattdyor.sparks` | `com.dyor.golfsparks` |
 | Package (Android) | `com.mattdyor.sparks` | `com.dyor.golfsparks` |
 | EAS projectId | `18230acd-…209c7` | `78f77b31-8f3c-4c6e-9821-918e51bd817b` |
-| Firebase project | `sparks-app` (existing) | **same project** — new iOS+Android app entries within it for the new bundle ID |
+| Firebase project | `sparks-app` (existing) | **same project, same plist/json** — see V1 Firebase note below |
 | Contents | all ~40 sparks | golf-category sparks only |
 | Icon / splash | current | new golf-themed assets |
 | Store listings | App Store + Play | separate App Store + Play listings |
@@ -103,7 +103,7 @@ Everything else downstream (`SparkSelectionScreen`, `SparkStatsSpark`, `sparkSto
 - [x] EAS projectId: `78f77b31-8f3c-4c6e-9821-918e51bd817b` (`eas init --id 78f77b31-8f3c-4c6e-9821-918e51bd817b`)
 - [x] App Store Connect / Play Console apps: separate (required by distinct bundle ID)
 - [x] Privacy policy: shared (keep current)
-- [x] Firebase: **same project** as Sparks. Need to register a new iOS app and a new Android app within the existing Firebase project (each requires the new bundle ID `com.dyor.golfsparks`); this lets Golf Sparks share Firestore/Auth/Remote Config but get its own bundle-ID-matched plist/json.
+- [x] Firebase: **same project, same plist/json** for V1. The codebase routes all Firestore/Analytics calls through `WebFirebaseService` (see `ServiceFactory.ts:32` — `isNativeFirebaseAvailable = false` with comment "All Firestore operations use the Firebase Web SDK"). The Web SDK reads its config from `EXPO_PUBLIC_FIREBASE_*` env vars, **not** from the bundled `GoogleService-Info.plist`. Reusing the existing plist means `[FIRApp configure]` will log a bundle-ID-mismatch warning at startup but is otherwise functionally inert — Golf Wisdom reads, SparkStats writes, etc. all flow through the web SDK and work unchanged. Defer creating new Firebase app entries until we actually need native Firebase features.
 - [x] Assets: golf icon (`assets/icon-golf.png`, 1024×1024), adaptive icon (`assets/adaptive-icon-golf.png`, 1024×1024), splash (`assets/splash-icon-golf.png`, 2048×2048), favicon (`assets/favicon-golf.png`, 64×64). Source: `assets/Gemini_Generated_Image_c6a2cgc6a2cgc6a2.png` (2048×2048 square stick-figure golfer with lightning).
    - **Asset path gotcha**: keep variant assets as siblings of the existing ones (e.g. `assets/icon-golf.png`), not in a nested `assets/variants/golf/` subdirectory. Expo's asset resolver expects each declared image's parent directory to contain the project's `package.json` walk path; nesting one level deeper triggers `ConfigError: The expected package.json path: …/variants/golf/package.json does not exist`.
 
@@ -267,7 +267,7 @@ For files that may not exist yet (golf assets, golf-bundle-ID Firebase plist/jso
 - [ ] Smoke test golf with placeholder assets: `EXPO_PUBLIC_APP_VARIANT=golf npx expo prebuild --no-install --platform ios` (or the new `npm run ios:golf` from Phase 3) — name "Golf Sparks", bundle ID `com.dyor.golfsparks`, falls back to Sparks icon/plist with a console note.
 - [ ] Commit: `feat: dynamic app config keyed on EXPO_PUBLIC_APP_VARIANT`
 
-**Caveat — Firebase bundle-ID mismatch during placeholder period.** Until the new `GoogleService-Info-golf.plist` is downloaded from Firebase Console, the golf build uses the Sparks plist whose `BUNDLE_ID` is `com.mattdyor.sparks` — but the actual app bundle ID is `com.dyor.golfsparks`. `[FIRApp configure]` will warn and may refuse to initialize Analytics / Crashlytics / Remote Config. App will still launch and JS-only sparks will work, but Firebase-dependent features (notifications, remote config) will be silently broken. Drop the new plist in to fix.
+**Note — Firebase bundle-ID mismatch is harmless in V1.** The existing Sparks plist stays in place permanently for V1. `[FIRApp configure]` will log a bundle-ID-mismatch warning at startup, but the codebase doesn't use any native Firebase APIs — every Firestore/Analytics call is routed through `WebFirebaseService` which reads `EXPO_PUBLIC_FIREBASE_*` env vars and bypasses the plist entirely. If we later need native Firebase features (Crashlytics, push via FCM, etc.), drop a new plist named `GoogleService-Info-golf.plist` at the repo root — the `pickFile` fallback in `app.config.ts` will pick it up automatically.
 
 ### Phase 3 — EAS + local run scripts for the Golf variant
 
@@ -300,17 +300,46 @@ For files that may not exist yet (golf assets, golf-bundle-ID Firebase plist/jso
 - [ ] Sanity check: `npm run ios:golf` installs a *second* app on the simulator (different bundle ID), with the name **Golf Sparks** and only the six golf sparks visible.
 - [ ] Commit: `feat: EAS + script wiring for Golf Sparks variant`
 
-### Phase 4 — Firebase + store onboarding
+### Phase 4 — Apple + Google Console onboarding (required for device builds & shipping)
 
-This is paperwork/console work, not code:
+V1 development happens entirely on the iOS simulator (see Phase 4a below) — no Apple Console work is needed for that. This phase is the paperwork required before the Golf Sparks build can be installed on a physical device or submitted to TestFlight / Play Store.
 
-- [ ] In the **existing** `sparks-app` Firebase Console project, register a new iOS app with bundle ID `com.dyor.golfsparks` → download plist as `GoogleService-Info-golf.plist` and place at repo root.
-- [ ] Same project: register a new Android app with package `com.dyor.golfsparks` → download as `google-services-golf.json` and place at repo root.
-- [ ] Verify both files commit (they're not secrets — match repo convention of committing the Sparks plist/json).
-- [ ] Create App Store Connect app for `com.dyor.golfsparks`; run TestFlight internal test with the `production-golf` build.
-- [ ] Create Play Console app for `com.dyor.golfsparks`; internal testing track.
-- [ ] Privacy policy reuse — confirmed in Phase 0 to keep current Sparks privacy policy URL.
-- [ ] Remote Config: keys live in the same Firebase project, so they're shared across both apps automatically. If a key should diverge by app, gate by Firebase app ID or set up Remote Config conditions on the bundle ID.
+Firebase work is intentionally **not** part of this phase — see Phase 0's Firebase note for why.
+
+**Apple Developer Console (apple.com/developer):**
+- [ ] Register App ID `com.dyor.golfsparks` (Identifiers → App IDs → +)
+- [ ] Enable capabilities on the new App ID:
+  - Sign In with Apple (matches `usesAppleSignIn: true` from `app.json`)
+  - Push Notifications (matches `expo-notifications` plugin's APNS entitlement)
+  - App Groups
+- [ ] Create App Group `group.com.dyor.golfsparks.screen-recorder` (Identifiers → App Groups → +). The BroadcastExtension target in `ios/Sparks.xcodeproj` references `group.com.mattdyor.sparks.screen-recorder` — that string is hardcoded in `Sparks.entitlements` and `BroadcastExtension.entitlements` for the Sparks bundle. For Golf Sparks we need either:
+  - **(recommended)** an Expo config plugin that rewrites the App Group identifier per variant, OR
+  - hand-edit the entitlements files post-prebuild for golf builds (brittle), OR
+  - drop the BroadcastExtension entirely from the golf variant if screen recording isn't a V1 golf feature
+- [ ] Add the new App Group to the App ID's App Groups capability config
+- [ ] Create / regenerate provisioning profile that includes all three capabilities + the new App Group
+- [ ] Refresh Xcode signing (`Sparks` target → Signing & Capabilities → Team → Automatically manage signing should pick up the regenerated profile)
+
+**App Store Connect:**
+- [ ] Create new app for `com.dyor.golfsparks` (My Apps → +)
+- [ ] Run TestFlight internal test with the `production-golf` build (`npm run build:ios:golf` then `npm run submit:ios:golf`)
+
+**Google Play Console:**
+- [ ] Create new app for `com.dyor.golfsparks`
+- [ ] Internal testing track for `production-golf` builds
+
+**Privacy policy:** Phase 0 already decided to keep the existing Sparks privacy policy URL.
+
+### Phase 4a — V1 simulator-only path (no Apple Console required)
+
+Until Phase 4 is complete, work happens on the iOS simulator. The simulator does not validate provisioning profiles or entitlements, so the App Groups / Push Notifications / Sign In with Apple errors that block device builds are bypassed.
+
+- [x] `npm run ios:golf` from the project root builds and installs Golf Sparks on the booted simulator
+- [ ] Sanity-check: only the 14 golf sparks (8 primary + 6 secondary, since `record-swing` is iOS) appear in Marketplace; My Sparks home shows the seeded trio
+- [ ] Bundle ID `com.dyor.golfsparks` confirmed in `xcrun simctl listapps booted | grep golfsparks`
+- [ ] Firebase: open Golf Wisdom and SparkStats — both should work (they use the web SDK and are unaffected by the bundle-ID mismatch warning in console)
+
+**Known limitation in V1:** physical-device deploys (`xcodebuild -destination id=<device-udid>`) will fail with provisioning-profile errors. EAS device installs (`build:ios:golf` profile development-golf) likewise fail until Phase 4. Stay on simulator until Apple Console work lands.
 
 ### Phase 5 — Trim the binary (optional but worth it)
 
@@ -374,7 +403,8 @@ This is how the cross-over sparks (todo, minute-minder, trip-story, short-saver,
 
 1. **Shared store state**. If two golf sparks share state via `sparkStore`, that continues to work. But if any spark references a hidden spark by ID (e.g. `SparkStatsSpark` aggregating over `flashcards`), it will silently skip the missing entry in the golf build. Audit consumers of `getSparkById` for hard-coded IDs — if any hit a non-golf id, the golf build gets a `undefined`. Existing iOS-Android gating already has this property, so the code should be robust, but worth grepping.
 2. **Shared version number**. Phase 2 keeps `version` shared. That simplifies releases but means every Golf release bumps when Sparks bumps. If golf ships on a different cadence, add `version` and `buildNumber` / `versionCode` to the variant branch in `app.config.ts`. Recommend staying shared initially.
-3. **Shared Firebase project**. Both apps live in the same Firebase project (per Phase 0 decision), with separate iOS/Android app entries for each bundle ID. Pros: shared Firestore data (a user's golf rounds are visible from either app, if they sign in to both), shared Auth users, shared Remote Config. Cons: Analytics events and Crashlytics are also pooled — distinguishing "Sparks crashes" from "Golf Sparks crashes" requires filtering by app ID in dashboards. Accept for v1.
+3. **Shared Firebase project + reused plist**. Both apps point at the same Firebase project AND share the same `GoogleService-Info.plist` / `google-services.json` (no new app entries inside Firebase for V1). Works because the codebase only uses the Firebase **Web SDK** via `WebFirebaseService`, which reads `EXPO_PUBLIC_FIREBASE_*` env vars and ignores the bundled plist. The native `[FIRApp configure]` will log a bundle-ID-mismatch warning at startup but is otherwise inert. Pros: zero Firebase ops work for V1; shared Firestore/Auth/Remote Config across both apps. Cons: web-SDK Analytics events from Golf Sparks land in the Sparks Analytics dashboard with no easy way to filter; if we ever add native Firebase features (Crashlytics, FCM), we'll need to register the new bundle ID in Firebase Console and drop a new plist named `GoogleService-Info-golf.plist` (the `pickFile` in `app.config.ts` is already wired to pick it up).
+4. **Apple App Group is hardcoded to the Sparks bundle ID.** `Sparks.entitlements` references `group.com.mattdyor.sparks.screen-recorder` — required by the BroadcastExtension target for screen recording (used by the Wolverine tripod-spark). Device builds of Golf Sparks fail until either we (a) create a per-variant App Group via an Expo config plugin, (b) hand-edit the entitlements file post-prebuild, or (c) drop the BroadcastExtension from the golf variant. Tracked in Phase 4. Simulator builds bypass entitlement checks so V1 dev is unaffected.
 4. **App Store review**. Apple may reject Golf Sparks as "minimum viable content" if only 3 of the 6 are substantive. Worth reviewing 4.2 / 4.3 guidelines before submission. Mitigation: ensure at least 3 golf sparks are polished + shippable (scorecard, skins, golf-wisdom are strong candidates).
 5. **`expo-apple-authentication` and other per-spark plugins**. Plugins in `app.config.ts` are applied to every build. Non-golf-relevant plugins inflate the golf binary. Phase 5 addresses this but needs per-plugin audit.
 6. **Shared patches**. `patches/` applies to `node_modules` regardless of variant. Confirm none of the patched modules is non-golf-only — if one is only used by (say) `SpanishReaderSpark`, the patch is dead weight in Golf Sparks but harmless.
@@ -384,27 +414,35 @@ This is how the cross-over sparks (todo, minute-minder, trip-story, short-saver,
 
 ## ✅ Definition of Done
 
-- [ ] `npm run ios:golf` builds, installs as a second app on the simulator, shows only six golf sparks
-- [ ] `npm run build:ios:golf` produces an IPA that uploads to App Store Connect under `com.dyor.golfsparks`
-- [ ] Same for Android via `build:android:golf`
+**V1 (simulator only):**
+- [x] `npm run ios:golf` builds, installs as a second app on the simulator, shows only golf sparks
+- [ ] My Sparks home seeded with Golf Brain / Record Swing / Tee Time Timer on first install
+- [ ] Marketplace displays the 14-spark golf subset (no chrome, just header + grid)
+- [ ] Golf Wisdom + SparkStats work via the web Firebase SDK despite bundle-ID-mismatch warning
+- [ ] `TESTPLAN.md` Level 1 smoke still passes for the full variant, unchanged
 - [ ] A new non-golf spark added after this work ships in Sparks without any Golf-Sparks-side change
 - [ ] A new golf spark added after this work ships in **both** apps without registry duplication
-- [ ] `TESTPLAN.md` Level 1 smoke passes for the full variant, unchanged
-- [ ] Golf variant has its own smoke pass documented in this plan's Testing Strategy section
+
+**V1.1 (device + ship) — blocked on Phase 4:**
+- [ ] `npm run build:ios:golf` produces an IPA that uploads to App Store Connect under `com.dyor.golfsparks`
+- [ ] Same for Android via `build:android:golf`
+- [ ] TestFlight internal install on a physical device
 
 ---
 
 ## 📅 Rough Effort Estimate
 
-| Phase | Estimate | Blocking? |
+| Phase | Estimate | Status / Blocking? |
 |---|---|---|
-| 0 — Decisions + console accounts | ½ day | yes (Phase 4) |
-| 1 — Variant scaffolding | 2–3 hours | no |
-| 1b — Discover Sparks UI trim | 30 min | no |
-| 1c — Seed default My Sparks | 30 min | no |
-| 2 — Dynamic app config | 3–4 hours | no |
-| 3 — EAS + scripts + local verify | 2–3 hours | no |
-| 4 — Firebase + store onboarding | 1 day (async review wait) | yes (ship) |
-| 5 — Binary trimming | ½ day | no (optional) |
+| 0 — Decisions | ½ day | ✅ done (Firebase deferred for V1) |
+| 1 — Variant scaffolding | 2–3 hours | ✅ done |
+| 1b — Discover Sparks UI trim | 30 min | ✅ done |
+| 1c — Seed default My Sparks | 30 min | ✅ done |
+| 2 — Dynamic app config | 3–4 hours | ✅ done |
+| 3 — EAS + scripts + local verify | 2–3 hours | ✅ done |
+| 4 — Apple + Play Console onboarding | 1–2 days (Apple review + capability config) | ⏳ user — required for device & ship |
+| 4a — V1 simulator smoke | < 1 hour | 🟡 user — `npm run ios:golf` |
+| 5 — Binary trimming | ½ day | optional, defer |
 
-Total engineering: ~1.5–2 days. Total calendar to first TestFlight: ~1 week including Apple review.
+Engineering remaining (V1 simulator): ~0 — code is in place; just run `npm run ios:golf`.
+Calendar to first TestFlight: ~1 week from Apple Console kickoff (Phase 4 dominates).
