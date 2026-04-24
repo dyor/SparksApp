@@ -180,8 +180,8 @@ export const sparkMetadata: Record<string, SparkMetadata> = {
     },
     "card-score": {
         id: "card-score",
-        title: "CardScore",
-        description: "Fast, simple scorekeeping for card games",
+        title: "Score Keeper",
+        description: "Fast, simple scorekeeping for any game",
         icon: "♠️",
         category: "utility",
         secondaryCategory: "golf",
@@ -213,6 +213,15 @@ export const sparkMetadata: Record<string, SparkMetadata> = {
         icon: "⚡️",
         category: "utility",
         createdAt: "2025-12-01T00:00:00.000Z",
+        rating: 4.5,
+    },
+    "share-golf-sparks": {
+        id: "share-golf-sparks",
+        title: "Share Golf Sparks",
+        description: "Share the Golf Sparks app with your golf buddies",
+        icon: "⛳️",
+        category: "golf",
+        createdAt: "2026-04-24T00:00:00.000Z",
         rating: 4.5,
     },
     "coming-up": {

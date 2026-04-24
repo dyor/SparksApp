@@ -41,7 +41,7 @@ The canonical source of truth is `sparkMetadata.ts`. A spark is in the Golf vari
 
 Today's set:
 
-**Primary `category: "golf"` (7) — the headline golf experiences:**
+**Primary `category: "golf"` (8) — the headline golf experiences:**
 
 | id | title | iOS | Android | Notes |
 |---|---|---|---|---|
@@ -50,8 +50,11 @@ Today's set:
 | `skins` | Skins | ✅ | ✅ | |
 | `scorecard` | Scorecard | ✅ | ✅ | |
 | `tripod-spark` | The Wolverine | ✅ | ✅ | tripod product spark |
+| `share-golf-sparks` | Share Golf Sparks | ✅ | ✅ | promotion spark; URLs/QRs currently still point at Sparks (see note below) |
 | `golf-brain` | Golf Brain | ✅ | ❌ | currently iOS-only in registry |
 | `record-swing` | Record Swing (Beta) | ✅ | ❌ | currently iOS-only, uses `expo-speech-recognition`, `expo-video` |
+
+**Note on `share-golf-sparks`**: cloned from `share-sparks` with golf-themed copy and ⛳️ icon. All App Store / Play Store / web URLs and the QR images still point at the existing Sparks app, on purpose — once Golf Sparks publishes (Phase 4), swap those four touch points (`apps.apple.com/...`, `play.google.com/...`, `sparks.febak.com/...`, and the two QR PNGs) to the Golf Sparks listings. It currently appears in **both** Sparks and Golf Sparks variants since it's primary `category: "golf"` and we don't yet exclude golf sparks from the full variant; if that becomes undesirable, we'd add an `excludeFromFull` opt-out or invert the variant filter logic.
 
 **`secondaryCategory: "golf"` (7) — useful adjacencies (not seeded into My Sparks by default; user opts in via Marketplace):**
 
@@ -63,7 +66,7 @@ Today's set:
 | `short-saver` | Short Saver | media | save swing tips / coaching YouTubes |
 | `goal-tracker` | Goal Tracker | productivity | season goals, handicap targets |
 | `coming-up` | Coming Up | utility | tournament dates, member-guest |
-| `card-score` | CardScore | utility | post-round Wolf/Skins side games at the bar |
+| `card-score` | Score Keeper | utility | post-round Wolf/Skins side games at the bar |
 
 **Decision needed**: do we keep `golf-brain` and `record-swing` iOS-only in the Golf app, or invest in Android support for these? Recommend shipping Golf v1 with the same iOS/Android matrix as today and treat Android parity as a separate effort.
 

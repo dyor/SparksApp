@@ -27,6 +27,7 @@ import { CardScoreSpark } from "../sparks/CardScoreSpark";
 import { GolfWisdomSpark } from "../sparks/GolfWisdomSpark";
 import WeightTrackerSpark from "../sparks/WeightTrackerSpark";
 import ShareSparks from "../sparks/ShareSparks";
+import ShareGolfSparks from "../sparks/ShareGolfSparks";
 import ComingUpSpark from "../sparks/ComingUpSpark";
 import { FinalClockSpark } from "../sparks/FinalClockSpark";
 import TripSurveySpark from "../sparks/TripSurveySpark";
@@ -160,6 +161,10 @@ const rawSparkRegistry: Record<string, BaseSpark> = {
   "share-sparks": {
     metadata: sparkMetadata["share-sparks"],
     component: ShareSparks,
+  },
+  "share-golf-sparks": {
+    metadata: sparkMetadata["share-golf-sparks"],
+    component: ShareGolfSparks,
   },
   "coming-up": {
     metadata: sparkMetadata["coming-up"],

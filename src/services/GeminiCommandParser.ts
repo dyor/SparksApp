@@ -50,7 +50,7 @@ Supported Sparks for Navigation ("open" action):
 - "minute-minder" (Minute Minder)
 - "buzzy-bingo" (Buzzy Bingo)
 - "memory" (Memory)
-- "card-score" (CardScore)
+- "card-score" (Score Keeper)
 - "golfWisdom" (Golf Wisdom)
 - "weight-tracker" (Weight Tracker)
 - "coming-up" (Coming Up)

@@ -310,13 +310,13 @@ const CardScoreSettings: React.FC<{
     <SettingsContainer>
       <SettingsScrollView>
         <SettingsHeader
-          title="CardScore Settings"
+          title="Score Keeper Settings"
           subtitle="Manage your player sets"
           icon="♠️"
           sparkId="card-score"
         />
 
-        <SettingsFeedbackSection sparkName="CardScore" sparkId="card-score" />
+        <SettingsFeedbackSection sparkName="Score Keeper" sparkId="card-score" />
 
         <SettingsSection title="Player Sets">
           <SettingsButton
@@ -1261,7 +1261,7 @@ export const CardScoreSpark: React.FC<CardScoreSparkProps> = ({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
-        <Text style={styles.title}>CardScore ♠️</Text>
+        <Text style={styles.title}>Score Keeper ♠️</Text>
         <TouchableOpacity
           style={styles.settingsButton}
           onPress={() => setShowInternalSettings(true)}
