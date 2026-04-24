@@ -51,10 +51,34 @@
           "NODE_ENV": "production"
         }
       }
+    },
+    "development-golf": {
+      "extends": "development",
+      "env": {
+        "EXPO_PUBLIC_BUILD_TYPE": "development",
+        "EXPO_PUBLIC_APP_VARIANT": "golf"
+      }
+    },
+    "preview-golf": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "golf"
+      }
+    },
+    "production-golf": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "golf"
+      }
     }
   },
   "submit": {
     "production": {
+      "android": {
+        "releaseStatus": "draft"
+      }
+    },
+    "production-golf": {
       "android": {
         "releaseStatus": "draft"
       }
