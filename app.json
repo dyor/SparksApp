@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.60",
+    "version": "1.0.61",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -49,7 +49,8 @@
       "expo-speech-recognition",
       "expo-apple-authentication",
       "@react-native-community/datetimepicker",
-      "./withRemoveForegroundServices"
+      "./withRemoveForegroundServices",
+      "./withGolfBroadcastExtensionBundleId"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -100,7 +101,7 @@
           }
         ]
       },
-      "buildNumber": "1.0.60"
+      "buildNumber": "1.0.61"
     },
     "android": {
       "compileSdkVersion": 35,
@@ -136,8 +137,8 @@
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.60",
-      "versionCode": 96,
+      "versionName": "1.0.61",
+      "versionCode": 98,
       "package": "com.mattdyor.sparks"
     },
     "extra": {
