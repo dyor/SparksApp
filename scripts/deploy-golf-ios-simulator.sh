@@ -10,6 +10,15 @@ set -e
 PROJECT_DIR="/Users/mattdyor/SparksApp"
 cd "$PROJECT_DIR" || { echo "Directory not found: $PROJECT_DIR"; exit 1; }
 
+# Pass --clean as the first arg to do a full Expo prebuild reset.
+# Use when the Xcode project gets stuck (codegen header missing, pbxproj
+# desync, etc.). Slow (rebuilds pods from scratch) but reliably recovers.
+CLEAN_FLAG=""
+if [[ "$1" == "--clean" ]]; then
+  CLEAN_FLAG="--clean"
+  echo "==> Running with --clean (full ios/ regeneration)"
+fi
+
 # Pin the app variant for every subsequent step (prebuild, Metro, bundling).
 export EXPO_PUBLIC_APP_VARIANT=golf
 echo "==> EXPO_PUBLIC_APP_VARIANT=$EXPO_PUBLIC_APP_VARIANT"
@@ -26,18 +35,23 @@ if ! xcrun simctl list devices booted 2>/dev/null | grep -qE "iPhone|iPad"; then
   open -a Simulator
 fi
 
-# 2. Clean stale build artifacts (keeps the ios/ Xcode project tree).
-echo "==> Cleaning ios/build..."
-rm -rf ios/build
-
-# 3. Prebuild with the golf variant so Xcode project bundle IDs, icons, and
-#    app.config overrides are in sync. This also runs `pod install` for us.
-#    Without this step, switching variants leaves the pbxproj on whatever the
-#    last prebuild set — which causes the "embedded binary's bundle identifier
-#    is not prefixed with the parent app's bundle identifier" error on a mixed
-#    main-target + BroadcastExtension.
+# 2. Prebuild with the golf variant so Xcode project bundle IDs, icons, and
+#    app.config overrides are in sync. Without this, switching variants
+#    leaves the pbxproj on whatever the last prebuild set — which causes
+#    "embedded binary's bundle identifier is not prefixed with the parent
+#    app's bundle identifier" on a mixed main-target + BroadcastExtension.
 echo "==> Running prebuild for golf variant..."
-npx expo prebuild --platform ios
+npx expo prebuild --platform ios $CLEAN_FLAG
+
+# 3. Ensure Pods are installed / regenerated. Prebuild runs pod install only
+#    when it detects Podfile changes, so re-run it explicitly. This is also
+#    what regenerates the RN codegen scripts that populate
+#    ios/build/generated/ios/RCTAppDependencyProvider.h during xcodebuild.
+#    Do NOT `rm -rf ios/build` — codegen writes into that tree and deleting
+#    it without a fresh pod install leaves the Pods project referencing
+#    headers that aren't recreated in time.
+echo "==> Installing CocoaPods..."
+( cd ios && pod install )
 
 # 4. Build + launch on simulator. Debug config — simulator doesn't codesign
 #    so we sidestep the App Group / Sign-In-with-Apple / Push Notifications
