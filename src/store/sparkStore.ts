@@ -4,6 +4,15 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SparkMetadata } from '../types/spark';
 import { sparkRegistry } from '../components/SparkRegistry';
+import { variant } from '../variants/variantConfig';
+
+// First-install seed for the Golf Sparks variant. Order is the home-screen
+// display order. Only applied when there is no persisted state — existing
+// users' My Sparks ordering is preserved by the persist middleware.
+const GOLF_DEFAULT_SPARKS = ['golf-brain', 'record-swing', 'tee-time-timer'];
+
+const initialUserSparkIds: string[] =
+  variant === 'golf' ? [...GOLF_DEFAULT_SPARKS] : [];
 
 interface SparkProgress {
   sparkId: string;
@@ -64,7 +73,7 @@ export const useSparkStore = create<SparkState>()(
       // Initial state
       sparkProgress: {},
       sparkData: {},
-      userSparkIds: [], // No default sparks - user starts with empty collection
+      userSparkIds: initialUserSparkIds, // empty for full variant; seeded for golf (see above)
       favoriteSparkIds: [],
       isHydrated: false,
       videoCapture: {
