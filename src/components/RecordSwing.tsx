@@ -14,8 +14,10 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { createAudioPlayer, AudioPlayer } from "expo-audio";
 import { HapticFeedback } from "../utils/haptics";
 import PermissionService from "../services/PermissionService";
+import { COUNTDOWN_LOW_BEEP_URI, COUNTDOWN_HIGH_BEEP_URI } from "../utils/beepSounds";
 
 export interface RecordedSwing {
   uri: string;
@@ -98,6 +100,36 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   // without rebinding every closure.
   const autoRestartRef = useRef(autoRestart);
   useEffect(() => { autoRestartRef.current = autoRestart; }, [autoRestart]);
+
+  // F1-style countdown beeps. Three short low beeps at displayed countdown
+  // 3/2/1 and a higher BEEP at recording start so the user can swing without
+  // looking at the screen.
+  const lowBeepRef = useRef<AudioPlayer | null>(null);
+  const highBeepRef = useRef<AudioPlayer | null>(null);
+  useEffect(() => {
+    try {
+      lowBeepRef.current = createAudioPlayer({ uri: COUNTDOWN_LOW_BEEP_URI });
+      highBeepRef.current = createAudioPlayer({ uri: COUNTDOWN_HIGH_BEEP_URI });
+    } catch (e) {
+      console.warn("⛳️ RecordSwing: failed to init countdown beeps", e);
+    }
+    return () => {
+      try { lowBeepRef.current?.release(); } catch {}
+      try { highBeepRef.current?.release(); } catch {}
+      lowBeepRef.current = null;
+      highBeepRef.current = null;
+    };
+  }, []);
+  const playBeep = (which: "low" | "high") => {
+    const player = which === "low" ? lowBeepRef.current : highBeepRef.current;
+    if (!player) return;
+    try {
+      player.seekTo(0);
+      player.play();
+    } catch (e) {
+      // swallow — beeps are nice-to-have, not load-bearing
+    }
+  };
 
   // State
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -240,6 +272,7 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
 
     if (countdownSeconds <= 0) {
       setCountdown(null);
+      playBeep("high");
       startRecording();
       return;
     }
@@ -251,7 +284,13 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
       if (count > 0) {
         setCountdown(count);
         HapticFeedback.light();
+        // Last 3 seconds before "go" → low beeps (F1-style "beep beep beep BEEP")
+        if (count <= 3) {
+          playBeep("low");
+        }
       } else {
+        // count === 0 → recording starts now → high BEEP (lights out!)
+        playBeep("high");
         setCountdown(null);
         if (countdownTimerRef.current) {
           clearInterval(countdownTimerRef.current);
