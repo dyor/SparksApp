@@ -56,7 +56,7 @@ Today's set:
 
 **Note on `share-golf-sparks`**: cloned from `share-sparks` with golf-themed copy and ⛳️ icon. All App Store / Play Store / web URLs and the QR images still point at the existing Sparks app, on purpose — once Golf Sparks publishes (Phase 4), swap those four touch points (`apps.apple.com/...`, `play.google.com/...`, `sparks.febak.com/...`, and the two QR PNGs) to the Golf Sparks listings. It currently appears in **both** Sparks and Golf Sparks variants since it's primary `category: "golf"` and we don't yet exclude golf sparks from the full variant; if that becomes undesirable, we'd add an `excludeFromFull` opt-out or invert the variant filter logic.
 
-**`secondaryCategory: "golf"` (7) — useful adjacencies (not seeded into My Sparks by default; user opts in via Marketplace):**
+**`secondaryCategory: "golf"` (8) — useful adjacencies (not seeded into My Sparks by default; user opts in via Marketplace):**
 
 | id | title | Primary category | Why golf-relevant |
 |---|---|---|---|
@@ -67,6 +67,7 @@ Today's set:
 | `goal-tracker` | Goal Tracker | productivity | season goals, handicap targets |
 | `coming-up` | Coming Up | utility | tournament dates, member-guest |
 | `card-score` | Score Keeper | utility | post-round Wolf/Skins side games at the bar |
+| `video` | Video | media | screen-record swings/round footage; iOS-only |
 
 **Decision needed**: do we keep `golf-brain` and `record-swing` iOS-only in the Golf app, or invest in Android support for these? Recommend shipping Golf v1 with the same iOS/Android matrix as today and treat Android parity as a separate effort.
 
