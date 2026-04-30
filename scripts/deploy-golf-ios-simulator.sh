@@ -26,6 +26,22 @@ if [[ "$1" == "--clean" ]]; then
   FORCE_CLEAN=1
 fi
 
+# --- Kill any running Metro on 8081 -----------------------------------------
+#
+# Critical for variants: Metro bundles EXPO_PUBLIC_* env vars into the JS
+# bundle at eval time. If a Metro is already running from an earlier session
+# (e.g. a previous full-variant build), `expo run:ios` reuses it instead of
+# spawning a fresh one — and the running app picks up a bundle built with
+# the old env. Symptoms: Golf Sparks variant shows all sparks and doesn't
+# seed My Sparks. Fix: start from a clean Metro every time.
+
+if lsof -ti:8081 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "==> Killing Metro on :8081 (pid $(lsof -ti:8081 -sTCP:LISTEN | tr '\n' ' '))..."
+  lsof -ti:8081 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
+  # give the port a moment to free
+  sleep 1
+fi
+
 # --- Boot a simulator if nothing is booted ----------------------------------
 
 if ! xcrun simctl list devices booted 2>/dev/null | grep -qE "iPhone|iPad"; then
@@ -75,6 +91,11 @@ run_build() {
 
   echo "==> Installing CocoaPods..."
   ( cd ios && pod install )
+
+  # Metro transform cache can retain stale EXPO_PUBLIC_* inlining across
+  # variant switches. Start with a fresh cache on every run; Metro caches
+  # the source transforms anyway so the real cost is ~1-2 seconds.
+  export EXPO_NO_CACHE=1
 
   echo "==> Building and launching Golf Sparks on simulator..."
   npx expo run:ios
