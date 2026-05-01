@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, TextInput, Alert, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, TextInput, Alert, Animated, Switch } from 'react-native';
 import * as Speech from 'expo-speech';
 import { setAudioModeAsync } from 'expo-audio';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -120,8 +120,17 @@ const FlashcardSettings: React.FC<{
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editingCard, setEditingCard] = useState<TranslationCard | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Group archive cascades to its cards: a card is "effectively archived" if
+  // either it has card.archived=true OR its group has group.archived=true.
+  const archivedGroupIds = new Set(
+    customGroups.filter((g) => g.archived).map((g) => g.id)
+  );
+  const isEffectivelyArchived = (card: TranslationCard): boolean =>
+    !!card.archived || !!(card.groupId && archivedGroupIds.has(card.groupId));
 
   // Synchronize local cards/groups with global state when it changes externally
   // (hydration updates while the settings modal is already open).
@@ -233,6 +242,54 @@ const FlashcardSettings: React.FC<{
     deleteCard(id);
   };
 
+  // -- Archive helpers (feature 3) ----------------------------------------
+
+  const setCardArchived = (id: number, archived: boolean) => {
+    setCustomCards((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, archived } : c))
+    );
+    setHasChanges(true);
+    HapticFeedback.light();
+  };
+
+  const setGroupArchived = (groupId: string, archived: boolean) => {
+    setCustomGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, archived } : g))
+    );
+    if (archived) {
+      // Per spec: archiving the group clears each member card's individual
+      // archived flag, so when the group is restored every card comes back.
+      setCustomCards((prev) =>
+        prev.map((c) => (c.groupId === groupId ? { ...c, archived: false } : c))
+      );
+    }
+    setHasChanges(true);
+    HapticFeedback.light();
+  };
+
+  const deleteGroup = (groupId: string) => {
+    const group = customGroups.find((g) => g.id === groupId);
+    const memberCount = customCards.filter((c) => c.groupId === groupId).length;
+    if (!group) return;
+    Alert.alert(
+      'Delete Group?',
+      `"${group.name}" and its ${memberCount} card${memberCount === 1 ? '' : 's'} will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setCustomGroups((prev) => prev.filter((g) => g.id !== groupId));
+            setCustomCards((prev) => prev.filter((c) => c.groupId !== groupId));
+            setHasChanges(true);
+            HapticFeedback.medium();
+          },
+        },
+      ]
+    );
+  };
+
   const saveSettings = () => {
     onSave(customCards, customGroups);
     onClose();
@@ -266,6 +323,59 @@ const FlashcardSettings: React.FC<{
           )}
         </SettingsSection>
 
+        <SettingsSection title="Show Archived">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SettingsText variant="caption">
+              Reveal archived phrases and groups so you can restore or delete them.
+            </SettingsText>
+            <Switch
+              value={showArchived}
+              onValueChange={setShowArchived}
+              trackColor={{ false: '#767577', true: colors.primary }}
+            />
+          </View>
+        </SettingsSection>
+
+        {customGroups.length > 0 && (
+          <SettingsSection title={`Phrase Groups (${customGroups.filter(g => showArchived || !g.archived).length})`}>
+            {customGroups
+              .filter((g) => showArchived || !g.archived)
+              .map((group) => {
+                const memberCount = customCards.filter((c) => c.groupId === group.id).length;
+                return (
+                  <SettingsItem key={group.id}>
+                    <View style={{ flex: 1 }}>
+                      <SettingsText>
+                        {group.name} {group.archived ? '🗃️' : ''}
+                      </SettingsText>
+                      <SettingsText variant="caption">
+                        {memberCount} phrase{memberCount === 1 ? '' : 's'}
+                        {group.archived ? ' • archived' : ''}
+                      </SettingsText>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setGroupArchived(group.id, !group.archived)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: colors.surface,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        marginRight: 6,
+                      }}
+                    >
+                      <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>
+                        {group.archived ? 'Restore' : 'Archive'}
+                      </Text>
+                    </TouchableOpacity>
+                    <SettingsRemoveButton onPress={() => deleteGroup(group.id)} />
+                  </SettingsItem>
+                );
+              })}
+          </SettingsSection>
+        )}
+
         <SettingsSection title="Search Phrases">
           <SettingsInput
             placeholder="Search in English or Spanish..."
@@ -274,27 +384,80 @@ const FlashcardSettings: React.FC<{
           />
         </SettingsSection>
 
-        <SettingsSection title={`Your Phrases (${customCards.length})`}>
-          {customCards
-            .filter(card =>
-              card.english.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              card.spanish.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-            .map((card) => (
-              <SettingsItem key={card.id}>
-                <TouchableOpacity
-                  onPress={() => editCard(card)}
-                  style={{ flex: 1 }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <SettingsText>{card.english} → {card.spanish}</SettingsText>
-                    <Text style={{ fontSize: 16 }}>✎</Text>
-                  </View>
-                </TouchableOpacity>
-                <SettingsRemoveButton onPress={() => removeCard(card.id)} />
-              </SettingsItem>
-            ))}
-        </SettingsSection>
+        {(() => {
+          const visibleCards = customCards
+            .filter((card) => {
+              const archived = isEffectivelyArchived(card);
+              return showArchived ? archived || true : !archived;
+            })
+            .filter(
+              (card) =>
+                card.english.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                card.spanish.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+          return (
+            <SettingsSection
+              title={
+                showArchived
+                  ? `Your Phrases (${visibleCards.length} · all)`
+                  : `Your Phrases (${visibleCards.length} active)`
+              }
+            >
+              {visibleCards.map((card) => {
+                const groupName = card.groupId
+                  ? customGroups.find((g) => g.id === card.groupId)?.name
+                  : null;
+                const archived = isEffectivelyArchived(card);
+                const archivedByGroup = !card.archived && archived; // can't toggle from card row
+                return (
+                  <SettingsItem key={card.id}>
+                    <TouchableOpacity
+                      onPress={() => editCard(card)}
+                      style={{ flex: 1 }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <SettingsText>
+                          {card.english} → {card.spanish} {archived ? '🗃️' : ''}
+                        </SettingsText>
+                        <Text style={{ fontSize: 16 }}>✎</Text>
+                      </View>
+                      {(groupName || archived) && (
+                        <SettingsText variant="caption">
+                          {groupName ? `Group: ${groupName}` : ''}
+                          {groupName && archived ? ' • ' : ''}
+                          {archivedByGroup
+                            ? 'archived (group)'
+                            : card.archived
+                            ? 'archived'
+                            : ''}
+                        </SettingsText>
+                      )}
+                    </TouchableOpacity>
+                    {!archivedByGroup && (
+                      <TouchableOpacity
+                        onPress={() => setCardArchived(card.id, !card.archived)}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          backgroundColor: colors.surface,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          marginRight: 6,
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>
+                          {card.archived ? 'Restore' : 'Archive'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <SettingsRemoveButton onPress={() => removeCard(card.id)} />
+                  </SettingsItem>
+                );
+              })}
+            </SettingsSection>
+          );
+        })()}
 
         <SaveCancelButtons onSave={saveSettings} onCancel={onClose} />
       </SettingsScrollView>
@@ -639,11 +802,20 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
   // Start a new session - initialize the queue with shuffled cards
   const startNewSession = () => {
-    if (cards.length === 0) {
+    // Exclude archived cards (and cards whose group is archived) from the deck.
+    const archivedGroupIds = new Set(
+      groups.filter((g) => g.archived).map((g) => g.id)
+    );
+    const activeCards = cards.filter((c) => {
+      if (c.archived) return false;
+      if (c.groupId && archivedGroupIds.has(c.groupId)) return false;
+      return true;
+    });
+    if (activeCards.length === 0) {
       return;
     }
 
-    const shuffledCards = shuffleArray(cards);
+    const shuffledCards = shuffleArray(activeCards);
 
     // Clear any existing countdown first
     if (countdownRef.current) {
