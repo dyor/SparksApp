@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
@@ -77,6 +79,7 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
   };
 
   const handleGenerate = async () => {
+    Keyboard.dismiss();
     const trimmedName = name.trim();
     const trimmedPrompt = prompt.trim();
     if (!trimmedName || !trimmedPrompt) {
@@ -126,6 +129,7 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
   };
 
   const handleSave = () => {
+    Keyboard.dismiss();
     const cleaned = draftCards
       .map((c) => ({ english: c.english.trim(), spanish: c.spanish.trim() }))
       .filter((c) => c.english && c.spanish);
@@ -239,6 +243,17 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
       marginTop: 12,
     },
     flex: { flex: 1 },
+    dismissKeyboardLink: {
+      alignItems: 'center',
+      paddingVertical: 8,
+      marginTop: -6,
+      marginBottom: 4,
+    },
+    dismissKeyboardText: {
+      fontSize: 12,
+      color: colors.primary,
+      textDecorationLine: 'underline',
+    },
   });
 
   const modalTitle = stage === 'input' ? 'Add Phrase Group' : 'Review Phrases';
@@ -246,53 +261,66 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
   return (
     <CommonModal visible={visible} onClose={handleClose} title={modalTitle}>
       {stage === 'input' && (
-        <View>
-          <Text style={styles.subtitle}>
-            AI will generate 10–15 English/Spanish phrase pairs from your prompt.
-          </Text>
+        // Tapping empty space dismisses the keyboard so the Generate / Cancel
+        // buttons are reachable on iOS when the multiline prompt is focused.
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View>
+            <Text style={styles.subtitle}>
+              AI will generate 10–15 English/Spanish phrase pairs from your prompt.
+            </Text>
 
-          <Text style={styles.label}>Group name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Cooking Expressions"
-            placeholderTextColor={colors.textSecondary}
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
+            <Text style={styles.label}>Group name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Cooking Expressions"
+              placeholderTextColor={colors.textSecondary}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => Keyboard.dismiss()}
+            />
 
-          <Text style={styles.label}>Prompt</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={
-              'Describe the topic, or paste lyrics, dialogue, etc.\n\nExamples:\n• Phrases for ordering at a Mexican restaurant\n• [paste song lyrics]\n• Travel small talk for a bus ride'
-            }
-            placeholderTextColor={colors.textSecondary}
-            value={prompt}
-            onChangeText={setPrompt}
-            multiline
-          />
+            <Text style={styles.label}>Prompt</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder={
+                'Describe the topic, or paste lyrics, dialogue, etc.\n\nExamples:\n• Phrases for ordering at a Mexican restaurant\n• [paste song lyrics]\n• Travel small talk for a bus ride'
+              }
+              placeholderTextColor={colors.textSecondary}
+              value={prompt}
+              onChangeText={setPrompt}
+              multiline
+            />
 
-          <TouchableOpacity
-            style={[styles.primaryButton, generating && { opacity: 0.6 }]}
-            onPress={handleGenerate}
-            disabled={generating}
-          >
-            {generating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Generate Phrases</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dismissKeyboardLink}
+              onPress={Keyboard.dismiss}
+            >
+              <Text style={styles.dismissKeyboardText}>Tap here to close keyboard</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleClose}
-            disabled={generating}
-          >
-            <Text style={styles.secondaryButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.primaryButton, generating && { opacity: 0.6 }]}
+              onPress={handleGenerate}
+              disabled={generating}
+            >
+              {generating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Generate Phrases</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleClose}
+              disabled={generating}
+            >
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableWithoutFeedback>
       )}
 
       {stage === 'preview' && (
@@ -307,6 +335,8 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
+            returnKeyType="done"
+            onSubmitEditing={() => Keyboard.dismiss()}
           />
 
           <Text style={styles.countLabel}>{draftCards.length} phrase pair{draftCards.length === 1 ? '' : 's'}</Text>
@@ -340,6 +370,13 @@ export const AddPhraseGroupModal: React.FC<Props> = ({ visible, onClose, onSave 
               </View>
             ))}
           </ScrollView>
+
+          <TouchableOpacity
+            style={styles.dismissKeyboardLink}
+            onPress={Keyboard.dismiss}
+          >
+            <Text style={styles.dismissKeyboardText}>Tap here to close keyboard</Text>
+          </TouchableOpacity>
 
           <View style={styles.actionsRow}>
             <TouchableOpacity
