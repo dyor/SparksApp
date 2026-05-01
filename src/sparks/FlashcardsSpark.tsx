@@ -20,6 +20,7 @@ import {
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
 import AddPhraseModal, { Phrase } from '../components/AddPhraseModal';
+import { AddPhraseGroupModal, AddedPhraseGroup } from '../components/AddPhraseGroupModal';
 import { CommonModal } from '../components/CommonModal';
 import { EditFlashcardModal, TranslationCard as TranslationCardType } from '../components/EditFlashcardModal';
 import { createCommonStyles } from '../styles/CommonStyles';
@@ -36,6 +37,16 @@ interface TranslationCard {
   lastAsked: Date | null;
   needsReview: boolean;
   addedAt?: string; // ISO date string
+  groupId?: string | null;       // null/undefined = ungrouped legacy card
+  archived?: boolean;            // wired in feature 3 (archive UI)
+}
+
+interface PhraseGroup {
+  id: string;
+  name: string;
+  prompt: string;
+  createdAt: string;             // ISO date string
+  archived?: boolean;            // wired in feature 3
 }
 
 const defaultTranslations: TranslationCard[] = [
@@ -93,27 +104,33 @@ const defaultTranslations: TranslationCard[] = [
 
 const FlashcardSettings: React.FC<{
   cards: TranslationCard[];
-  onSave: (cards: TranslationCard[]) => void;
+  groups: PhraseGroup[];
+  onSave: (cards: TranslationCard[], groups: PhraseGroup[]) => void;
   onClose: () => void;
   sparkId?: string;
-}> = ({ cards, onSave, onClose, sparkId = 'flashcards' }) => {
+}> = ({ cards, groups, onSave, onClose, sparkId = 'flashcards' }) => {
   const { colors } = useTheme();
   const [customCards, setCustomCards] = useState<TranslationCard[]>(
     JSON.parse(JSON.stringify(cards))
   );
+  const [customGroups, setCustomGroups] = useState<PhraseGroup[]>(
+    JSON.parse(JSON.stringify(groups || []))
+  );
   const [hasChanges, setHasChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
   const [editingCard, setEditingCard] = useState<TranslationCard | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Synchronize local cards with global cards when global cards change
-  // This ensures hydration updates are captured if the settings modal is already open
+  // Synchronize local cards/groups with global state when it changes externally
+  // (hydration updates while the settings modal is already open).
   useEffect(() => {
     if (!hasChanges) {
       setCustomCards(JSON.parse(JSON.stringify(cards)));
+      setCustomGroups(JSON.parse(JSON.stringify(groups || [])));
     }
-  }, [cards, hasChanges]);
+  }, [cards, groups, hasChanges]);
 
   const addCustomCard = (newPhrase: Omit<Phrase, 'id'>) => {
     const newTranslationCard: TranslationCard = {
@@ -128,6 +145,38 @@ const FlashcardSettings: React.FC<{
     };
 
     setCustomCards([newTranslationCard, ...customCards]);
+    setHasChanges(true);
+    HapticFeedback.success();
+  };
+
+  const addPhraseGroup = (group: AddedPhraseGroup) => {
+    const groupId = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const newGroup: PhraseGroup = {
+      id: groupId,
+      name: group.name,
+      prompt: group.prompt,
+      createdAt: new Date().toISOString(),
+    };
+
+    let nextId = Math.max(...customCards.map((c) => c.id), 0);
+    const now = new Date().toISOString();
+    const newCards: TranslationCard[] = group.cards.map((c) => {
+      nextId += 1;
+      return {
+        id: nextId,
+        english: c.english,
+        spanish: c.spanish,
+        correctCount: 0,
+        incorrectCount: 0,
+        lastAsked: null,
+        needsReview: false,
+        addedAt: now,
+        groupId,
+      };
+    });
+
+    setCustomGroups([newGroup, ...customGroups]);
+    setCustomCards([...newCards, ...customCards]);
     setHasChanges(true);
     HapticFeedback.success();
   };
@@ -185,7 +234,7 @@ const FlashcardSettings: React.FC<{
   };
 
   const saveSettings = () => {
-    onSave(customCards);
+    onSave(customCards, customGroups);
     onClose();
   };
 
@@ -203,6 +252,18 @@ const FlashcardSettings: React.FC<{
 
         <SettingsSection title="Add New Phrase">
           <SettingsButton title="+ Add New Phrase" onPress={() => setShowAddModal(true)} />
+        </SettingsSection>
+
+        <SettingsSection title="Add Phrase Group">
+          <SettingsButton
+            title="+ Add Group from AI"
+            onPress={() => setShowAddGroupModal(true)}
+          />
+          {customGroups.length > 0 && (
+            <SettingsText variant="caption">
+              {customGroups.length} group{customGroups.length === 1 ? '' : 's'} saved
+            </SettingsText>
+          )}
         </SettingsSection>
 
         <SettingsSection title="Search Phrases">
@@ -261,6 +322,11 @@ const FlashcardSettings: React.FC<{
           card={editingCard}
         />
       )}
+      <AddPhraseGroupModal
+        visible={showAddGroupModal}
+        onClose={() => setShowAddGroupModal(false)}
+        onSave={addPhraseGroup}
+      />
     </SettingsContainer>
   );
 };
@@ -283,6 +349,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const commonStyles = createCommonStyles(colors);
 
   const [cards, setCards] = useState<TranslationCard[]>(defaultTranslations);
+  const [groups, setGroups] = useState<PhraseGroup[]>([]);
   const [currentCard, setCurrentCard] = useState<TranslationCard | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -299,6 +366,8 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [audioSessionSet, setAudioSessionSet] = useState(false);
   const [showAddPhraseModal, setShowAddPhraseModal] = useState(false);
   const [autoPlayActive, setAutoPlayActive] = useState(false);
+  /** True when autoplay session is "on" but not advancing (user paused, or returned after leaving the spark mid-autoplay). */
+  const [autoPlayPaused, setAutoPlayPaused] = useState(false);
   const [autoPlayPhase, setAutoPlayPhase] = useState<'english' | 'spanish1' | 'spanish2' | null>(null);
   const [autoPlayProgress, setAutoPlayProgress] = useState(0); // 0-1 for current phase progress
   const [showEditModal, setShowEditModal] = useState(false);
@@ -337,6 +406,12 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
     setCards(migratedCards);
 
+    // Load saved groups (feature 1: AI-generated phrase groups). Empty array
+    // for users who haven't created any groups yet.
+    if (Array.isArray(savedData.groups)) {
+      setGroups(savedData.groups as PhraseGroup[]);
+    }
+
     // Restore session if it exists
     if (savedData.session) {
       const session = savedData.session;
@@ -350,6 +425,10 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         setAutoPlayActive(session.autoPlayActive || false);
         setAutoPlayPhase(session.autoPlayPhase || null);
         setAutoPlayProgress(session.autoPlayProgress || 0);
+        // Timers do not survive leaving the spark; require explicit Play to resume autoplay.
+        if (session.autoPlayActive) {
+          setAutoPlayPaused(true);
+        }
 
         // Restore current card if exists
         if (session.currentCard) {
@@ -376,6 +455,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       });
     }
   }, [cards, dataLoaded, setSparkData, getSparkData]);
+
+  // Save groups separately so we don't have to thread groups through every
+  // existing setSparkData call site.
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const savedData = getSparkData('flashcards') || {};
+    setSparkData('flashcards', { ...savedData, groups });
+  }, [groups, dataLoaded, setSparkData, getSparkData]);
 
   // Save session state whenever it changes
   useEffect(() => {
@@ -436,22 +523,20 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setupAudioSession();
   }, []);
 
-  // Sync ref with autoPlayActive state and manage keep-awake
+  // Sync ref: autoplay only advances when active and not paused; keep screen awake while running
   useEffect(() => {
-    autoPlayActiveRef.current = autoPlayActive;
+    autoPlayActiveRef.current = autoPlayActive && !autoPlayPaused;
 
-    // Keep screen awake during auto-play mode
-    if (autoPlayActive) {
+    if (autoPlayActive && !autoPlayPaused) {
       activateKeepAwakeAsync();
     } else {
       deactivateKeepAwake();
     }
 
-    // Cleanup on unmount
     return () => {
       deactivateKeepAwake();
     };
-  }, [autoPlayActive]);
+  }, [autoPlayActive, autoPlayPaused]);
 
   // Cleanup timers on unmount or when autoplay stops
   useEffect(() => {
@@ -575,6 +660,17 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setCurrentCard(null);
     setShowAnswer(false);
     setIsCountingDown(false);
+    setAutoPlayActive(false);
+    setAutoPlayPaused(false);
+    autoPlayActiveRef.current = false;
+    setAutoPlayPhase(null);
+    setAutoPlayProgress(0);
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
 
     // Set session active LAST to ensure all other state is ready
     setSessionActive(true);
@@ -913,6 +1009,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setTotalAsked(0);
     setSessionActive(false);
     setAutoPlayActive(false);
+    setAutoPlayPaused(false);
     autoPlayActiveRef.current = false;
     setAutoPlayPhase(null);
     setAutoPlayProgress(0);
@@ -938,7 +1035,9 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   };
 
   const stopAutoPlay = () => {
+    Speech.stop();
     setAutoPlayActive(false);
+    setAutoPlayPaused(false);
     autoPlayActiveRef.current = false;
     setAutoPlayPhase(null);
     setAutoPlayProgress(0);
@@ -964,6 +1063,35 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setIsCountingDown(false);
   };
 
+  const pauseAutoPlay = () => {
+    setAutoPlayPaused(true);
+    autoPlayActiveRef.current = false;
+    Speech.stop();
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
+  };
+
+  const resumeAutoPlay = () => {
+    if (!currentCard || !sessionActive) return;
+    Speech.stop();
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
+    setAutoPlayPaused(false);
+    setAutoPlayActive(true);
+    autoPlayActiveRef.current = true;
+    setTimeout(() => {
+      processAutoPlayCard(currentCard, sessionQueue);
+    }, 100);
+  };
+
   const startAutoPlay = () => {
     // Initialize session same as regular mode
     if (cards.length === 0) {
@@ -982,6 +1110,8 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     // Clear all progress intervals
     progressIntervalsRef.current.forEach(interval => clearInterval(interval));
     progressIntervalsRef.current = [];
+
+    setAutoPlayPaused(false);
 
     // Reset all session state
     setSessionQueue(shuffledCards);
@@ -1147,6 +1277,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
           setShowCelebration(true);
           setSessionActive(false);
           setAutoPlayActive(false);
+          setAutoPlayPaused(false);
           autoPlayActiveRef.current = false;
           setAutoPlayPhase(null);
           triggerCelebration();
@@ -1201,7 +1332,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     }
   };
 
-  const saveCustomCards = (newCards: TranslationCard[]) => {
+  const saveCustomCards = (newCards: TranslationCard[], newGroups: PhraseGroup[]) => {
     // Ensure all cards have addedAt
     const updated = newCards.map(card => ({
       ...card,
@@ -1209,12 +1340,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     }));
 
     setCards(updated);
+    setGroups(newGroups);
 
     // CRITICAL: Merge with existing data to prevent partial saves from overwriting state
     const savedData = getSparkData('flashcards') || {};
     setSparkData('flashcards', {
       ...savedData,
       cards: updated,
+      groups: newGroups,
       lastPlayed: new Date().toISOString(),
     });
     HapticFeedback.success();
@@ -1446,6 +1579,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       fontSize: 16,
       fontWeight: '600',
     },
+    pausePlayButton: {
+      backgroundColor: colors.primary,
+    },
+    pausePlayButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
     celebrationContainer: {
       position: 'absolute',
       top: 0,
@@ -1560,6 +1701,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     return (
       <FlashcardSettings
         cards={cards}
+        groups={groups}
         onSave={saveCustomCards}
         onClose={onCloseSettings || (() => { })}
       />
@@ -1745,6 +1887,16 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
       {sessionActive && (
         <View style={styles.bottomButtons}>
+          {autoPlayActive && currentCard && (
+            <TouchableOpacity
+              style={[styles.bottomButton, styles.pausePlayButton]}
+              onPress={autoPlayPaused ? resumeAutoPlay : pauseAutoPlay}
+            >
+              <Text style={styles.pausePlayButtonText} numberOfLines={1}>
+                {autoPlayPaused ? '▶ Play' : '⏸ Pause'}
+              </Text>
+            </TouchableOpacity>
+          )}
           {autoPlayActive && (
             <TouchableOpacity
               style={[styles.bottomButton, styles.stopAutoPlayButton]}
