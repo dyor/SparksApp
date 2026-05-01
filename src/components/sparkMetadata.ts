@@ -18,6 +18,7 @@ export const sparkMetadata: Record<string, SparkMetadata> = {
         category: "spanish",
         createdAt: "2024-01-02T00:00:00.000Z",
         rating: 4.6,
+        properties: ["AI"],
     },
     "packing-list": {
         id: "packing-list",
