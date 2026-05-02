@@ -49,6 +49,11 @@ interface PhraseGroup {
   archived?: boolean;            // wired in feature 3
 }
 
+// "Default Expressions" group — a built-in catch-all for the seed phrases
+// (and any other ungrouped cards). Created during hydration if absent.
+const DEFAULT_GROUP_ID = 'default-expressions';
+const DEFAULT_GROUP_NAME = 'Default Expressions';
+
 const defaultTranslations: TranslationCard[] = [
   // { id: 1, english: "Hello", spanish: "Hola", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
   // { id: 2, english: "Thank you", spanish: "Gracias", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
@@ -556,10 +561,15 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       loadedCards = savedData.cards;
     }
 
-    // Migration: ensure addedAt exists and sort by it
+    // Migration: ensure addedAt exists, every card has a groupId, and the
+    // Default Expressions group exists. Idempotent — safe to re-run on every
+    // hydration. Pre-feature-1 installs will pick up the default group on
+    // first load and migrate all ungrouped cards (defaults + manual adds)
+    // into it. Feature 1 cards already have groupId set and pass through.
     const migratedCards = loadedCards.map((card: any) => ({
       ...card,
-      addedAt: card.addedAt || new Date(0).toISOString(), // Use epoch for old cards
+      addedAt: card.addedAt || new Date(0).toISOString(),
+      groupId: card.groupId || DEFAULT_GROUP_ID,
     }));
 
     // Sort by addedAt descending (newest first)
@@ -569,11 +579,23 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
     setCards(migratedCards);
 
-    // Load saved groups (feature 1: AI-generated phrase groups). Empty array
-    // for users who haven't created any groups yet.
-    if (Array.isArray(savedData.groups)) {
-      setGroups(savedData.groups as PhraseGroup[]);
-    }
+    // Load saved groups + ensure Default Expressions exists
+    const savedGroups: PhraseGroup[] = Array.isArray(savedData.groups)
+      ? (savedData.groups as PhraseGroup[])
+      : [];
+    const hasDefault = savedGroups.some((g) => g.id === DEFAULT_GROUP_ID);
+    const finalGroups: PhraseGroup[] = hasDefault
+      ? savedGroups
+      : [
+          {
+            id: DEFAULT_GROUP_ID,
+            name: DEFAULT_GROUP_NAME,
+            prompt: '',
+            createdAt: new Date(0).toISOString(),
+          },
+          ...savedGroups,
+        ];
+    setGroups(finalGroups);
 
     // Restore session if it exists
     if (savedData.session) {
@@ -1505,14 +1527,50 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   };
 
   const saveCustomCards = (newCards: TranslationCard[], newGroups: PhraseGroup[]) => {
-    // Ensure all cards have addedAt
+    // Ensure all cards have addedAt + a groupId (default group as fallback)
     const updated = newCards.map(card => ({
       ...card,
       addedAt: card.addedAt || new Date().toISOString(),
+      groupId: card.groupId || DEFAULT_GROUP_ID,
     }));
 
     setCards(updated);
     setGroups(newGroups);
+
+    // Mid-session: mix any newly-added active cards into the live queue and
+    // drop any cards that just became archived. Without this, cards added
+    // during an active study session would never be dealt — the queue is
+    // captured at startNewSession time.
+    if (sessionActive && !isCompleted) {
+      const archivedGroupIds = new Set(
+        newGroups.filter((g) => g.archived).map((g) => g.id)
+      );
+      const isActive = (c: TranslationCard) =>
+        !c.archived && !(c.groupId && archivedGroupIds.has(c.groupId));
+
+      setSessionQueue((prevQueue) => {
+        // Keep only currently-active cards from the existing queue.
+        const filtered = prevQueue.filter((c) => {
+          const fresh = updated.find((u) => u.id === c.id);
+          return fresh ? isActive(fresh) : false;
+        });
+        // Find genuinely new cards: not in the queue, not already seen, not the
+        // current card on screen.
+        const knownIds = new Set<number>([
+          ...filtered.map((c) => c.id),
+          ...Array.from(seenCards),
+          ...(currentCard ? [currentCard.id] : []),
+        ]);
+        const additions = updated.filter(
+          (c) => !knownIds.has(c.id) && isActive(c)
+        );
+        if (additions.length === 0 && filtered.length === prevQueue.length) {
+          return prevQueue;
+        }
+        // Re-shuffle so additions are interleaved with existing queue.
+        return shuffleArray([...filtered, ...additions]);
+      });
+    }
 
     // CRITICAL: Merge with existing data to prevent partial saves from overwriting state
     const savedData = getSparkData('flashcards') || {};
