@@ -1,27 +1,26 @@
 #!/bin/bash
 #
-# Build + launch the Golf Sparks variant on the iOS simulator.
-# V1 development path — no Apple Developer Console setup required.
+# Build + launch the full Sparks variant on the iOS simulator.
 #
-# Fire-and-forget: the script tries the fast incremental path first, and if
-# that fails (stale pbxproj, missing RN codegen headers, pod install drift,
-# etc.) automatically falls back to a full `expo prebuild --clean` + pod
-# install + build.
+# Fire-and-forget: tries the fast incremental path first, and if it fails
+# (stale pbxproj from a previous golf-variant prebuild, missing RN codegen
+# headers, pod install drift, etc.) automatically falls back to a full
+# `expo prebuild --clean` + pod install + build.
 #
-# Manual --clean: pass --clean as the first arg to skip the fast path and go
-# straight to the full reset (useful when you already know things are hosed).
+# Manual --clean: pass --clean as the first arg to skip the fast path and
+# go straight to the full reset.
 #
 # Sister scripts:
-#   - deploy-ios-simulator.sh          (Debug simulator, full Sparks)
-#   - deploy-ios-device.sh             (Release device,  full Sparks)
-#   - deploy-golf-ios-device.sh        (Release device,  Golf Sparks)
+#   - deploy-ios-device.sh             (Release device build, full Sparks)
+#   - deploy-golf-ios-simulator.sh     (Debug simulator,  Golf Sparks)
+#   - deploy-golf-ios-device.sh        (Release device build, Golf Sparks)
 #
 set -e
 
 PROJECT_DIR="/Users/mattdyor/SparksApp"
 cd "$PROJECT_DIR" || { echo "Directory not found: $PROJECT_DIR"; exit 1; }
 
-export EXPO_PUBLIC_APP_VARIANT=golf
+export EXPO_PUBLIC_APP_VARIANT=full
 echo "==> EXPO_PUBLIC_APP_VARIANT=$EXPO_PUBLIC_APP_VARIANT"
 
 FORCE_CLEAN=0
@@ -33,15 +32,14 @@ fi
 #
 # Critical for variants: Metro bundles EXPO_PUBLIC_* env vars into the JS
 # bundle at eval time. If a Metro is already running from an earlier session
-# (e.g. a previous full-variant build), `expo run:ios` reuses it instead of
+# (e.g. a previous golf-variant build), `expo run:ios` reuses it instead of
 # spawning a fresh one — and the running app picks up a bundle built with
-# the old env. Symptoms: Golf Sparks variant shows all sparks and doesn't
-# seed My Sparks. Fix: start from a clean Metro every time.
+# the old env. Symptoms: Sparks variant only shows the golf subset and seeds
+# the wrong My Sparks defaults. Fix: start from a clean Metro every time.
 
 if lsof -ti:8081 -sTCP:LISTEN >/dev/null 2>&1; then
   echo "==> Killing Metro on :8081 (pid $(lsof -ti:8081 -sTCP:LISTEN | tr '\n' ' '))..."
   lsof -ti:8081 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
-  # give the port a moment to free
   sleep 1
 fi
 
@@ -58,16 +56,10 @@ if ! xcrun simctl list devices booted 2>/dev/null | grep -qE "iPhone|iPad"; then
 fi
 
 # --- Proactive checks for known-bad states ---------------------------------
-#
-# These are state conditions where we know an incremental build is doomed;
-# promote to --clean upfront to save the wasted first attempt.
-#
+
 needs_clean() {
-  # ios/ doesn't exist yet
   [[ ! -d "$PROJECT_DIR/ios" ]] && { echo "   • ios/ missing"; return 0; }
-  # Podfile.lock missing → pods never installed
   [[ ! -f "$PROJECT_DIR/ios/Podfile.lock" ]] && { echo "   • ios/Podfile.lock missing"; return 0; }
-  # Pods/ never materialized
   [[ ! -d "$PROJECT_DIR/ios/Pods" ]] && { echo "   • ios/Pods missing"; return 0; }
   return 1
 }
@@ -96,11 +88,10 @@ run_build() {
   ( cd ios && pod install )
 
   # Metro transform cache can retain stale EXPO_PUBLIC_* inlining across
-  # variant switches. Start with a fresh cache on every run; Metro caches
-  # the source transforms anyway so the real cost is ~1-2 seconds.
+  # variant switches. Start with a fresh cache on every run.
   export EXPO_NO_CACHE=1
 
-  echo "==> Building and launching Golf Sparks on simulator..."
+  echo "==> Building and launching Sparks on simulator..."
   npx expo run:ios
 }
 
@@ -111,8 +102,6 @@ if [[ $FORCE_CLEAN -eq 1 ]]; then
   exit 0
 fi
 
-# run_build called inside an `if` guard → `set -e` does not propagate its
-# failure, we can inspect and retry.
 if run_build; then
   exit 0
 fi
