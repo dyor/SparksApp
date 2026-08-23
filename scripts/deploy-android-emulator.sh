@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build + launch the full Sparks variant on an Android emulator.
+# Build + launch Sparks on an Android emulator.
 # Debug build, no signing required.
 #
 # Default path runs NO prebuild: android/ is committed and carries hand-edits
@@ -23,12 +23,9 @@
 #   backs the file up and makes you opt in instead.
 #
 # Sister scripts:
-#   - deploy-ios-simulator.sh          (Debug simulator, full Sparks)
-#   - deploy-ios-device.sh             (Release device,  full Sparks)
-#   - deploy-android.sh                (Release device,  full Sparks)
-#   - deploy-golf-ios-simulator.sh     (Debug simulator, Golf Sparks)
-#   - deploy-golf-ios-device.sh        (Release device,  Golf Sparks)
-#   - deploy-golf-android-emulator.sh  (Debug emulator,  Golf Sparks)
+#   - deploy-ios-simulator.sh          (Debug simulator)
+#   - deploy-ios-device.sh             (Release device)
+#   - deploy-android.sh                (Release device)
 #
 set -e
 
@@ -36,12 +33,6 @@ PROJECT_DIR="/Users/mattdyor/SparksApp"
 cd "$PROJECT_DIR" || { echo "Directory not found: $PROJECT_DIR"; exit 1; }
 
 PKG="com.mattdyor.sparks"
-
-# The full variant is the default, but set it explicitly: a stale
-# EXPO_PUBLIC_APP_VARIANT=golf exported in the caller's shell would otherwise
-# bundle Golf Sparks JS into the Sparks app.
-export EXPO_PUBLIC_APP_VARIANT=full
-echo "==> EXPO_PUBLIC_APP_VARIANT=$EXPO_PUBLIC_APP_VARIANT"
 
 MODE="fast"
 case "$1" in
@@ -74,9 +65,8 @@ export ANDROID_SDK_ROOT="$ANDROID_SDK"
 
 # --- Kill any running Metro on 8081 -----------------------------------------
 #
-# Metro inlines EXPO_PUBLIC_* env vars at bundle time, so a stale Metro left
-# over from a golf run will serve a bundle built with the wrong variant and
-# the running app will look like Golf Sparks.
+# Metro inlines EXPO_PUBLIC_* env vars at bundle time, so a stale Metro can
+# serve an outdated JS bundle. Kill it before each deploy.
 
 if lsof -ti:8081 -sTCP:LISTEN >/dev/null 2>&1; then
   echo "==> Killing Metro on :8081 (pid $(lsof -ti:8081 -sTCP:LISTEN | tr '\n' ' '))..."
@@ -187,8 +177,7 @@ case "$MODE" in
     ;;
 esac
 
-# Metro transform cache can retain stale EXPO_PUBLIC_* inlining across
-# variant switches. Start with a fresh cache on every run.
+# Start with a fresh Metro transform cache on every run.
 export EXPO_NO_CACHE=1
 
 echo "==> Building and launching Sparks on emulator..."

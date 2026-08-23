@@ -1,5 +1,4 @@
 import { BaseSpark } from "../types/spark";
-import { isAllowed as isAllowedInVariant } from "../variants/variantConfig";
 
 // Import actual spark components
 import React from "react";
@@ -27,7 +26,6 @@ import { CardScoreSpark } from "../sparks/CardScoreSpark";
 import { GolfWisdomSpark } from "../sparks/GolfWisdomSpark";
 import WeightTrackerSpark from "../sparks/WeightTrackerSpark";
 import ShareSparks from "../sparks/ShareSparks";
-import ShareGolfSparks from "../sparks/ShareGolfSparks";
 import ComingUpSpark from "../sparks/ComingUpSpark";
 import { FinalClockSpark } from "../sparks/FinalClockSpark";
 import TripSurveySpark from "../sparks/TripSurveySpark";
@@ -71,9 +69,7 @@ const PlaceholderSpark: React.FC = () => (
 
 import { sparkMetadata } from "./sparkMetadata";
 
-// Registry of all available sparks (unfiltered).
-// The exported sparkRegistry below filters this by app variant.
-const rawSparkRegistry: Record<string, BaseSpark> = {
+export const sparkRegistry: Record<string, BaseSpark> = {
   spinner: {
     metadata: sparkMetadata.spinner,
     component: SpinnerSpark,
@@ -162,10 +158,6 @@ const rawSparkRegistry: Record<string, BaseSpark> = {
     metadata: sparkMetadata["share-sparks"],
     component: ShareSparks,
   },
-  "share-golf-sparks": {
-    metadata: sparkMetadata["share-golf-sparks"],
-    component: ShareGolfSparks,
-  },
   "coming-up": {
     metadata: sparkMetadata["coming-up"],
     component: ComingUpSpark,
@@ -245,13 +237,6 @@ const rawSparkRegistry: Record<string, BaseSpark> = {
     }
   } : {}),
 };
-
-// Registry filtered by app variant. In the "full" variant this is the full
-// rawSparkRegistry; in "golf" it contains only the golf subset. See
-// src/variants/variantConfig.ts and CONTEXT/GENERAL/GOLFSPARKSPLAN.md.
-export const sparkRegistry: Record<string, BaseSpark> = Object.fromEntries(
-  Object.entries(rawSparkRegistry).filter(([id]) => isAllowedInVariant(id))
-);
 
 // Memoization cache for enhanced spark objects
 const memoizedSparks: Record<string, BaseSpark> = {};

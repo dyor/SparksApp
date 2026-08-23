@@ -1,27 +1,21 @@
 #!/bin/bash
 #
-# Build + launch the full Sparks variant on the iOS simulator.
+# Build + launch Sparks on the iOS simulator.
 #
 # Fire-and-forget: tries the fast incremental path first, and if it fails
-# (stale pbxproj from a previous golf-variant prebuild, missing RN codegen
-# headers, pod install drift, etc.) automatically falls back to a full
-# `expo prebuild --clean` + pod install + build.
+# (stale pbxproj, missing RN codegen headers, pod install drift, etc.)
+# automatically falls back to a full `expo prebuild --clean` + pod install + build.
 #
 # Manual --clean: pass --clean as the first arg to skip the fast path and
 # go straight to the full reset.
 #
 # Sister scripts:
-#   - deploy-ios-device.sh             (Release device build, full Sparks)
-#   - deploy-golf-ios-simulator.sh     (Debug simulator,  Golf Sparks)
-#   - deploy-golf-ios-device.sh        (Release device build, Golf Sparks)
+#   - deploy-ios-device.sh             (Release device build)
 #
 set -e
 
 PROJECT_DIR="/Users/mattdyor/SparksApp"
 cd "$PROJECT_DIR" || { echo "Directory not found: $PROJECT_DIR"; exit 1; }
-
-export EXPO_PUBLIC_APP_VARIANT=full
-echo "==> EXPO_PUBLIC_APP_VARIANT=$EXPO_PUBLIC_APP_VARIANT"
 
 FORCE_CLEAN=0
 if [[ "$1" == "--clean" ]]; then
@@ -30,12 +24,8 @@ fi
 
 # --- Kill any running Metro on 8081 -----------------------------------------
 #
-# Critical for variants: Metro bundles EXPO_PUBLIC_* env vars into the JS
-# bundle at eval time. If a Metro is already running from an earlier session
-# (e.g. a previous golf-variant build), `expo run:ios` reuses it instead of
-# spawning a fresh one — and the running app picks up a bundle built with
-# the old env. Symptoms: Sparks variant only shows the golf subset and seeds
-# the wrong My Sparks defaults. Fix: start from a clean Metro every time.
+# Metro can reuse a stale JS bundle from an earlier session. Start from a
+# clean Metro every time so env/config changes are picked up.
 
 if lsof -ti:8081 -sTCP:LISTEN >/dev/null 2>&1; then
   echo "==> Killing Metro on :8081 (pid $(lsof -ti:8081 -sTCP:LISTEN | tr '\n' ' '))..."
@@ -87,8 +77,7 @@ run_build() {
   echo "==> Installing CocoaPods..."
   ( cd ios && pod install )
 
-  # Metro transform cache can retain stale EXPO_PUBLIC_* inlining across
-  # variant switches. Start with a fresh cache on every run.
+  # Start with a fresh Metro transform cache on every run.
   export EXPO_NO_CACHE=1
 
   echo "==> Building and launching Sparks on simulator..."

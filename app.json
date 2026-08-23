@@ -51,7 +51,6 @@
       "@react-native-community/datetimepicker",
       "./withRemoveForegroundServices",
       "./withRemoveMediaReadPermissions",
-      "./withGolfBroadcastExtensionBundleId",
       "./withFmtConstevalFix"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",

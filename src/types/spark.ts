@@ -5,10 +5,6 @@ export interface SparkMetadata {
   icon: string;
   iconImage?: any; // Image source (require or uri)
   category: 'productivity' | 'travel' | 'food' | 'golf' | 'game' | 'media' | 'utility' | 'community' | 'health' | 'social' | 'spanish';
-  // Optional secondary category. Used by app variants (e.g. Golf Sparks) to
-  // include sparks whose primary category is something else but whose use case
-  // overlaps. See src/variants/variantConfig.ts.
-  secondaryCategory?: 'golf';
   createdAt: string; // ISO date string
   rating: number; // 1-5 stars
   archived?: boolean; // Optional flag for archived sparks

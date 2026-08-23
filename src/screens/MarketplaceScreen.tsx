@@ -6,11 +6,8 @@ import { MarketplaceStackParamList } from '../types/navigation';
 import { getAllSparks } from '../components/SparkRegistry';
 import { useTheme } from '../contexts/ThemeContext';
 import { NotificationBadge } from '../components/NotificationBadge';
-import { variant } from '../variants/variantConfig';
 
-// In single-category builds (golf) the New/Top/Filter chrome and "All Sparks"
-// subheader are meaningless — collapse to header + grid.
-const showDiscoverChrome = variant !== 'golf';
+const showDiscoverChrome = true;
 
 type MarketplaceNavigationProp = StackNavigationProp<MarketplaceStackParamList, 'MarketplaceList'>;
 
