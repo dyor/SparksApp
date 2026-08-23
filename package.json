@@ -1,10 +1,11 @@
 {
   "name": "sparksapp",
-  "version": "1.0.55",
+  "version": "1.0.65",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:emulator": "./scripts/deploy-android-emulator.sh",
     "ios": "expo run:ios",
     "web": "node scripts/start-web.js",
     "build:web": "expo export --platform web && node scripts/fix-web-build.js",
