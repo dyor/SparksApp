@@ -71,17 +71,24 @@ class PermissionService {
 
     /**
      * Media Library Permissions
+     *
+     * Android no longer holds READ_MEDIA_IMAGES/VIDEO/AUDIO — reading is done via
+     * the system photo picker (expo-image-picker), and saving uses write-only
+     * access, which needs no permission at all on Android 13+. So every media
+     * library request on Android is scoped to writeOnly.
      */
+    private static readonly MEDIA_WRITE_ONLY = Platform.OS === 'android';
+
     static async checkMediaLibraryPermission(): Promise<PermissionStatus> {
-        const { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+        const { status, canAskAgain } = await MediaLibrary.getPermissionsAsync(this.MEDIA_WRITE_ONLY);
         return { granted: status === 'granted', canAskAgain, status };
     }
 
     static async requestMediaLibraryPermission(showAlert = true): Promise<boolean> {
-        const current = await MediaLibrary.getPermissionsAsync();
+        const current = await MediaLibrary.getPermissionsAsync(this.MEDIA_WRITE_ONLY);
         if (current.status === 'granted') return true;
 
-        const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync();
+        const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync(this.MEDIA_WRITE_ONLY);
 
         if (status !== 'granted' && !canAskAgain && showAlert) {
             this.showDeniedAlert('Media Library');
@@ -145,12 +152,12 @@ class PermissionService {
                     }
                     break;
                 case 'mediaLibrary':
-                    const currentMedia = await MediaLibrary.getPermissionsAsync();
+                    const currentMedia = await MediaLibrary.getPermissionsAsync(this.MEDIA_WRITE_ONLY);
                     if (currentMedia.status === 'granted') {
                         granted = true;
                         statusStr = 'granted (cached)';
                     } else {
-                        const res = await MediaLibrary.requestPermissionsAsync();
+                        const res = await MediaLibrary.requestPermissionsAsync(this.MEDIA_WRITE_ONLY);
                         granted = res.status === 'granted';
                         statusStr = res.status;
                     }

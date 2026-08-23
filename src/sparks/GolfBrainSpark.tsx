@@ -12,6 +12,7 @@ import {
   Animated,
   Keyboard,
   Image,
+  Platform,
 } from "react-native";
 import { Video, ResizeMode, AVPlaybackStatus, VideoFullscreenUpdate } from "expo-av";
 import * as MediaLibrary from 'expo-media-library';
@@ -1885,7 +1886,11 @@ const HighlightReelModal: React.FC<{
               zIndex: 50
             }}
             onPress={async () => {
-              const { status } = await MediaLibrary.requestPermissionsAsync();
+              // Write-only on Android: saveToLibraryAsync needs no permission
+              // there, and we no longer hold READ_MEDIA_VIDEO.
+              const { status } = await MediaLibrary.requestPermissionsAsync(
+                Platform.OS === 'android'
+              );
               if (status !== 'granted') {
                 Alert.alert('Permission needed', 'Please allow access to your photos.');
                 return;

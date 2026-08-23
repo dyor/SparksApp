@@ -138,8 +138,11 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  // Android holds no READ_MEDIA_* permissions, so ask for write-only access —
+  // that resolves to granted with no prompt on Android 13+. iOS still needs full
+  // access to save into the "Golf Swings" album.
   const [mediaLibraryPermission, requestMediaLibraryPermission] =
-    MediaLibrary.usePermissions();
+    MediaLibrary.usePermissions({ writeOnly: Platform.OS === 'android' });
   const [showCamera, setShowCamera] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [recordedSwing, setRecordedSwing] = useState<RecordedSwing | null>(
@@ -422,12 +425,16 @@ export const RecordSwing: React.FC<RecordSwingProps> = ({
         }
       }
 
-      // Get album or create it
-      const album = await MediaLibrary.getAlbumAsync("Golf Swings");
-      if (album) {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-      } else {
-        await MediaLibrary.createAlbumAsync("Golf Swings", asset, false);
+      // Get album or create it. Album lookup is a *read* operation, which needs
+      // READ_MEDIA_VIDEO on Android — a permission we deliberately do not hold.
+      // Android clips land in the general camera roll instead.
+      if (Platform.OS !== "android") {
+        const album = await MediaLibrary.getAlbumAsync("Golf Swings");
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync("Golf Swings", asset, false);
+        }
       }
 
       // Create RecordedSwing object with metadata

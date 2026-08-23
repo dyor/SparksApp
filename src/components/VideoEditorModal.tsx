@@ -10,6 +10,7 @@ import {
     Alert,
     Linking,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { VideoAI } from '../sparks/VideoSpark';
@@ -120,7 +121,10 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                 await Sharing.shareAsync(video.uri);
             } else {
                 // Fallback to media library
-                const { status: libStatus } = await MediaLibrary.requestPermissionsAsync();
+                // Write-only on Android — we no longer hold READ_MEDIA_VIDEO.
+                const { status: libStatus } = await MediaLibrary.requestPermissionsAsync(
+                    Platform.OS === 'android'
+                );
                 if (libStatus === 'granted') {
                     await MediaLibrary.createAssetAsync(video.uri);
                     Alert.alert('Saved to Gallery', 'The video has been saved to your gallery. You can edit it there using the system tools.');

@@ -30,7 +30,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import PermissionService from '../services/PermissionService';
+import PermissionService, { PermissionType } from '../services/PermissionService';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -477,8 +477,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   // Load trips on mount
   useEffect(() => {
     loadTrips();
-    // Request permissions immediately
-    PermissionService.requestMultiple(['camera', 'mediaLibrary', 'location']).catch(err =>
+    // Request permissions immediately. Android uses the system photo picker, so
+    // it never needs media library read access — asking would prompt for nothing.
+    const upfrontPermissions: PermissionType[] =
+      Platform.OS === 'ios'
+        ? ['camera', 'mediaLibrary', 'location']
+        : ['camera', 'location'];
+    PermissionService.requestMultiple(upfrontPermissions).catch(err =>
       console.warn('Initial TripStory permission request failed:', err)
     );
   }, []);
@@ -683,8 +688,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
     // Only use custom picker for "Add Many" (multiple selection) with date filtering
     // For "Add 1", use regular picker which allows cropping
+    //
+    // Android is excluded: date filtering requires READ_MEDIA_IMAGES, which Play
+    // will not let us keep. Android falls through to the system photo picker
+    // below, which still supports multi-select and needs no permission at all.
+    // Photos are stamped with the button's date either way (see dateToUse below).
     const dateToUse = date || activity?.startDate;
-    if (dateToUse && allowMultiple) {
+    if (Platform.OS === 'ios' && dateToUse && allowMultiple) {
       // Create a unique key for this loading operation
       const loadingKey = dateToUse + (activity?.id || '');
       setLoadingPhotosByDate(loadingKey);

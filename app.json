@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.61",
+    "version": "1.0.65",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "FoodCam accesses your photo library to save and select food photos for your diary.",
+          "photosPermission": false,
           "cameraPermission": "FoodCam uses the camera to take photos of your food for your visual food diary."
         }
       ],
@@ -36,9 +36,9 @@
             "useFrameworks": "static"
           },
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0",
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
             "minSdkVersion": 24,
             "ndkVersion": "27.0.12077973"
           }
@@ -50,7 +50,9 @@
       "expo-apple-authentication",
       "@react-native-community/datetimepicker",
       "./withRemoveForegroundServices",
-      "./withGolfBroadcastExtensionBundleId"
+      "./withRemoveMediaReadPermissions",
+      "./withGolfBroadcastExtensionBundleId",
+      "./withFmtConstevalFix"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -101,11 +103,11 @@
           }
         ]
       },
-      "buildNumber": "1.0.61"
+      "buildNumber": "1.0.65"
     },
     "android": {
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
+      "compileSdkVersion": 36,
+      "targetSdkVersion": 36,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -116,11 +118,6 @@
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.MODIFY_AUDIO_SETTINGS",
@@ -134,11 +131,17 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
         "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.61",
-      "versionCode": 98,
+      "versionName": "1.0.65",
+      "versionCode": 108,
       "package": "com.mattdyor.sparks"
     },
     "extra": {
