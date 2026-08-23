@@ -92,8 +92,8 @@ android {
         applicationId 'com.mattdyor.sparks'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 88
-        versionName "1.0.56"
+        versionCode 108
+        versionName "1.0.65"
     }
     signingConfigs {
         debug {
@@ -177,3 +177,34 @@ dependencies {
 }
 
 apply plugin: 'com.google.gms.google-services'
+/**
+ * [ANTIGRAVITY] Nuclear Manifest Stripper
+ * Runs after manifest merge and strips foreground-service nodes/permissions.
+ * Use Java string regexes (not Groovy /slashy/ strings) — `/g` flags and
+ * patterns containing `/>` break Groovy parsing of this file.
+ */
+afterEvaluate {
+    android.applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            output.processResourcesProvider.get().doFirst {
+                def manifestFiles = fileTree(dir: project.buildDir, include: "**/intermediates/merged_manifests/**/AndroidManifest.xml")
+
+                manifestFiles.each { File manifestFile ->
+                    if (manifestFile.exists()) {
+                        println "[AG] Stripping Foreground Services from final manifest: " + manifestFile.absolutePath
+                        def content = manifestFile.getText('UTF-8')
+
+                        content = content.replaceAll('<service[^>]*?ExpoVideoPlaybackService[^>]*?>[\\s\\S]*?</service>', '')
+                        content = content.replaceAll('<service[^>]*?LocationTaskService[^>]*?>[\\s\\S]*?</service>', '')
+                        content = content.replaceAll('<service[^>]*?ScreenRecordingService[^>]*?>[\\s\\S]*?</service>', '')
+                        content = content.replaceAll('android:foregroundServiceType="[^"]*"', '')
+                        content = content.replaceAll('<uses-permission[^>]+?android:name="android\\.permission\\.FOREGROUND_SERVICE[^"]*"[^>]*?/>', '')
+
+                        manifestFile.write(content, 'UTF-8')
+                        println "[AG] Manifest cleaned successfully."
+                    }
+                }
+            }
+        }
+    }
+}

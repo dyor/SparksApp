@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import { ensurePhotoLibraryAccess } from "../utils/mediaPicker";
 import { useSparkStore } from "../store/sparkStore";
 import { HapticFeedback } from "../utils/haptics";
 import { GeminiService } from "../services/GeminiService";
@@ -646,13 +647,10 @@ const CoursesView: React.FC<CoursesViewProps> = ({
 
   const processImage = async (launcher: any) => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission needed",
-          "Please grant permission to access your photos to scan a scorecard.",
-        );
+      const allowed = await ensurePhotoLibraryAccess(
+        "Please grant permission to access your photos to scan a scorecard.",
+      );
+      if (!allowed) {
         return;
       }
 

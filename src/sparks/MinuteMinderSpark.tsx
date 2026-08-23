@@ -11,6 +11,7 @@ import Svg, { Circle } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { GeminiService } from '../services/GeminiService';
+import { ensurePhotoLibraryAccess } from '../utils/mediaPicker';
 import { Dropdown, DropdownOption } from '../components/shared/Dropdown';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -170,9 +171,10 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Handle Scan Schedule
   const handleScanSchedule = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access your photos to scan a schedule.');
+      const allowed = await ensurePhotoLibraryAccess(
+        'Please grant permission to access your photos to scan a schedule.',
+      );
+      if (!allowed) {
         return;
       }
 

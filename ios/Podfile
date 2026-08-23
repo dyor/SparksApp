@@ -43,6 +43,39 @@ target 'Sparks' do
   )
 
   post_install do |installer|
+    # -------------------------------------------------------------------
+    # fmt + Apple clang 21 (Xcode 26.x) workaround  [FMT_CONSTEVAL_FIX]
+    #
+    # fmt 11.0.2 (vendored by React Native 0.79) turns on `consteval` for
+    # every Apple clang >= 14. Apple clang 21 is stricter about requiring
+    # consteval call sites to themselves be constant expressions, so fmt's
+    # own FMT_STRING(...) uses inside format-inl.h are rejected:
+    #
+    #   call to consteval function 'fmt::basic_format_string<...>'
+    #   is not a constant expression
+    #
+    # Passing -DFMT_USE_CONSTEVAL=0 does not help: base.h unconditionally
+    # redefines the macro. So we patch the compiler-detection line instead,
+    # which is the workaround recommended upstream (fmtlib/fmt#4740).
+    # Re-applied on every `pod install`. Delete this block once React
+    # Native ships fmt >= 11.1.x.
+    # -------------------------------------------------------------------
+    fmt_base_h = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base_h)
+      fmt_src = File.read(fmt_base_h)
+      fmt_needle = '#elif defined(__apple_build_version__) && __apple_build_version__ < 14000029L'
+      if fmt_src.include?(fmt_needle)
+        File.write(
+          fmt_base_h,
+          fmt_src.sub(
+            fmt_needle,
+            '#elif defined(__apple_build_version__)  // consteval is broken in Apple clang < 14 and >= 21 (Xcode 26).'
+          )
+        )
+        Pod::UI.puts '[fmt] FMT_USE_CONSTEVAL disabled for Apple clang (Xcode 26 workaround)'
+      end
+    end
+
     react_native_post_install(
       installer,
       config[:reactNativePath],

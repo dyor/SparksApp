@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import { ensurePhotoLibraryAccess } from '../utils/mediaPicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
@@ -326,9 +327,8 @@ Generate the recipe now:`;
 
     const handleImageSelection = async (recipe: Recipe) => {
         try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission needed', 'Please grant permission to access your photos.');
+            const allowed = await ensurePhotoLibraryAccess();
+            if (!allowed) {
                 return;
             }
 

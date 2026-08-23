@@ -1,7 +1,7 @@
 const { withProjectBuildGradle, withGradleProperties, withAndroidManifest } = require('@expo/config-plugins');
 
 /**
- * Expo Config Plugin to ensure Android 15 (API 35) and 16KB page alignment support.
+ * Expo Config Plugin to ensure Android 16 (API 36) and 16KB page alignment support.
  */
 const withAndroid16KBSupport = (config) => {
     // 1. Update ndkVersion and targetSdkVersion in root build.gradle
@@ -9,11 +9,11 @@ const withAndroid16KBSupport = (config) => {
         if (config.modResults.language === 'groovy') {
             let content = config.modResults.contents;
 
-            // Update targetSdkVersion to 35
+            // Update targetSdkVersion to 36 (Google Play requirement as of Aug 31, 2026)
             // This matches both the versioned and non-versioned formats
             content = content.replace(
-                /targetSdkVersion\s*=\s*(?:Integer\.parseInt\(findProperty\('android\.targetSdkVersion'\)\s*\?:\s*'\d+'\)|34)/g,
-                "targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '35')"
+                /targetSdkVersion\s*=\s*(?:Integer\.parseInt\(findProperty\('android\.targetSdkVersion'\)\s*\?:\s*'\d+'\)|\d+)/g,
+                "targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '36')"
             );
 
             // Update ndkVersion to 27.0.12077973
